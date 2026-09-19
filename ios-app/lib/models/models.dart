@@ -1,3 +1,17 @@
+double safeParseDouble(dynamic val, [double fallback = 0.0]) {
+  if (val == null) return fallback;
+  if (val is num) return val.toDouble();
+  final str = val.toString().replaceAll('%', '').replaceAll('+', '').replaceAll('\$', '').trim();
+  return double.tryParse(str) ?? fallback;
+}
+
+int safeParseInt(dynamic val, [int fallback = 0]) {
+  if (val == null) return fallback;
+  if (val is num) return val.toInt();
+  final str = val.toString().replaceAll(RegExp(r'[^0-9\-]'), '').trim();
+  return int.tryParse(str) ?? fallback;
+}
+
 class Position {
   final String symbol;
   final String side;
@@ -27,14 +41,14 @@ class Position {
     return Position(
       symbol: json['symbol'] ?? 'UNKNOWN',
       side: (json['side'] ?? 'BUY').toString().toUpperCase(),
-      entryPrice: (json['entry_price'] as num?)?.toDouble() ?? 0.0,
-      currentPrice: (json['current_price'] as num?)?.toDouble() ?? (json['entry_price'] as num?)?.toDouble() ?? 0.0,
-      stopLoss: (json['stop_loss'] as num?)?.toDouble() ?? 0.0,
-      takeProfit: (json['take_profit'] as num?)?.toDouble() ?? 0.0,
-      pnlUsdt: (json['pnl_usdt'] as num?)?.toDouble() ?? (json['unrealized_pnl'] as num?)?.toDouble() ?? 0.0,
-      pnlPercent: (json['pnl_percent'] as num?)?.toDouble() ?? 0.0,
-      margin: (json['margin'] as num?)?.toDouble() ?? 0.0,
-      leverage: (json['leverage'] as num?)?.toInt() ?? 5,
+      entryPrice: safeParseDouble(json['entry_price']),
+      currentPrice: safeParseDouble(json['current_price'], safeParseDouble(json['entry_price'])),
+      stopLoss: safeParseDouble(json['stop_loss']),
+      takeProfit: safeParseDouble(json['take_profit']),
+      pnlUsdt: safeParseDouble(json['pnl_usdt'], safeParseDouble(json['unrealized_pnl'])),
+      pnlPercent: safeParseDouble(json['pnl_percent']),
+      margin: safeParseDouble(json['margin']),
+      leverage: safeParseInt(json['leverage'], 5),
     );
   }
 }
@@ -74,17 +88,17 @@ class BotStatus {
     var cb = json['circuit_breaker'] as Map<String, dynamic>? ?? {};
 
     return BotStatus(
-      balance: (json['balance'] as num?)?.toDouble() ?? 1000.0,
-      unrealizedPnl: (json['unrealized_pnl'] as num?)?.toDouble() ?? (json['total_unrealized_pnl'] as num?)?.toDouble() ?? 0.0,
+      balance: safeParseDouble(json['balance'], 1000.0),
+      unrealizedPnl: safeParseDouble(json['unrealized_pnl'], safeParseDouble(json['total_unrealized_pnl'], 0.0)),
       btcRegime: json['btc_regime'] ?? 'BULL',
       btcRegimeReason: json['btc_regime_reason'] ?? 'BTC Trend Shield',
-      fearAndGreedValue: (fng['value'] as num?)?.toInt() ?? 50,
+      fearAndGreedValue: safeParseInt(fng['value'], 50),
       fearAndGreedClass: fng['classification_vi'] ?? fng['value_classification'] ?? 'Trung Lập',
       circuitBreakerTriggered: cb['triggered'] == true,
       isPaused: json['is_paused'] == true,
       tradingMode: json['trading_mode'] ?? 'MARKET_ALL',
       positions: posList,
-      maxPositions: (json['max_concurrent_positions'] as num?)?.toInt() ?? 3,
+      maxPositions: safeParseInt(json['max_concurrent_positions'], 3),
     );
   }
 }
@@ -111,9 +125,9 @@ class RadarPair {
       symbol: json['symbol'] ?? '',
       trend: json['trend'] ?? 'NEUTRAL',
       signal: json['signal'] ?? 'HOLD',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      adx: (json['adx'] as num?)?.toDouble() ?? 25.0,
-      rsi: (json['rsi'] as num?)?.toDouble() ?? 50.0,
+      price: safeParseDouble(json['price']),
+      adx: safeParseDouble(json['adx'], 25.0),
+      rsi: safeParseDouble(json['rsi'], 50.0),
     );
   }
 }
@@ -160,12 +174,12 @@ class ClosedTrade {
       timestamp: json['timestamp'] ?? json['closed_at'] ?? '',
       symbol: json['symbol'] ?? 'UNKNOWN',
       side: (json['side'] ?? 'BUY').toString().toUpperCase(),
-      entryPrice: (json['entry_price'] as num?)?.toDouble() ?? 0.0,
-      exitPrice: (json['exit_price'] as num?)?.toDouble() ?? 0.0,
-      pnlUsdt: (json['pnl_usdt'] as num?)?.toDouble() ?? 0.0,
-      pnlPercent: (json['pnl_percent'] as num?)?.toDouble() ?? 0.0,
+      entryPrice: safeParseDouble(json['entry_price']),
+      exitPrice: safeParseDouble(json['exit_price']),
+      pnlUsdt: safeParseDouble(json['pnl_usdt']),
+      pnlPercent: safeParseDouble(json['pnl_percent']),
       exitReason: json['exit_reason'] ?? json['reason'] ?? 'Đóng vị thế',
-      leverage: (json['leverage'] as num?)?.toInt() ?? 5,
+      leverage: safeParseInt(json['leverage'], 5),
     );
   }
 }
@@ -187,11 +201,11 @@ class HistorySummary {
 
   factory HistorySummary.fromJson(Map<String, dynamic> json) {
     return HistorySummary(
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      wins: (json['wins'] as num?)?.toInt() ?? 0,
-      losses: (json['losses'] as num?)?.toInt() ?? 0,
-      winRate: (json['win_rate'] as num?)?.toDouble() ?? 0.0,
-      netPnl: (json['net_pnl'] as num?)?.toDouble() ?? 0.0,
+      total: safeParseInt(json['total']),
+      wins: safeParseInt(json['wins']),
+      losses: safeParseInt(json['losses']),
+      winRate: safeParseDouble(json['win_rate']),
+      netPnl: safeParseDouble(json['net_pnl']),
     );
   }
 }
@@ -211,4 +225,3 @@ class HistoryData {
     );
   }
 }
-

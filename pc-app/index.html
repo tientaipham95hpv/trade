@@ -85,14 +85,19 @@
     </div>
 
     <!-- CÁC NÚT ĐIỀU KHIỂN NHANH Ở GIỮA -->
-    <div class="flex items-center space-x-2">
-      <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5 text-xs font-mono">
+    <div class="flex items-center space-x-2 font-mono text-xs">
+      <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5">
+        <button id="btnModeBluechip" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">BLUECHIP</button>
+        <button id="btnModeMarket" class="px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition">TOP 80</button>
+      </div>
+      <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5">
         <button id="btnPauseResume" class="px-3 py-1 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 flex items-center space-x-1 hover:bg-yellow-500/20 transition">
           <i class="fa-solid fa-play text-[10px]"></i>
           <span id="pauseResumeText">Đang chạy</span>
         </button>
       </div>
     </div>
+
 
     <!-- CÁC NÚT THAO TÁC BÊN PHẢI -->
     <div class="flex items-center space-x-3">
