@@ -44,15 +44,15 @@ jobs:
           cd ios-app/build/ios/iphoneos
           mkdir -p Payload
           cp -r Runner.app Payload/
-          zip -r -q ../../../BinanceQuantPro_unsigned.ipa Payload
-          cd ../../..
-          ls -lh BinanceQuantPro_unsigned.ipa
+          zip -r -q "$GITHUB_WORKSPACE/BinanceQuantPro_unsigned.ipa" Payload
+          ls -lh "$GITHUB_WORKSPACE/BinanceQuantPro_unsigned.ipa"
 
       - name: 🚀 Upload IPA Artifact to GitHub Actions
         uses: actions/upload-artifact@v4
         with:
           name: BinanceQuantPro-iOS-Unsigned
           path: BinanceQuantPro_unsigned.ipa
+          if-no-files-found: error
           retention-days: 30
 
       - name: 🏷️ Publish IPA to GitHub Release (on Tags)
