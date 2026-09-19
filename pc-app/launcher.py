@@ -36,6 +36,33 @@ class DesktopAPI:
             return False
 
 
+def set_window_icon(window, icon_path):
+    import time
+    time.sleep(0.5)
+    try:
+        if os.path.exists(icon_path):
+            import ctypes
+            hwnd = ctypes.windll.user32.FindWindowW(None, "Binance Futures Institutional Quant Pro Terminal")
+            if hwnd:
+                IMAGE_ICON = 1
+                LR_LOADFROMFILE = 0x00000010
+                hicon_big = ctypes.windll.user32.LoadImageW(0, icon_path, IMAGE_ICON, 256, 256, LR_LOADFROMFILE)
+                hicon_sm = ctypes.windll.user32.LoadImageW(0, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE)
+                WM_SETICON = 0x80
+                if hicon_big:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 1, hicon_big)
+                if hicon_sm:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, 0, hicon_sm)
+    except Exception:
+        pass
+    try:
+        if hasattr(window, 'native') and window.native and os.path.exists(icon_path):
+            from System.Drawing import Icon
+            window.native.Icon = Icon(icon_path)
+    except Exception:
+        pass
+
+
 def main():
     api = DesktopAPI()
     # Xác định đường dẫn file giao diện HTML
@@ -60,7 +87,7 @@ def main():
         background_color="#080A0F"
     )
 
-    webview.start(debug=False, gui="edgechromium")
+    webview.start(set_window_icon, (window, icon_path), debug=False, gui="edgechromium")
 
 
 if __name__ == "__main__":
