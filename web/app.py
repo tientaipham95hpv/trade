@@ -948,7 +948,42 @@ async def download_state():
             filename=f"bot_state_{datetime.now(VIETNAM_TZ).strftime('%Y%m%d_%H%M%S')}.json",
             media_type="application/json"
         )
-    raise HTTPException(status_code=404, detail="Chưa có file trạng thái bot")
+    raise HTTPException(status_code=404, detail="Chưa có file trạng thái")
+
+
+@app.get("/api/logs", dependencies=[Depends(verify_auth)])
+async def api_get_logs(lines: int = 150):
+    """Lấy nhật ký hoạt động hệ thống gần nhất cho App PC/Mobile"""
+    log_candidates = ["bot.log", "binance_bot.log", "app.log", "system.log"]
+    result_lines = []
+    found_file = ""
+    for lf in log_candidates:
+        if os.path.exists(lf):
+            found_file = lf
+            try:
+                with open(lf, "r", encoding="utf-8", errors="ignore") as f:
+                    all_lines = f.readlines()
+                    result_lines = all_lines[-lines:]
+                break
+            except Exception:
+                pass
+
+    if not result_lines:
+        try:
+            import subprocess
+            cmd = ["journalctl", "-u", "binance-bot.service", "-n", str(lines), "--no-pager"]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if proc.returncode == 0 and proc.stdout:
+                result_lines = proc.stdout.splitlines()
+                found_file = "journalctl"
+        except Exception:
+            pass
+
+    return JSONResponse({
+        "success": True,
+        "source": found_file or "none",
+        "lines": [l.rstrip() for l in result_lines] if result_lines else ["Hệ thống đang hoạt động bình thường, chưa có bản ghi log mới."]
+    })
 
 
 @app.get("/logo.png")

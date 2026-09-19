@@ -30,3 +30,4 @@ ios-app/ios/Flutter/Flutter.podspec
 # OS
 .DS_Store
 Thumbs.db
+*.lnk

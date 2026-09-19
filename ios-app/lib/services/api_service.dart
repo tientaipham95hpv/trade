@@ -121,13 +121,35 @@ class ApiService {
   }
 
   Future<bool> setTradingMode(String mode) async {
-    final uri = Uri.parse('$serverUrl/api/mode');
+    final uri = Uri.parse('$serverUrl/api/update_settings');
     final response = await http.post(
       uri,
       headers: _buildHeaders(),
-      body: jsonEncode({'mode': mode}),
+      body: jsonEncode({'trading_mode': mode}),
     ).timeout(const Duration(seconds: 10));
     return response.statusCode == 200;
+  }
+
+  Future<HistoryData> fetchHistory() async {
+    if (authToken.isEmpty) {
+      await login();
+    }
+    final uri = Uri.parse('$serverUrl/api/history');
+    var response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 401) {
+      final ok = await login();
+      if (ok) {
+        response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
+      }
+    }
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return HistoryData.fromJson(data);
+    } else {
+      throw Exception('Lỗi nạp lịch sử: HTTP ${response.statusCode}');
+    }
   }
 
   Future<String> askAiCopilot(String query) async {
@@ -146,3 +168,4 @@ class ApiService {
     }
   }
 }
+

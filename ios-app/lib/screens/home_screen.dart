@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import 'dashboard_tab.dart';
 import 'positions_tab.dart';
 import 'scanner_tab.dart';
+import 'history_tab.dart';
 import 'ai_copilot_tab.dart';
 import 'settings_dialog.dart';
 
@@ -52,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
       DashboardTab(status: _status, apiService: widget.apiService, onRefresh: _fetchData),
       PositionsTab(positions: _status?.positions ?? [], apiService: widget.apiService, onRefresh: _fetchData),
       ScannerTab(apiService: widget.apiService),
+      HistoryTab(apiService: widget.apiService),
       AiCopilotTab(apiService: widget.apiService),
     ];
 
@@ -130,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Vị Thế',
             ),
             const BottomNavigationBarItem(icon: Icon(Icons.radar_outlined), activeIcon: Icon(Icons.radar), label: 'Scanner 80'),
+            const BottomNavigationBarItem(icon: Icon(Icons.history_outlined), activeIcon: Icon(Icons.history), label: 'Lịch Sử'),
             const BottomNavigationBarItem(icon: Icon(Icons.psychology_outlined), activeIcon: Icon(Icons.psychology), label: 'AI Copilot'),
           ],
         ),

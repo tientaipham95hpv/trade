@@ -131,3 +131,84 @@ class ChatMessage {
     required this.timestamp,
   });
 }
+
+class ClosedTrade {
+  final String timestamp;
+  final String symbol;
+  final String side;
+  final double entryPrice;
+  final double exitPrice;
+  final double pnlUsdt;
+  final double pnlPercent;
+  final String exitReason;
+  final int leverage;
+
+  ClosedTrade({
+    required this.timestamp,
+    required this.symbol,
+    required this.side,
+    required this.entryPrice,
+    required this.exitPrice,
+    required this.pnlUsdt,
+    required this.pnlPercent,
+    required this.exitReason,
+    required this.leverage,
+  });
+
+  factory ClosedTrade.fromJson(Map<String, dynamic> json) {
+    return ClosedTrade(
+      timestamp: json['timestamp'] ?? json['closed_at'] ?? '',
+      symbol: json['symbol'] ?? 'UNKNOWN',
+      side: (json['side'] ?? 'BUY').toString().toUpperCase(),
+      entryPrice: (json['entry_price'] as num?)?.toDouble() ?? 0.0,
+      exitPrice: (json['exit_price'] as num?)?.toDouble() ?? 0.0,
+      pnlUsdt: (json['pnl_usdt'] as num?)?.toDouble() ?? 0.0,
+      pnlPercent: (json['pnl_percent'] as num?)?.toDouble() ?? 0.0,
+      exitReason: json['exit_reason'] ?? json['reason'] ?? 'Đóng vị thế',
+      leverage: (json['leverage'] as num?)?.toInt() ?? 5,
+    );
+  }
+}
+
+class HistorySummary {
+  final int total;
+  final int wins;
+  final int losses;
+  final double winRate;
+  final double netPnl;
+
+  HistorySummary({
+    required this.total,
+    required this.wins,
+    required this.losses,
+    required this.winRate,
+    required this.netPnl,
+  });
+
+  factory HistorySummary.fromJson(Map<String, dynamic> json) {
+    return HistorySummary(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      wins: (json['wins'] as num?)?.toInt() ?? 0,
+      losses: (json['losses'] as num?)?.toInt() ?? 0,
+      winRate: (json['win_rate'] as num?)?.toDouble() ?? 0.0,
+      netPnl: (json['net_pnl'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class HistoryData {
+  final HistorySummary summary;
+  final List<ClosedTrade> trades;
+
+  HistoryData({required this.summary, required this.trades});
+
+  factory HistoryData.fromJson(Map<String, dynamic> json) {
+    final sumJson = json['summary'] as Map<String, dynamic>? ?? {};
+    final tradesList = json['trades'] as List<dynamic>? ?? [];
+    return HistoryData(
+      summary: HistorySummary.fromJson(sumJson),
+      trades: tradesList.map((t) => ClosedTrade.fromJson(t as Map<String, dynamic>)).toList(),
+    );
+  }
+}
+

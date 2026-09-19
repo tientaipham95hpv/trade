@@ -69,9 +69,58 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFF0B90B))),
               ),
             ),
+            const SizedBox(height: 16),
+            const Text('Chế Độ Quét & Giao Dịch:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF080A0F),
+                      foregroundColor: const Color(0xFFF0B90B),
+                      side: const BorderSide(color: Color(0xFF1C2436)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: () async {
+                      await widget.apiService.setTradingMode('BLUECHIP_ONLY');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã chuyển sang chế độ BLUECHIP (BTC/ETH)')),
+                        );
+                        widget.onSaved();
+                      }
+                    },
+                    child: const Text('BLUECHIP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFF0B90B).withValues(alpha: 0.15),
+                      foregroundColor: const Color(0xFFF0B90B),
+                      side: BorderSide(color: const Color(0xFFF0B90B).withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onPressed: () async {
+                      await widget.apiService.setTradingMode('MARKET_ALL');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Đã chuyển sang chế độ QUÉT TOP 80 COIN')),
+                        );
+                        widget.onSaved();
+                      }
+                    },
+                    child: const Text('TOP 80 COIN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+
       actions: [
         TextButton(
           child: const Text('HỦY', style: TextStyle(color: Colors.grey)),

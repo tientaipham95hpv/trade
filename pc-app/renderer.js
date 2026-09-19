@@ -1,6 +1,6 @@
 // =======================================================
 // TRẠM ĐIỀU HÀNH GIAO DỊCH ĐỊNH LƯỢNG BINANCE QUANT PRO
-// BẢN MÁY TÍNH TIẾNG VIỆT 100%
+// BẢN MÁY TÍNH TIẾNG VIỆT 100% - FULL 6 TABS CHUYÊN NGHIỆP
 // =======================================================
 
 let serverUrl = 'https://trader.noza.site';
@@ -11,6 +11,11 @@ let pollTimer = null;
 let lastPositionsCount = 0;
 let lastUnrealizedPnl = 0;
 let currentUser = '';
+let cachedRadarPairs = [];
+let activeRadarFilter = 'ALL';
+let logPollInterval = null;
+let currentActiveTab = 'overview';
+let activeTradingMode = 'MARKET_ALL';
 
 // Bộ tạo âm thanh sàn giao dịch Web Audio Synthesizer
 class AudioSynthesizer {
@@ -54,7 +59,6 @@ class AudioSynthesizer {
     this.init();
     try {
       const now = this.ctx.currentTime;
-      // Âm thanh chuông ngân tiếng vàng chốt lời
       [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
@@ -96,7 +100,7 @@ class AudioSynthesizer {
 
 const audioSynth = new AudioSynthesizer();
 
-// Phần tử DOM
+// Các phần tử DOM chung
 const connIndicator = document.getElementById('connIndicator');
 const connStatus = document.getElementById('connStatus');
 const pingLatency = document.getElementById('pingLatency');
@@ -109,11 +113,7 @@ const statFng = document.getElementById('statFng');
 const statCircuit = document.getElementById('statCircuit');
 const badgePosCount = document.getElementById('badgePosCount');
 const positionsTableBody = document.getElementById('positionsTableBody');
-const radarCardsGrid = document.getElementById('radarCardsGrid');
 const aiAuditFeed = document.getElementById('aiAuditFeed');
-const aiChatMessages = document.getElementById('aiChatMessages');
-const aiChatForm = document.getElementById('aiChatForm');
-const aiChatInput = document.getElementById('aiChatInput');
 const btnEmergencyClose = document.getElementById('btnEmergencyClose');
 const btnAudioToggle = document.getElementById('btnAudioToggle');
 const btnLoginOpen = document.getElementById('btnLoginOpen');
@@ -134,7 +134,75 @@ const btnModeMarket = document.getElementById('btnModeMarket');
 const btnPauseResume = document.getElementById('btnPauseResume');
 const pauseResumeText = document.getElementById('pauseResumeText');
 
-// Khởi chạy ứng dụng
+// Các phần tử Navigation 6 Tabs
+const tabBtns = {
+  overview: document.getElementById('tabBtnOverview'),
+  radar: document.getElementById('tabBtnRadar'),
+  history: document.getElementById('tabBtnHistory'),
+  strategy: document.getElementById('tabBtnStrategy'),
+  logs: document.getElementById('tabBtnLogs'),
+  ai: document.getElementById('tabBtnAi')
+};
+
+const viewPanels = {
+  overview: document.getElementById('viewOverview'),
+  radar: document.getElementById('viewRadar'),
+  history: document.getElementById('viewHistory'),
+  strategy: document.getElementById('viewStrategy'),
+  logs: document.getElementById('viewLogs'),
+  ai: document.getElementById('viewAi')
+};
+
+// Phần tử Tab 2: Scanner Radar
+const inputRadarSearch = document.getElementById('inputRadarSearch');
+const btnFilterAll = document.getElementById('btnFilterAll');
+const btnFilterLong = document.getElementById('btnFilterLong');
+const btnFilterShort = document.getElementById('btnFilterShort');
+const btnFilterTrend = document.getElementById('btnFilterTrend');
+const radarCardsGrid = document.getElementById('radarCardsGrid');
+
+// Phần tử Tab 3: History & Analytics
+const histTotalTrades = document.getElementById('histTotalTrades');
+const histWinRate = document.getElementById('histWinRate');
+const histWinLoss = document.getElementById('histWinLoss');
+const histNetPnl = document.getElementById('histNetPnl');
+const histProfitFactor = document.getElementById('histProfitFactor');
+const btnExportCsv = document.getElementById('btnExportCsv');
+const equityChartContainer = document.getElementById('equityChartContainer');
+const historyTableBody = document.getElementById('historyTableBody');
+
+// Phần tử Tab 4: Strategy Settings
+const stratBtnBluechip = document.getElementById('stratBtnBluechip');
+const stratBtnMarket = document.getElementById('stratBtnMarket');
+const stratTradeDirection = document.getElementById('stratTradeDirection');
+const stratLeverage = document.getElementById('stratLeverage');
+const stratLeverageVal = document.getElementById('stratLeverageVal');
+const stratRisk = document.getElementById('stratRisk');
+const stratRiskVal = document.getElementById('stratRiskVal');
+const stratAdx = document.getElementById('stratAdx');
+const stratAdxVal = document.getElementById('stratAdxVal');
+const stratHardCap = document.getElementById('stratHardCap');
+const stratTrailingStop = document.getElementById('stratTrailingStop');
+const stratBtcFilter = document.getElementById('stratBtcFilter');
+const stratDynamicLev = document.getElementById('stratDynamicLev');
+const btnSaveLiveStrategy = document.getElementById('btnSaveLiveStrategy');
+const stratStatusMsg = document.getElementById('stratStatusMsg');
+
+// Phần tử Tab 5: Logs Live
+const logTerminalBox = document.getElementById('logTerminalBox');
+const logAutoScroll = document.getElementById('logAutoScroll');
+const btnRefreshLogs = document.getElementById('btnRefreshLogs');
+const btnClearLogs = document.getElementById('btnClearLogs');
+const logSourceBadge = document.getElementById('logSourceBadge');
+
+// Phần tử Tab 6: AI Copilot
+const aiChatMessages = document.getElementById('aiChatMessages');
+const aiChatForm = document.getElementById('aiChatForm');
+const aiChatInput = document.getElementById('aiChatInput');
+
+// =======================================================
+// KHỞI CHẠY ỨNG DỤNG
+// =======================================================
 async function initApp() {
   let cfg = {
     serverUrl: 'https://trader.noza.site',
@@ -142,19 +210,14 @@ async function initApp() {
     soundEnabled: true
   };
 
-  // Đọc từ Electron / PyWebView / LocalStorage
   if (window.electronAPI) {
     try {
       const eCfg = await window.electronAPI.getConfig();
       cfg = { ...cfg, ...eCfg };
       window.electronAPI.onTriggerAction((action) => {
-        if (action === 'emergency-close-all') {
-          executeEmergencyClose();
-        } else if (action === 'pause') {
-          togglePauseResume(true);
-        } else if (action === 'resume') {
-          togglePauseResume(false);
-        }
+        if (action === 'emergency-close-all') executeEmergencyClose();
+        else if (action === 'pause') togglePauseResume(true);
+        else if (action === 'resume') togglePauseResume(false);
       });
     } catch (e) {}
   } else if (window.pywebview && window.pywebview.api) {
@@ -178,18 +241,71 @@ async function initApp() {
   document.getElementById('cfgAuthToken').value = authToken;
   document.getElementById('cfgSound').checked = soundEnabled;
 
-  // Nếu chưa có token, thử tự động đăng nhập với tài khoản mặc định
+  setupNavigationTabs();
+  setupRadarFilters();
+  setupStrategySliders();
+  setupAiQuickButtons();
+
   if (!authToken) {
     await tryAutoLogin('admin', 'admin123456');
   }
 
-  // Bắt đầu quét dữ liệu định kỳ mỗi 3 giây
+  // Bắt đầu chu kỳ quét dữ liệu
   pollDashboardData();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(pollDashboardData, 3000);
+
+  // Chu kỳ quét logs nền
+  if (logPollInterval) clearInterval(logPollInterval);
+  logPollInterval = setInterval(() => {
+    if (currentActiveTab === 'logs') pollLiveLogs();
+  }, 3500);
 }
 
-// Tự động đăng nhập
+// =======================================================
+// XỬ LÝ CHUYỂN TAB (NAVIGATION)
+// =======================================================
+function setupNavigationTabs() {
+  Object.keys(tabBtns).forEach((tabKey) => {
+    const btn = tabBtns[tabKey];
+    if (!btn) return;
+    btn.addEventListener('click', () => switchTab(tabKey));
+  });
+}
+
+function switchTab(tabKey) {
+  currentActiveTab = tabKey;
+  Object.keys(tabBtns).forEach((key) => {
+    const btn = tabBtns[key];
+    const view = viewPanels[key];
+    if (!btn || !view) return;
+
+    if (key === tabKey) {
+      btn.classList.add('bg-darkCardHover', 'text-white');
+      btn.classList.remove('text-gray-400');
+      view.classList.remove('hidden');
+      if (key === 'strategy') {
+        view.classList.add('block');
+      } else {
+        view.classList.add('flex');
+      }
+    } else {
+      btn.classList.remove('bg-darkCardHover', 'text-white');
+      btn.classList.add('text-gray-400');
+      view.classList.add('hidden');
+      view.classList.remove('flex', 'block');
+    }
+  });
+
+  if (tabKey === 'history') loadHistoryData();
+  else if (tabKey === 'strategy') loadStrategySettings();
+  else if (tabKey === 'logs') pollLiveLogs();
+  else if (tabKey === 'radar') pollRadar();
+}
+
+// =======================================================
+// GIAO TIẾP VỚI MÁY CHỦ & XÁC THỰC
+// =======================================================
 async function tryAutoLogin(user, pass) {
   try {
     const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/login`, {
@@ -212,7 +328,6 @@ async function tryAutoLogin(user, pass) {
   return false;
 }
 
-// Gọi API có kèm xác thực
 async function fetchApi(endpoint, options = {}) {
   const url = `${serverUrl.replace(/\/+$/, '')}${endpoint}`;
   const headers = {
@@ -230,7 +345,6 @@ async function fetchApi(endpoint, options = {}) {
     const latency = Date.now() - startTime;
     pingLatency.textContent = `${latency} ms`;
 
-    // Nếu bị 401 Unauthorized (Chưa đăng nhập / Token hết hạn)
     if (res.status === 401) {
       connIndicator.className = 'inline-block w-2 h-2 rounded-full bg-yellow-400';
       connStatus.textContent = 'Yêu cầu đăng nhập quản trị';
@@ -249,7 +363,9 @@ async function fetchApi(endpoint, options = {}) {
   }
 }
 
-// Nạp dữ liệu Bảng điều khiển chính
+// =======================================================
+// TAB 1: TỔNG QUAN & VỊ THẾ LIVE
+// =======================================================
 async function pollDashboardData() {
   try {
     const data = await fetchApi('/api/status');
@@ -274,7 +390,7 @@ async function pollDashboardData() {
       statUnrealizedPct.className = 'text-[10px] text-lossRed font-mono mt-0.5';
     }
 
-    // 2. Xu hướng BTC Regime
+    // 2. Lá chắn BTC Regime
     const btcMatrix = (data.protection_matrix && data.protection_matrix.btc_regime) || {};
     const btcRegime = btcMatrix.regime || data.btc_regime || 'BULL';
     if (btcRegime.includes('BULL') || btcRegime === 'UPTREND') {
@@ -286,12 +402,12 @@ async function pollDashboardData() {
     }
     statBtcDetails.textContent = btcMatrix.desc || data.btc_regime_reason || 'Đồng pha xu hướng khung 1H/4H';
 
-    // 3. Chỉ số Tâm lý Fear & Greed
+    // 3. Tâm lý Fear & Greed
     if (data.fear_and_greed) {
       statFng.innerHTML = `<i class="fa-solid fa-fire text-amber-500"></i> <span>${data.fear_and_greed.value}/100 (${data.fear_and_greed.classification_vi || 'Tham Lam'})</span>`;
     }
 
-    // 4. Cầu dao an toàn Circuit Breaker
+    // 4. Circuit Breaker
     if (data.circuit_breaker && data.circuit_breaker.triggered) {
       statCircuit.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-lossRed"></i> <span class="text-lossRed">ĐANG KHÓA COOLDOWN</span>';
     } else {
@@ -303,7 +419,7 @@ async function pollDashboardData() {
     renderPositions(positions);
     badgePosCount.textContent = `${positions.length}/${data.max_positions || data.max_concurrent_positions || 3}`;
 
-    // Phát âm thanh và gửi thông báo khi có lệnh mới khớp
+    // Phát âm thanh khi có lệnh mới
     if (positions.length > lastPositionsCount) {
       audioSynth.playEntrySound();
       if (window.electronAPI) {
@@ -315,16 +431,7 @@ async function pollDashboardData() {
     }
     lastPositionsCount = positions.length;
 
-    // Cập nhật System Tray trên PC
-    if (window.electronAPI) {
-      window.electronAPI.updateTray({
-        pnl: `${pnlPrefix}$${uPnl.toFixed(2)}`,
-        positions: positions.length,
-        status: data.is_paused ? 'Tạm dừng' : 'Đang chạy'
-      });
-    }
-
-    // 6. Trạng thái Tạm dừng / Bật lại
+    // 6. Trạng thái tạm dừng
     if (data.is_paused) {
       pauseResumeText.textContent = 'Đã tạm dừng';
       btnPauseResume.className = 'px-3 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/30 flex items-center space-x-1 hover:bg-red-500/20 transition';
@@ -336,24 +443,36 @@ async function pollDashboardData() {
     }
 
     // 7. Chế độ giao dịch
-    const mode = data.trading_mode || 'MARKET_ALL';
-    if (mode === 'BLUECHIP_ONLY') {
-      btnModeBluechip.className = 'px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition';
-      btnModeMarket.className = 'px-2.5 py-1 rounded text-gray-400 hover:text-white transition';
-    } else {
-      btnModeMarket.className = 'px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition';
-      btnModeBluechip.className = 'px-2.5 py-1 rounded text-gray-400 hover:text-white transition';
-    }
+    activeTradingMode = data.trading_mode || 'MARKET_ALL';
+    updateTradingModeButtons();
+
+    // 8. Gatekeeper Audit Feed
+    renderGatekeeperFeed(data);
 
   } catch (e) {
-    console.debug('Lỗi quét dữ liệu:', e);
+    console.debug('Lỗi quét dữ liệu dashboard:', e);
   }
 
-  // Quét Radar thị trường
-  pollRadar();
+  // Đồng bộ Radar nếu đang ở tab radar
+  if (currentActiveTab === 'radar') {
+    pollRadar();
+  }
 }
 
-// Vẽ bảng danh sách vị thế
+function updateTradingModeButtons() {
+  if (activeTradingMode === 'BLUECHIP_ONLY') {
+    btnModeBluechip.className = 'px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition';
+    btnModeMarket.className = 'px-2.5 py-1 rounded text-gray-400 hover:text-white transition';
+    stratBtnBluechip.className = 'py-2 px-3 rounded-lg border border-binanceGold/40 bg-binanceGold/20 text-binanceGold font-bold transition text-center';
+    stratBtnMarket.className = 'py-2 px-3 rounded-lg border border-darkBorder text-gray-400 hover:text-white transition text-center';
+  } else {
+    btnModeMarket.className = 'px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition';
+    btnModeBluechip.className = 'px-2.5 py-1 rounded text-gray-400 hover:text-white transition';
+    stratBtnMarket.className = 'py-2 px-3 rounded-lg border border-binanceGold/40 bg-binanceGold/20 text-binanceGold font-bold transition text-center';
+    stratBtnBluechip.className = 'py-2 px-3 rounded-lg border border-darkBorder text-gray-400 hover:text-white transition text-center';
+  }
+}
+
 function renderPositions(positions) {
   if (!positions || positions.length === 0) {
     positionsTableBody.innerHTML = `
@@ -384,7 +503,7 @@ function renderPositions(positions) {
     const tp = pos.take_profit ? Number(pos.take_profit).toFixed(4) : '--';
 
     return `
-      <tr class="hover:bg-darkCardHover/50 transition">
+      <tr class="hover:bg-darkCardHover/50 transition font-mono">
         <td class="py-2.5 font-bold text-white">${pos.symbol} <span class="text-[10px] text-gray-500 font-normal">(${pos.leverage || 5}x)</span></td>
         <td class="py-2.5">${sideBadge}</td>
         <td class="py-2.5 text-gray-300">$${entry}</td>
@@ -400,6 +519,38 @@ function renderPositions(positions) {
       </tr>
     `;
   }).join('');
+}
+
+function renderGatekeeperFeed(data) {
+  if (!aiAuditFeed) return;
+  const timeStr = new Date().toLocaleTimeString('vi-VN');
+  const btcMatrix = (data.protection_matrix && data.protection_matrix.btc_regime) || {};
+  const regime = btcMatrix.regime || 'BULL';
+  const posCount = (data.positions || []).length;
+
+  aiAuditFeed.innerHTML = `
+    <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+      <div class="flex items-center justify-between text-[11px] font-bold text-profitGreen mb-1">
+        <span><i class="fa-solid fa-shield-check"></i> BTC Trend Filter</span>
+        <span class="text-[10px] text-gray-500">${timeStr}</span>
+      </div>
+      <div class="text-[11px] text-gray-300">Bộ lọc trạng thái: <b class="text-binanceGold">${regime}</b>. ${btcMatrix.desc || 'Đang bảo vệ vốn an toàn'}.</div>
+    </div>
+    <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+      <div class="flex items-center justify-between text-[11px] font-bold text-cyan-400 mb-1">
+        <span><i class="fa-solid fa-chart-pie"></i> Giám Sát Danh Mục</span>
+        <span class="text-[10px] text-gray-500">${timeStr}</span>
+      </div>
+      <div class="text-[11px] text-gray-300">Đang giữ ${posCount} vị thế. Đòn bẩy ${data.leverage || 5}x với rủi ro ${data.risk_percent || 1.5}%/vị thế.</div>
+    </div>
+    <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+      <div class="flex items-center justify-between text-[11px] font-bold text-purple-400 mb-1">
+        <span><i class="fa-solid fa-microchip"></i> AI Gatekeeper Validator</span>
+        <span class="text-[10px] text-gray-500">${timeStr}</span>
+      </div>
+      <div class="text-[11px] text-gray-300">Bộ não DeepSeek V4.1 kết nối thời gian thực, sẵn sàng phân tích tín hiệu quét.</div>
+    </div>
+  `;
 }
 
 // Đóng vị thế cụ thể
@@ -442,53 +593,414 @@ async function executeEmergencyClose() {
     btnEmergencyClose.innerHTML = '<i class="fa-solid fa-radiation"></i> <span>CẮT KHẨN CẤP [KILL-SWITCH]</span>';
   }
 }
-
 btnEmergencyClose.addEventListener('click', executeEmergencyClose);
 
-// Nạp dữ liệu Radar quét Top 80 coin
+// =======================================================
+// TAB 2: SCANNER 80 COIN RADAR
+// =======================================================
+function setupRadarFilters() {
+  btnFilterAll.addEventListener('click', () => setRadarFilter('ALL'));
+  btnFilterLong.addEventListener('click', () => setRadarFilter('LONG'));
+  btnFilterShort.addEventListener('click', () => setRadarFilter('SHORT'));
+  btnFilterTrend.addEventListener('click', () => setRadarFilter('TREND'));
+
+  inputRadarSearch.addEventListener('input', () => renderFilteredRadar());
+}
+
+function setRadarFilter(filter) {
+  activeRadarFilter = filter;
+  const filterBtns = [
+    { btn: btnFilterAll, name: 'ALL' },
+    { btn: btnFilterLong, name: 'LONG' },
+    { btn: btnFilterShort, name: 'SHORT' },
+    { btn: btnFilterTrend, name: 'TREND' }
+  ];
+
+  filterBtns.forEach(({ btn, name }) => {
+    if (name === filter) {
+      btn.className = 'px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold border border-binanceGold/30';
+    } else {
+      btn.className = 'px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-white';
+    }
+  });
+
+  renderFilteredRadar();
+}
+
 async function pollRadar() {
   try {
     const data = await fetchApi('/api/radar');
-    if (!data || !data.pairs) return;
-
-    radarCardsGrid.innerHTML = data.pairs.slice(0, 8).map(pair => {
-      const isUp = pair.trend === 'UP' || pair.signal === 'BUY';
-      const badge = isUp 
-        ? '<span class="text-profitGreen font-bold">MUA ▲</span>' 
-        : '<span class="text-lossRed font-bold">BÁN ▼</span>';
-      return `
-        <div class="bg-darkBase border border-darkBorder rounded-lg p-2 hover:border-binanceGold/40 transition">
-          <div class="flex items-center justify-between text-xs font-bold text-white">
-            <span>${pair.symbol}</span>
-            <span class="text-[10px]">${badge}</span>
-          </div>
-          <div class="flex items-center justify-between text-[10px] text-gray-400 mt-1 font-mono">
-            <span>$${Number(pair.price || 0).toFixed(4)}</span>
-            <span class="text-cyan-400 font-semibold">ADX ${pair.adx ? Number(pair.adx).toFixed(1) : '25.0'}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
+    if (data && data.pairs) {
+      cachedRadarPairs = data.pairs;
+      renderFilteredRadar();
+    }
   } catch (e) {
-    // Bỏ qua lỗi polling radar
+    console.debug('Lỗi nạp Radar:', e);
   }
 }
 
-// Khung Chat AI Copilot
+function renderFilteredRadar() {
+  if (!radarCardsGrid) return;
+  const search = (inputRadarSearch.value || '').trim().toUpperCase();
+
+  let filtered = cachedRadarPairs.filter(p => {
+    if (search && !p.symbol.toUpperCase().includes(search)) return false;
+    if (activeRadarFilter === 'LONG') return p.signal === 'BUY' || p.trend === 'UP';
+    if (activeRadarFilter === 'SHORT') return p.signal === 'SELL' || p.trend === 'DOWN';
+    if (activeRadarFilter === 'TREND') return (p.adx || 0) >= 25;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    radarCardsGrid.innerHTML = `
+      <div class="col-span-4 text-center py-12 text-gray-500 font-mono">
+        <i class="fa-solid fa-satellite-dish text-2xl mb-2 text-gray-600 block"></i>
+        Không tìm thấy cặp coin nào thỏa mãn tiêu chí lọc (${activeRadarFilter}).
+      </div>
+    `;
+    return;
+  }
+
+  radarCardsGrid.innerHTML = filtered.map(pair => {
+    const isUp = pair.trend === 'UP' || pair.signal === 'BUY';
+    const isDown = pair.trend === 'DOWN' || pair.signal === 'SELL';
+    const badge = isUp 
+      ? '<span class="px-2 py-0.5 rounded bg-profitGreen/20 text-profitGreen text-[10px] font-bold border border-profitGreen/30">LONG ▲</span>'
+      : (isDown 
+        ? '<span class="px-2 py-0.5 rounded bg-lossRed/20 text-lossRed text-[10px] font-bold border border-lossRed/30">SHORT ▼</span>'
+        : '<span class="px-2 py-0.5 rounded bg-gray-500/20 text-gray-400 text-[10px] font-bold">CHỜ •</span>');
+
+    const price = Number(pair.price || 0);
+    const priceStr = price >= 1 ? price.toFixed(2) : price.toFixed(4);
+    const adx = Number(pair.adx || 25).toFixed(1);
+    const rsi = Number(pair.rsi || 50).toFixed(1);
+
+    return `
+      <div class="bg-darkCard border border-darkBorder rounded-xl p-3 hover:border-binanceGold/50 transition shadow-sm font-mono">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-white text-xs">${pair.symbol}</span>
+          ${badge}
+        </div>
+        <div class="flex items-baseline justify-between mt-2">
+          <span class="text-sm font-bold text-white">$${priceStr}</span>
+          <span class="text-[10px] text-gray-400">RSI ${rsi}</span>
+        </div>
+        <div class="flex items-center justify-between text-[10px] text-gray-500 mt-1 border-t border-darkBorder/50 pt-1.5">
+          <span>Xu hướng: <b class="${isUp ? 'text-profitGreen' : (isDown ? 'text-lossRed' : 'text-gray-400')}">${pair.trend || 'N/A'}</b></span>
+          <span class="text-cyan-400 font-semibold">ADX ${adx}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// =======================================================
+// TAB 3: LỊCH SỬ & PHÂN TÍCH (HISTORY & ANALYTICS)
+// =======================================================
+async function loadHistoryData() {
+  try {
+    const res = await fetchApi('/api/history');
+    if (!res) return;
+
+    const summary = res.summary || {};
+    const trades = res.trades || [];
+    const chartData = res.chart_data || [];
+
+    // Cập nhật thẻ KPI
+    histTotalTrades.textContent = summary.total || 0;
+    const wr = summary.win_rate !== undefined ? Number(summary.win_rate).toFixed(1) : '0.0';
+    histWinRate.textContent = `${wr}%`;
+    histWinLoss.textContent = `${summary.wins || 0} Thắng / ${summary.losses || 0} Thua`;
+
+    const netPnl = summary.net_pnl !== undefined ? Number(summary.net_pnl) : 0.0;
+    const netPrefix = netPnl >= 0 ? '+' : '';
+    histNetPnl.textContent = `${netPrefix}$${netPnl.toFixed(2)} USDT`;
+    histNetPnl.className = `text-lg font-bold mt-0.5 ${netPnl >= 0 ? 'text-profitGreen' : 'text-lossRed'}`;
+
+    // Tính Profit Factor
+    let grossWin = 0, grossLoss = 0;
+    trades.forEach(t => {
+      const p = parseFloat(t.pnl_usdt || 0);
+      if (p > 0) grossWin += p;
+      else if (p < 0) grossLoss += Math.abs(p);
+    });
+    const pf = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? '99.9' : '0.00');
+    histProfitFactor.textContent = pf;
+
+    // Vẽ biểu đồ Equity Curve SVG
+    renderEquityCurve(chartData);
+
+    // Vẽ bảng lịch sử giao dịch
+    renderHistoryTable(trades);
+
+  } catch (e) {
+    console.debug('Lỗi nạp lịch sử:', e);
+  }
+}
+
+function renderEquityCurve(chartData) {
+  if (!equityChartContainer) return;
+  if (!chartData || chartData.length === 0) {
+    equityChartContainer.innerHTML = '<div class="text-gray-500">Chưa có giao dịch hoàn tất nào trong chu kỳ này để vẽ đường cong vốn.</div>';
+    return;
+  }
+
+  const w = equityChartContainer.clientWidth || 750;
+  const h = 100;
+  const pad = 24;
+
+  const cumValues = chartData.map(d => d.cum_pnl || 0);
+  const minVal = Math.min(0, ...cumValues);
+  const maxVal = Math.max(1, ...cumValues);
+  const range = (maxVal - minVal) || 1;
+
+  const getX = (idx) => pad + (idx / Math.max(1, chartData.length - 1)) * (w - pad * 2);
+  const getY = (val) => h - pad - ((val - minVal) / range) * (h - pad * 2);
+
+  const points = chartData.map((d, i) => `${getX(i).toFixed(1)},${getY(d.cum_pnl || 0).toFixed(1)}`).join(' ');
+  const zeroY = getY(0).toFixed(1);
+  const finalVal = cumValues[cumValues.length - 1];
+  const strokeColor = finalVal >= 0 ? '#0ECB81' : '#F6465D';
+
+  equityChartContainer.innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" class="w-full h-full">
+      <defs>
+        <linearGradient id="equityGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0.0" />
+        </linearGradient>
+      </defs>
+      <!-- Đường cơ sở mốc 0 -->
+      <line x1="${pad}" y1="${zeroY}" x2="${w - pad}" y2="${zeroY}" stroke="#2B313A" stroke-dasharray="3,3" stroke-width="1" />
+      <text x="${pad}" y="${Math.max(12, zeroY - 4)}" fill="#6B7280" font-size="9" font-family="monospace">$0</text>
+      <!-- Vùng diện tích mờ -->
+      <polygon points="${getX(0)},${h - pad} ${points} ${getX(chartData.length - 1)},${h - pad}" fill="url(#equityGrad)" />
+      <!-- Đường cong vốn chính -->
+      <polyline fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="${points}" />
+      <!-- Điểm cuối cùng -->
+      <circle cx="${getX(chartData.length - 1)}" cy="${getY(finalVal)}" r="3.5" fill="${strokeColor}" />
+      <text x="${w - pad - 60}" y="${Math.min(h - 8, getY(finalVal) - 6)}" fill="${strokeColor}" font-size="10" font-weight="bold" font-family="monospace">
+        ${finalVal >= 0 ? '+' : ''}$${finalVal.toFixed(2)}
+      </text>
+    </svg>
+  `;
+}
+
+function renderHistoryTable(trades) {
+  if (!historyTableBody) return;
+  if (!trades || trades.length === 0) {
+    historyTableBody.innerHTML = `
+      <tr>
+        <td colspan="8" class="text-center py-10 text-gray-500 font-mono">
+          Chưa có lệnh nào được ghi nhận vào trade_history.csv
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  historyTableBody.innerHTML = trades.map((t, idx) => {
+    const isLong = (t.side || 'BUY').toUpperCase().includes('BUY') || (t.side || '').toUpperCase().includes('LONG');
+    const sideBadge = isLong 
+      ? '<span class="text-profitGreen font-bold">LONG</span>' 
+      : '<span class="text-lossRed font-bold">SHORT</span>';
+
+    const pnl = parseFloat(t.pnl_usdt || 0);
+    const pnlColor = pnl >= 0 ? 'text-profitGreen' : 'text-lossRed';
+    const pnlPrefix = pnl >= 0 ? '+' : '';
+
+    return `
+      <tr class="hover:bg-darkCardHover/40 transition">
+        <td class="py-2.5 text-gray-500">${idx + 1}</td>
+        <td class="py-2.5 text-gray-300">${t.timestamp || '--'}</td>
+        <td class="py-2.5 font-bold text-white">${t.symbol || '--'}</td>
+        <td class="py-2.5">${sideBadge}</td>
+        <td class="py-2.5 text-gray-300">$${Number(t.entry_price || 0).toFixed(4)}</td>
+        <td class="py-2.5 text-gray-300">$${Number(t.exit_price || 0).toFixed(4)}</td>
+        <td class="py-2.5 font-bold ${pnlColor}">${pnlPrefix}$${pnl.toFixed(2)}</td>
+        <td class="py-2.5 text-gray-400 text-[11px]">${escapeHtml(t.exit_reason || t.reason || 'Đóng chuẩn')}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Xuất file CSV
+btnExportCsv.addEventListener('click', () => {
+  const url = `${serverUrl.replace(/\/+$/, '')}/api/download_csv`;
+  window.open(url, '_blank');
+});
+
+// =======================================================
+// TAB 4: CẤU HÌNH THAM SỐ CHIẾN LƯỢC LIVE
+// =======================================================
+function setupStrategySliders() {
+  stratLeverage.addEventListener('input', () => {
+    stratLeverageVal.textContent = `${stratLeverage.value}x`;
+  });
+  stratRisk.addEventListener('input', () => {
+    stratRiskVal.textContent = `${parseFloat(stratRisk.value).toFixed(1)}%`;
+  });
+  stratAdx.addEventListener('input', () => {
+    stratAdxVal.textContent = stratAdx.value;
+  });
+
+  stratBtnBluechip.addEventListener('click', () => {
+    activeTradingMode = 'BLUECHIP_ONLY';
+    updateTradingModeButtons();
+  });
+  stratBtnMarket.addEventListener('click', () => {
+    activeTradingMode = 'MARKET_ALL';
+    updateTradingModeButtons();
+  });
+
+  btnSaveLiveStrategy.addEventListener('click', saveLiveStrategySettings);
+}
+
+async function loadStrategySettings() {
+  try {
+    const data = await fetchApi('/api/status');
+    if (!data) return;
+
+    activeTradingMode = data.trading_mode || 'MARKET_ALL';
+    updateTradingModeButtons();
+
+    if (data.leverage) {
+      stratLeverage.value = data.leverage;
+      stratLeverageVal.textContent = `${data.leverage}x`;
+    }
+    if (data.risk_percent) {
+      stratRisk.value = data.risk_percent;
+      stratRiskVal.textContent = `${parseFloat(data.risk_percent).toFixed(1)}%`;
+    }
+    if (data.protection_matrix && data.protection_matrix.adx_filter) {
+      const adx = data.protection_matrix.adx_filter.min_adx || 20;
+      stratAdx.value = adx;
+      stratAdxVal.textContent = adx;
+    }
+    if (data.real_trading_hard_cap) {
+      stratHardCap.value = data.real_trading_hard_cap;
+    }
+    if (data.use_trailing_stop !== undefined) {
+      stratTrailingStop.checked = !!data.use_trailing_stop;
+    }
+    if (data.protection_matrix && data.protection_matrix.btc_regime) {
+      stratBtcFilter.checked = data.protection_matrix.btc_regime.enabled !== false;
+      const dir = data.protection_matrix.btc_regime.direction || 'AUTO';
+      stratTradeDirection.value = dir;
+    }
+    if (data.protection_matrix && data.protection_matrix.dynamic_leverage) {
+      stratDynamicLev.checked = data.protection_matrix.dynamic_leverage.enabled !== false;
+    }
+  } catch (e) {
+    console.debug('Lỗi đọc cấu hình chiến lược:', e);
+  }
+}
+
+async function saveLiveStrategySettings() {
+  btnSaveLiveStrategy.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ĐANG LƯU...';
+  stratStatusMsg.className = 'hidden';
+
+  const payload = {
+    trading_mode: activeTradingMode,
+    trade_direction: stratTradeDirection.value,
+    leverage: parseInt(stratLeverage.value, 10),
+    risk_percent: parseFloat(stratRisk.value),
+    adx_min: parseFloat(stratAdx.value),
+    real_trading_hard_cap: parseFloat(stratHardCap.value),
+    use_trailing_stop: stratTrailingStop.checked,
+    enable_btc_regime_filter: stratBtcFilter.checked,
+    enable_dynamic_leverage: stratDynamicLev.checked
+  };
+
+  try {
+    const res = await fetchApi('/api/update_settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    stratStatusMsg.className = 'p-3 rounded-lg text-xs font-mono text-center bg-profitGreen/20 text-profitGreen border border-profitGreen/40';
+    stratStatusMsg.innerHTML = '<i class="fa-solid fa-circle-check"></i> Đã lưu cấu hình thời gian thực thành công lên máy chủ VPS!';
+    audioSynth.playTakeProfitSound();
+    pollDashboardData();
+  } catch (err) {
+    stratStatusMsg.className = 'p-3 rounded-lg text-xs font-mono text-center bg-lossRed/20 text-lossRed border border-lossRed/40';
+    stratStatusMsg.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Không thể lưu cấu hình: ${err.message}`;
+  } finally {
+    btnSaveLiveStrategy.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> <span>LƯU CẤU HÌNH LIVE</span>';
+  }
+}
+
+// =======================================================
+// TAB 5: NHẬT KÝ LOGS LIVE STREAM TERMINAL
+// =======================================================
+async function pollLiveLogs() {
+  if (!logTerminalBox) return;
+  try {
+    const res = await fetchApi('/api/logs?lines=120');
+    if (!res || !res.lines) return;
+
+    if (res.source && logSourceBadge) {
+      logSourceBadge.textContent = `Nguồn: ${res.source}`;
+    }
+
+    logTerminalBox.innerHTML = res.lines.map(line => {
+      let colorClass = 'text-gray-300';
+      if (line.includes('ERROR') || line.includes('CRITICAL') || line.includes('Exception')) {
+        colorClass = 'text-lossRed font-bold';
+      } else if (line.includes('WARNING') || line.includes('CẢNH BÁO')) {
+        colorClass = 'text-yellow-400';
+      } else if (line.includes('KHỚP LỆNH') || line.includes('BUY') || line.includes('LONG') || line.includes('THẮNG')) {
+        colorClass = 'text-profitGreen font-bold';
+      } else if (line.includes('SELL') || line.includes('SHORT')) {
+        colorClass = 'text-red-400 font-bold';
+      } else if (line.includes('DeepSeek') || line.includes('AI') || line.includes('Gatekeeper')) {
+        colorClass = 'text-purple-300';
+      }
+
+      return `<div class="${colorClass} hover:bg-white/5 px-1 py-0.5 rounded transition">${escapeHtml(line)}</div>`;
+    }).join('');
+
+    if (logAutoScroll && logAutoScroll.checked) {
+      logTerminalBox.scrollTop = logTerminalBox.scrollHeight;
+    }
+  } catch (e) {
+    console.debug('Lỗi nạp logs:', e);
+  }
+}
+
+btnRefreshLogs.addEventListener('click', pollLiveLogs);
+btnClearLogs.addEventListener('click', () => {
+  if (logTerminalBox) logTerminalBox.innerHTML = '<div class="text-gray-600">Đã xóa khung nhìn logs tạm thời. Nhấn Làm Mới để tải lại.</div>';
+});
+
+// =======================================================
+// TAB 6: TRỢ LÝ AI QUANT COPILOT
+// =======================================================
+function setupAiQuickButtons() {
+  document.querySelectorAll('.ai-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prompt = btn.textContent.replace(/^[^\s]+\s+/, '');
+      aiChatInput.value = prompt;
+      aiChatForm.dispatchEvent(new Event('submit'));
+    });
+  });
+}
+
 aiChatForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const query = aiChatInput.value.trim();
   if (!query) return;
 
   const userMsgDiv = document.createElement('div');
-  userMsgDiv.className = 'bg-binanceGold/10 border border-binanceGold/30 text-white rounded-lg p-2.5 ml-4 text-xs font-mono';
+  userMsgDiv.className = 'bg-binanceGold/10 border border-binanceGold/30 text-white rounded-lg p-2.5 ml-8 text-xs font-mono';
   userMsgDiv.innerHTML = `<b>Bạn:</b> ${escapeHtml(query)}`;
   aiChatMessages.appendChild(userMsgDiv);
   aiChatInput.value = '';
   aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
 
   const botThinking = document.createElement('div');
-  botThinking.className = 'bg-darkBase/70 border border-darkBorder text-gray-400 rounded-lg p-2.5 mr-4 text-xs font-mono flex items-center space-x-2';
+  botThinking.className = 'bg-darkBase/70 border border-darkBorder text-gray-400 rounded-lg p-2.5 mr-8 text-xs font-mono flex items-center space-x-2';
   botThinking.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-400"></i> <span>DeepSeek V4.1 Flash đang phân tích định lượng...</span>';
   aiChatMessages.appendChild(botThinking);
   aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
@@ -502,7 +1014,7 @@ aiChatForm.addEventListener('submit', async (e) => {
     botThinking.remove();
 
     const botMsgDiv = document.createElement('div');
-    botMsgDiv.className = 'bg-darkBase border border-purple-500/30 text-gray-200 rounded-lg p-2.5 mr-4 text-xs leading-relaxed';
+    botMsgDiv.className = 'bg-darkBase border border-purple-500/30 text-gray-200 rounded-lg p-2.5 mr-8 text-xs leading-relaxed font-mono';
     botMsgDiv.innerHTML = `<div class="flex items-center space-x-1.5 text-purple-400 font-bold mb-1"><i class="fa-solid fa-brain text-[10px]"></i><span>Trợ Lý Quant (${(res && res.provider) || 'DeepSeek V4.1'}):</span></div>${escapeHtml((res && (res.reply || res.response)) || 'Không có phản hồi từ mô hình AI.')}`;
     aiChatMessages.appendChild(botMsgDiv);
     aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
@@ -517,11 +1029,13 @@ aiChatForm.addEventListener('submit', async (e) => {
 
 function escapeHtml(text) {
   const div = document.createElement('div');
-  div.textContent = text;
+  div.textContent = text || '';
   return div.innerHTML;
 }
 
-// Bật tắt âm thanh
+// =======================================================
+// ÂM THANH & CÀI ĐẶT
+// =======================================================
 btnAudioToggle.addEventListener('click', () => {
   soundEnabled = !soundEnabled;
   updateAudioIcon();
@@ -584,7 +1098,7 @@ btnLoginSubmit.addEventListener('click', async () => {
   }
 });
 
-// Modal Cài Đặt
+// Modal Cài Đặt Kết Nối
 btnSettings.addEventListener('click', () => settingsModal.classList.remove('hidden'));
 btnCloseSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
 btnCancelSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
@@ -622,22 +1136,35 @@ async function saveDesktopConfig(patch) {
   } catch (e) {}
 }
 
-// Chuyển chế độ Bluechip / Market Top 80
+// Chuyển đổi nhanh chế độ Bluechip / Market Top 80 ở Header
 btnModeBluechip.addEventListener('click', async () => {
-  await fetchApi('/api/update_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trading_mode: 'BLUECHIP_ONLY' }) });
-  pollDashboardData();
-});
-btnModeMarket.addEventListener('click', async () => {
-  await fetchApi('/api/update_settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trading_mode: 'MARKET_ALL' }) });
+  activeTradingMode = 'BLUECHIP_ONLY';
+  await fetchApi('/api/update_settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trading_mode: 'BLUECHIP_ONLY' })
+  });
+  updateTradingModeButtons();
   pollDashboardData();
 });
 
-// Tạm dừng / Bật lại bot
+btnModeMarket.addEventListener('click', async () => {
+  activeTradingMode = 'MARKET_ALL';
+  await fetchApi('/api/update_settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trading_mode: 'MARKET_ALL' })
+  });
+  updateTradingModeButtons();
+  pollDashboardData();
+});
+
+// Tạm dừng / Tiếp tục bot
 async function togglePauseResume(forcePause = null) {
   await fetchApi('/api/toggle_pause', { method: 'POST' });
   pollDashboardData();
 }
 btnPauseResume.addEventListener('click', () => togglePauseResume());
 
-// Bắt đầu
+// Bắt đầu khởi tạo
 initApp();
