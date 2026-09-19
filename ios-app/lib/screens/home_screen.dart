@@ -63,12 +63,16 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: const Color(0xFFF0B90B).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFF0B90B).withValues(alpha: 0.3)),
               ),
-              child: const Icon(Icons.bolt, color: Color(0xFFF0B90B), size: 18),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+              ),
             ),
             const SizedBox(width: 8),
             const Column(
