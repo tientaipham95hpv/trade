@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Futures Quant Pro Terminal (2.0 PRO)</title>
+    <link rel="icon" type="image/png" href="/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        darkBase: '#080a0f',
+                        darkCard: '#10141e',
+                        darkCardHover: '#141a27',
+                        darkBorder: '#1c2436',
+                        binanceGold: '#F0B90B',
+                        profitGreen: '#0ECB81',
+                        lossRed: '#F6465D',
+                        cyberCyan: '#00F0FF',
+                        cyberPurple: '#A855F7'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #080a0f; }
+        ::-webkit-scrollbar-thumb { background: #1c2436; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #F0B90B; }
+
+        .glass-panel {
+            background: rgba(16, 20, 30, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .glass-card {
+            background: rgba(18, 23, 35, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: all 0.2s ease-in-out;
+        }
+        .glass-card:hover {
+            border-color: rgba(240, 185, 11, 0.3);
+            transform: translateY(-2px);
+        }
+        .glow-green { box-shadow: 0 0 20px rgba(14, 203, 129, 0.2); }
+        .glow-red { box-shadow: 0 0 20px rgba(246, 70, 93, 0.2); }
+        .glow-gold { box-shadow: 0 0 20px rgba(240, 185, 11, 0.25); }
+
+        /* Robot Mascot Keyframes */
+        @keyframes float-robot {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-7px) rotate(1.5deg); }
+        }
+        @keyframes eye-glow {
+            0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px #0ECB81); }
+            50% { opacity: 0.6; filter: drop-shadow(0 0 2px #0ECB81); }
+        }
+        @keyframes orbit-drone {
+            0% { transform: rotate(0deg) translateX(36px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(36px) rotate(-360deg); }
+        }
+        @keyframes mouth-wave {
+            0%, 100% { height: 3px; }
+            50% { height: 9px; }
+        }
+        @keyframes antenna-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 6px #F0B90B); }
+            50% { opacity: 0.4; transform: scale(0.8); filter: drop-shadow(0 0 1px #F0B90B); }
+        }
+        @keyframes robot-jump {
+            0% { transform: scale(1) translateY(0); }
+            40% { transform: scale(1.15) translateY(-14px) rotate(4deg); }
+            70% { transform: scale(0.95) translateY(2px) rotate(-2deg); }
+            100% { transform: scale(1) translateY(0); }
+        }
+        .robot-floating { animation: float-robot 3.5s infinite ease-in-out; }
+        .robot-eye-glow { animation: eye-glow 2s infinite ease-in-out; }
+        .drone-orbit { animation: orbit-drone 6s infinite linear; }
+        .mouth-bar-1 { animation: mouth-wave 0.8s infinite ease-in-out; }
+        .mouth-bar-2 { animation: mouth-wave 0.6s infinite ease-in-out 0.15s; }
+        .mouth-bar-3 { animation: mouth-wave 0.9s infinite ease-in-out 0.3s; }
+        .mouth-bar-4 { animation: mouth-wave 0.7s infinite ease-in-out 0.1s; }
+        .antenna-dot { animation: antenna-pulse 1.8s infinite ease-in-out; }
+        .robot-jumping { animation: robot-jump 0.5s ease-out; }
+    </style>
+</head>
+<body class="bg-darkBase text-gray-200 font-sans min-h-screen antialiased selection:bg-binanceGold selection:text-black">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-md w-full p-6 rounded-2xl border border-lossRed/40 shadow-2xl space-y-4">
+            <div class="w-12 h-12 rounded-full bg-red-500/20 text-lossRed flex items-center justify-center text-2xl mx-auto">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="text-center">
+                <h3 class="text-lg font-bold text-white" id="modal-title">Xác nhận đóng khẩn cấp</h3>
+                <p class="text-sm text-gray-400 mt-2" id="modal-desc">Bạn có chắc chắn muốn đóng toàn bộ vị thế đang mở bằng lệnh Market?</p>
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeConfirmModal()" class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 transition">Hủy bỏ</button>
+                <button id="modal-confirm-btn" class="flex-1 py-2.5 rounded-xl text-sm font-bold bg-lossRed hover:bg-red-700 text-white shadow-lg shadow-red-900/40 transition">XÁC NHẬN ĐÓNG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-[998] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-binanceGold/30 shadow-2xl space-y-5">
+            <div class="flex justify-between items-center pb-3 border-b border-darkBorder">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-sliders text-binanceGold text-lg"></i>
+                    <h3 class="text-base font-bold text-white">CẤU HÌNH HỆ THỐNG THỜI GIAN THỰC</h3>
+                </div>
+                <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="space-y-4 text-xs">
+                <!-- Trading Mode Selector -->
+                <div>
+                    <label class="block font-semibold text-gray-300 mb-2">Chế độ giao dịch thị trường:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button" onclick="selectTradingMode('BLUECHIP_ONLY')" id="opt-mode-bluechip" class="p-3 rounded-xl border text-left flex flex-col justify-between transition border-darkBorder bg-darkBase text-gray-300">
+                            <span class="font-bold flex items-center gap-1.5 text-sm">
+                                <span>🛡️</span> Chỉ BTC & ETH
+                            </span>
+                            <span class="text-[10px] text-gray-500 mt-1">An toàn tuyệt đối, thanh khoản sâu, ít giật râu.</span>
+                        </button>
+                        <button type="button" onclick="selectTradingMode('MARKET_ALL')" id="opt-mode-all" class="p-3 rounded-xl border text-left flex flex-col justify-between transition border-binanceGold bg-yellow-950/20 text-binanceGold">
+                            <span class="font-bold flex items-center gap-1.5 text-sm">
+                                <span>🚀</span> Toàn Bộ Altcoin / Meme
+                            </span>
+                            <span class="text-[10px] text-gray-400 mt-1">Quét top 50 coin, biên độ sóng lớn (10-30%).</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Leverage Selector -->
+                <div>
+                    <label class="block font-semibold text-gray-300 mb-2">Đòn bẩy giao dịch (Leverage):</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" onclick="selectLeverage(3)" id="opt-lev-3" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">3x</button>
+                        <button type="button" onclick="selectLeverage(5)" id="opt-lev-5" class="py-2 rounded-lg font-mono font-bold border border-binanceGold bg-yellow-950/30 text-binanceGold">5x</button>
+                        <button type="button" onclick="selectLeverage(10)" id="opt-lev-10" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">10x</button>
+                        <button type="button" onclick="selectLeverage(15)" id="opt-lev-15" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">15x</button>
+                    </div>
+                </div>
+
+                <!-- Risk Percent Selector -->
+                <div>
+                    <label class="block font-semibold text-gray-300 mb-2">Mức rủi ro tối đa mỗi lệnh (% Vốn):</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button type="button" onclick="selectRisk(0.5)" id="opt-risk-05" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">0.5%</button>
+                        <button type="button" onclick="selectRisk(1.0)" id="opt-risk-10" class="py-2 rounded-lg font-mono font-bold border border-profitGreen bg-green-950/30 text-profitGreen">1.0%</button>
+                        <button type="button" onclick="selectRisk(1.5)" id="opt-risk-15" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">1.5%</button>
+                        <button type="button" onclick="selectRisk(2.0)" id="opt-risk-20" class="py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300">2.0%</button>
+                    </div>
+                </div>
+
+                <!-- Trailing Stop Toggle -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-darkBase border border-darkBorder">
+                    <div>
+                        <p class="font-bold text-white text-xs">Dynamic Trailing Stop Loss 🚀</p>
+                        <p class="text-[10px] text-gray-400">Tự động dâng SL theo đà tăng để khóa chặt lợi nhuận.</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="chk-trailing-stop" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-profitGreen"></div>
+                    </label>
+                </div>
+
+                <!-- AI Copilot API Key Input -->
+                <div class="p-3.5 rounded-xl bg-darkBase border border-cyan-900/40 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="font-bold text-white text-xs flex items-center gap-1.5">
+                            <i class="fa-solid fa-brain text-cyberCyan"></i> Google Gemini API Key (Miễn Phí)
+                        </label>
+                        <a href="https://aistudio.google.com/" target="_blank" class="text-[11px] text-binanceGold hover:underline font-semibold flex items-center gap-1">
+                            <span>Lấy key miễn phí 30s</span> <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                        </a>
+                    </div>
+                    <input type="password" id="input-ai-key" placeholder="AIzaSy... (Để trống nếu dùng Quant Heuristics)" class="w-full bg-darkCard border border-darkBorder rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyberCyan font-mono">
+                    <p class="text-[10px] text-gray-400">Dán key miễn phí từ Google AI Studio để mở khóa trí tuệ nhân tạo Gemini 2.5 Flash thông minh, phân tích sâu và audit lệnh.</p>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button onclick="closeSettingsModal()" class="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 transition">Đóng</button>
+                <button onclick="saveLiveSettings()" class="flex-1 py-2.5 rounded-xl text-xs font-bold bg-binanceGold hover:bg-yellow-500 text-black shadow-lg shadow-yellow-900/30 transition">LƯU CẤU HÌNH NGAY</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive AI Copilot Chat Modal / Drawer -->
+    <div id="ai-chat-modal" class="fixed inset-0 z-[999] bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="glass-panel max-w-2xl w-full h-[620px] rounded-2xl border border-cyberCyan/40 shadow-2xl flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 bg-gradient-to-r from-darkCard via-cyan-950/20 to-darkCard border-b border-darkBorder flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-950/60 border border-cyberCyan/50 flex items-center justify-center text-cyberCyan text-lg shadow-lg shadow-cyan-950/50">
+                        <i class="fa-solid fa-robot animate-bounce"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-extrabold text-sm text-white tracking-wide">CYBER-NOVA 2.0 • AI QUANT COPILOT</h3>
+                            <span id="ai-connected-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyberCyan border border-cyan-700/50">LOCAL QUANT BRAIN</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400">Trợ lý Phân Tích Kỹ Thuật & Giám Sát Rủi Ro Lượng Tử Thời Gian Thực</p>
+                    </div>
+                </div>
+                <button onclick="closeAiModal()" class="w-8 h-8 rounded-lg bg-darkBase hover:bg-gray-800 text-gray-400 hover:text-white flex items-center justify-center transition">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Chat Stream Body -->
+            <div id="ai-chat-body" class="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs">
+                <!-- Welcome Message Bubble -->
+                <div class="flex gap-2.5 items-start">
+                    <div class="w-7 h-7 rounded-lg bg-cyan-950 border border-cyberCyan/50 flex items-center justify-center text-cyberCyan text-xs flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-microchip"></i>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-darkCard border border-cyan-900/30 text-gray-200 max-w-[85%] leading-relaxed shadow-sm">
+                        Chào Sếp! Em là <b>Cyber-Nova</b>. Em liên tục đọc dữ liệu giá, các vị thế đang mở và chỉ báo ADX/EMA của bot.<br><br>
+                        Sếp muốn em hỗ trợ soi kèo, phân tích danh mục hay tư vấn chiến lược gì hôm nay ạ?
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Suggestion Chips -->
+            <div class="px-4 py-2 border-t border-darkBorder/60 bg-darkBase/40 flex items-center gap-2 overflow-x-auto text-[11px] whitespace-nowrap">
+                <button onclick="sendQuickPrompt('Phân tích 3 vị thế đang chạy')" class="px-2.5 py-1 rounded-full bg-cyan-950/40 text-cyan-300 border border-cyan-800/50 hover:bg-cyan-900/50 transition">
+                    📊 Soi Kèo Các Vị Thế
+                </button>
+                <button onclick="sendQuickPrompt('Có nên chuyển sang chế độ chỉ đánh BTC/ETH không?')" class="px-2.5 py-1 rounded-full bg-yellow-950/40 text-binanceGold border border-yellow-800/50 hover:bg-yellow-900/50 transition">
+                    🎯 Tư Vấn Chế Độ Quét
+                </button>
+                <button onclick="sendQuickPrompt('Hướng dẫn setup API key AI')" class="px-2.5 py-1 rounded-full bg-blue-950/40 text-blue-300 border border-blue-800/50 hover:bg-blue-900/50 transition">
+                    🔑 Hướng Dẫn Setup Key
+                </button>
+                <button onclick="sendQuickPrompt('Tiến độ đánh tiền thật hiện tại thế nào?')" class="px-2.5 py-1 rounded-full bg-green-950/40 text-profitGreen border border-green-800/50 hover:bg-green-900/50 transition">
+                    🏆 Đánh Giá Đánh Thật
+                </button>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="p-3 bg-darkCard border-t border-darkBorder flex items-center gap-2">
+                <input type="text" id="ai-chat-input" onkeydown="if(event.key==='Enter') sendAiMessage()" placeholder="Hỏi Cyber-Nova về thị trường, lệnh đang chạy, tư vấn rủi ro..." class="flex-1 bg-darkBase border border-darkBorder rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyberCyan transition font-sans">
+                <button onclick="sendAiMessage()" id="btn-send-ai" class="px-4 py-2.5 rounded-xl bg-cyberCyan hover:bg-cyan-400 text-black font-bold text-xs shadow-lg shadow-cyan-900/30 transition flex items-center gap-1.5">
+                    <span>Gửi</span> <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-darkBorder bg-darkCard/90 sticky top-0 z-50 backdrop-blur-md">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Left Branding -->
+            <div class="flex items-center space-x-3">
+                <img src="/logo.png" alt="Quant Bot Logo" class="w-10 h-10 rounded-xl object-cover border border-binanceGold/40 shadow-lg shadow-yellow-900/20">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-extrabold text-lg text-white tracking-wider">BINANCE QUANT PRO</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-binanceGold/20 text-binanceGold border border-binanceGold/40" id="badge-version">2.0 PRO</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400 font-medium">Institutional Multi-Timeframe Strategy • Cloud VPS Terminal</p>
+                </div>
+            </div>
+
+            <!-- Center/Right Badges & Controls -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- Ping Latency -->
+                <div class="hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-darkBase border border-darkBorder text-xs text-gray-300 font-mono">
+                    <span id="ping-indicator" class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span>
+                    <span id="ping-latency">24.5 ms</span>
+                </div>
+
+                <!-- Trading Mode Badge -->
+                <span id="badge-trading-mode" class="px-2.5 py-1 rounded-full text-xs font-bold bg-cyan-950/40 text-cyberCyan border border-cyan-700/50 flex items-center gap-1">
+                    <i class="fa-solid fa-radar"></i> <span id="trading-mode-text">ALL MARKET</span>
+                </span>
+
+                <!-- Bot Status Badge -->
+                <span id="badge-status" class="px-2.5 py-1 rounded-full text-xs font-bold bg-green-900/30 text-profitGreen border border-green-700/50 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span> ĐANG CHẠY
+                </span>
+
+                <!-- Sound Alert Toggle Button -->
+                <button onclick="toggleAudio()" id="btn-audio" title="Bật/Tắt chuông âm thanh" class="p-2 rounded-lg bg-darkBase border border-darkBorder text-gray-300 hover:text-binanceGold hover:border-binanceGold/40 transition">
+                    <i class="fa-solid fa-volume-high text-sm" id="icon-audio"></i>
+                </button>
+
+                <!-- Quick Settings Modal Trigger -->
+                <button onclick="openSettingsModal()" title="Cài đặt cấu hình thời gian thực" class="p-2 rounded-lg bg-darkBase border border-darkBorder text-gray-300 hover:text-binanceGold hover:border-binanceGold/40 transition">
+                    <i class="fa-solid fa-gear text-sm"></i>
+                </button>
+
+                <!-- Refresh Button -->
+                <button onclick="fetchStatus(true)" title="Làm mới ngay" class="p-2 rounded-lg bg-darkBase border border-darkBorder text-gray-300 hover:text-binanceGold hover:border-binanceGold/40 transition">
+                    <i class="fa-solid fa-arrows-rotate text-sm" id="btn-refresh-icon"></i>
+                </button>
+
+                <!-- Clock -->
+                <span id="clock" class="text-xs font-mono text-gray-400 hidden lg:inline px-2 py-1 rounded bg-darkBase border border-darkBorder">--:--:-- UTC</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Interactive Cyber AI Robot Mascot & Speech Assistant Card -->
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border border-cyan-800/50 relative overflow-hidden bg-gradient-to-r from-darkCard via-[#0d1527] to-cyan-950/20 shadow-xl">
+            <!-- Ambient neon lighting -->
+            <div class="absolute -top-12 -left-12 w-44 h-44 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-12 -right-12 w-44 h-44 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <div class="flex flex-col sm:flex-row items-center gap-5 relative z-10">
+                <!-- Mascot High-Tech Avatar Container -->
+                <div class="relative cursor-pointer flex-shrink-0 group select-none" onclick="triggerMascotClick()" title="Bấm vào em để trò chuyện!">
+                    <!-- Floating Robot Container -->
+                    <div id="robot-avatar-box" class="w-20 h-20 sm:w-22 sm:h-22 rounded-2xl bg-gradient-to-b from-[#1a233a] via-[#101728] to-[#0a0f1d] border-2 border-cyberCyan/60 flex items-center justify-center shadow-2xl shadow-cyan-950/70 relative overflow-visible robot-floating transition-transform duration-300 group-hover:scale-105">
+                        
+                        <!-- Orbiting Satellite Drone -->
+                        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div class="w-full h-full relative drone-orbit">
+                                <div class="w-3 h-3 rounded-full bg-binanceGold border border-yellow-200 shadow-md shadow-yellow-500/80 absolute top-0 left-1/2 -ml-1.5 flex items-center justify-center">
+                                    <span class="w-1 h-1 rounded-full bg-white"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vector Cyber Robot (Rich SVG) -->
+                        <svg class="w-14 h-14" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="headGrad" x1="16" y1="18" x2="64" y2="66" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#1e293b"/>
+                                    <stop offset="1" stop-color="#090d16"/>
+                                </linearGradient>
+                                <linearGradient id="visorGrad" x1="22" y1="30" x2="58" y2="52" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#08101e"/>
+                                    <stop offset="1" stop-color="#030712"/>
+                                </linearGradient>
+                            </defs>
+
+                            <!-- Antenna -->
+                            <path d="M40 8V18" stroke="#00F0FF" stroke-width="2.5" stroke-linecap="round"/>
+                            <circle cx="40" cy="7" r="4.5" fill="#F0B90B" class="antenna-dot"/>
+
+                            <!-- Robot Head Armor -->
+                            <rect x="15" y="18" width="50" height="42" rx="14" fill="url(#headGrad)" stroke="#00F0FF" stroke-width="2.2"/>
+
+                            <!-- Ear Muff Thrusters -->
+                            <rect x="10" y="30" width="5" height="18" rx="2.5" fill="#00F0FF" opacity="0.8"/>
+                            <rect x="65" y="30" width="5" height="18" rx="2.5" fill="#00F0FF" opacity="0.8"/>
+
+                            <!-- Visor Glass -->
+                            <rect x="21" y="27" width="38" height="24" rx="8" fill="url(#visorGrad)" stroke="#38bdf8" stroke-width="1.2"/>
+
+                            <!-- Digital Eyes (Interactive Dynamic State) -->
+                            <!-- Happy Eyes (curved arcs ^ ^) -->
+                            <g id="robot-eyes-happy" class="hidden">
+                                <path d="M26 38 Q30 33 34 38" stroke="#0ECB81" stroke-width="3.2" stroke-linecap="round" fill="none" class="robot-eye-glow"/>
+                                <path d="M46 38 Q50 33 54 38" stroke="#0ECB81" stroke-width="3.2" stroke-linecap="round" fill="none" class="robot-eye-glow"/>
+                            </g>
+                            <!-- Normal / Focused Eyes (Pill LEDs) -->
+                            <g id="robot-eyes-normal">
+                                <rect id="robot-eye-left" x="27" y="34" width="7" height="9" rx="3.5" fill="#0ECB81" class="robot-eye-glow"/>
+                                <rect id="robot-eye-right" x="46" y="34" width="7" height="9" rx="3.5" fill="#0ECB81" class="robot-eye-glow"/>
+                            </g>
+                            <!-- Alert Eyes (Diagonal) -->
+                            <g id="robot-eyes-alert" class="hidden">
+                                <path d="M26 35 L34 39" stroke="#F6465D" stroke-width="3.5" stroke-linecap="round"/>
+                                <path d="M54 35 L46 39" stroke="#F6465D" stroke-width="3.5" stroke-linecap="round"/>
+                            </g>
+
+                            <!-- Equalizer Voice Waveform Mouth -->
+                            <g transform="translate(32, 53)">
+                                <line x1="0" y1="0" x2="0" y2="4" stroke="#00F0FF" stroke-width="2" stroke-linecap="round" class="mouth-bar-1"/>
+                                <line x1="5" y1="0" x2="5" y2="6" stroke="#00F0FF" stroke-width="2" stroke-linecap="round" class="mouth-bar-2"/>
+                                <line x1="11" y1="0" x2="11" y2="5" stroke="#00F0FF" stroke-width="2" stroke-linecap="round" class="mouth-bar-3"/>
+                                <line x1="16" y1="0" x2="16" y2="3" stroke="#00F0FF" stroke-width="2" stroke-linecap="round" class="mouth-bar-4"/>
+                            </g>
+                        </svg>
+
+                        <!-- Pulse status dot -->
+                        <span id="robot-status-dot" class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-profitGreen border-2 border-darkBase flex items-center justify-center">
+                            <span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+                        </span>
+                    </div>
+                    <span class="text-[9px] text-center block mt-1.5 font-mono text-cyan-400/80 group-hover:text-binanceGold transition">Chạm vào em!</span>
+                </div>
+
+                <!-- Speech Bubble & Real-time Commentary -->
+                <div class="flex-1 text-center sm:text-left space-y-2">
+                    <div class="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <span class="font-extrabold text-sm text-cyberCyan flex items-center gap-1.5">
+                            <i class="fa-solid fa-microchip"></i> CYBER-NOVA 2.0
+                        </span>
+                        <span id="robot-mood-chip" class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-950/60 text-profitGreen border border-emerald-500/50 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-profitGreen animate-pulse"></span>
+                            <span id="robot-mood-text">SIÊU PHẤN KHỞI 🤩</span>
+                        </span>
+                        <span id="badge-ai-model-tag" class="text-[10px] px-2 py-0.5 rounded font-mono bg-cyan-900/30 text-cyan-300 border border-cyan-700/40 hidden sm:inline">
+                            QUANT NEURAL LINK
+                        </span>
+                    </div>
+
+                    <div class="p-3 sm:p-3.5 rounded-xl bg-darkBase/70 border border-cyan-950/60 text-xs sm:text-sm text-gray-100 font-medium leading-relaxed relative">
+                        <p id="robot-speech">
+                            "Chào Sếp! Em đang theo dõi thị trường theo thời gian thực. Hệ thống phòng thủ ADX và Dynamic Trailing Stop đang kích hoạt bảo vệ vốn an toàn tuyệt đối!"
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Action Controls -->
+                <div class="flex sm:flex-col items-center gap-2 flex-shrink-0 w-full sm:w-auto">
+                    <button onclick="openAiModal()" class="flex-1 sm:flex-none w-full px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black shadow-lg shadow-cyan-900/40 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-comments"></i> <span>Trò Chuyện AI</span>
+                    </button>
+                    <button onclick="triggerRobotDialogue()" class="flex-1 sm:flex-none w-full px-3 py-2 rounded-xl text-xs font-semibold bg-darkBase hover:bg-cyan-950/40 text-cyan-300 border border-cyan-800/40 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-dice"></i> <span>Đổi Lời Thoại</span>
+                    </button>
+                    <button onclick="openSettingsModal()" class="flex-1 sm:flex-none w-full px-3 py-2 rounded-xl text-xs font-semibold bg-darkBase hover:bg-yellow-950/40 text-binanceGold border border-yellow-800/40 transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-sliders"></i> <span>Cài Đặt</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Institutional Protection & Filter Status Bar -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                    <i class="fa-solid fa-compass"></i>
+                </div>
+                <div>
+                    <p class="text-[11px] text-gray-400 uppercase font-semibold">ADX Trend Filter</p>
+                    <p class="text-xs font-bold text-white flex items-center gap-1" id="adx-filter-status">
+                        <span class="text-profitGreen"><i class="fa-solid fa-circle-check"></i></span>
+                        <span>ADX ≥ 20.0 (Lọc Sideway)</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center text-lossRed">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <p class="text-[11px] text-gray-400 uppercase font-semibold">BTC Crash Protection</p>
+                    <p class="text-xs font-bold text-white flex items-center gap-1" id="btc-crash-status">
+                        <span class="text-profitGreen"><i class="fa-solid fa-circle-check"></i></span>
+                        <span>Bình Thường (Độ lệch 15m)</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                    <i class="fa-solid fa-newspaper"></i>
+                </div>
+                <div>
+                    <p class="text-[11px] text-gray-400 uppercase font-semibold">Macro News Blackout</p>
+                    <p class="text-xs font-bold text-white flex items-center gap-1" id="news-filter-status">
+                        <span class="text-profitGreen"><i class="fa-solid fa-circle-check"></i></span>
+                        <span>An Toàn (Né tin Mỹ)</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="glass-card p-3 rounded-xl flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center text-binanceGold">
+                    <i class="fa-solid fa-crosshairs"></i>
+                </div>
+                <div>
+                    <p class="text-[11px] text-gray-400 uppercase font-semibold">Dynamic Trailing Stop</p>
+                    <p class="text-xs font-bold text-white flex items-center gap-1" id="trailing-stop-status">
+                        <span class="text-profitGreen"><i class="fa-solid fa-circle-check"></i></span>
+                        <span>BẬT (Khóa lãi tự động)</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric KPI Cards (4 Cards) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Balance & ROI -->
+            <div class="glass-card rounded-2xl p-5 border-l-4 border-l-binanceGold relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tổng Vốn & Số Dư</span>
+                    <div class="w-8 h-8 rounded-lg bg-binanceGold/10 text-binanceGold flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl lg:text-3xl font-extrabold text-white font-mono" id="metric-balance">$0.00 <span class="text-xs font-normal text-gray-400">USDT</span></div>
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-darkBorder">
+                        <span class="text-gray-400">Tăng trưởng ròng:</span>
+                        <span id="metric-roi" class="font-bold font-mono text-profitGreen">+0.00%</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs mt-1">
+                        <span class="text-gray-400">Đòn bẩy:</span>
+                        <span id="metric-leverage" class="font-semibold text-white">5x (ISOLATED)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Unrealized PnL (Floating) -->
+            <div class="glass-card rounded-2xl p-5 border-l-4 border-l-profitGreen relative overflow-hidden" id="card-u-pnl">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">PnL Tạm Tính (Floating)</span>
+                    <div class="w-8 h-8 rounded-lg bg-profitGreen/10 text-profitGreen flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl lg:text-3xl font-extrabold text-profitGreen font-mono" id="metric-unrealized-pnl">+$0.00</div>
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-darkBorder">
+                        <span class="text-gray-400">Số vị thế đang mở:</span>
+                        <span id="metric-open-count" class="font-bold font-mono text-white">0 / 3 vị thế</span>
+                    </div>
+                    <div class="w-full bg-darkBase h-1.5 rounded-full mt-2 overflow-hidden">
+                        <div id="metric-slot-bar" class="bg-profitGreen h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: Realized Net PnL & Win Rate -->
+            <div class="glass-card rounded-2xl p-5 border-l-4 border-l-cyberCyan relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Lãi Ròng Đã Chốt</span>
+                    <div class="w-8 h-8 rounded-lg bg-cyberCyan/10 text-cyberCyan flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl lg:text-3xl font-extrabold text-white font-mono" id="metric-realized-pnl">$0.00</div>
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-darkBorder">
+                        <span class="text-gray-400">Tỷ lệ thắng (Winrate):</span>
+                        <span id="metric-winrate" class="font-bold font-mono text-binanceGold">0.0%</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs mt-1">
+                        <span class="text-gray-400">Lệnh Thắng / Thua:</span>
+                        <span class="font-mono text-white"><span id="metric-wins" class="text-profitGreen font-bold">0</span> / <span id="metric-losses" class="text-lossRed font-bold">0</span> (<span id="metric-total-closed">0</span> lệnh)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: VPS Health & Latency -->
+            <div class="glass-card rounded-2xl p-5 border-l-4 border-l-purple-500 relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sức Khỏe VPS & Uptime</span>
+                    <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center text-sm">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <div class="text-2xl lg:text-3xl font-extrabold text-white font-mono" id="metric-uptime">--</div>
+                    <div class="flex items-center justify-between text-xs mt-2 pt-2 border-t border-darkBorder">
+                        <span class="text-gray-400">CPU: <span id="metric-cpu" class="text-white font-semibold font-mono">0%</span></span>
+                        <span class="text-gray-400">RAM: <span id="metric-ram" class="text-white font-semibold font-mono">0%</span></span>
+                        <span class="text-gray-400">Ổ cứng: <span id="metric-disk" class="text-white font-semibold font-mono">Trống 0GB</span></span>
+                    </div>
+                    <div class="w-full bg-darkBase h-1.5 rounded-full mt-2 overflow-hidden flex">
+                        <div id="ram-progress-bar" class="bg-purple-500 h-full rounded-full transition-all duration-500" style="width: 30%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Scanner Radar Section (BẢNG QUÉT THỊ TRƯỜNG THỜI GIAN THỰC) -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-darkBorder shadow-lg">
+            <div class="px-6 py-4 border-b border-darkBorder flex flex-wrap items-center justify-between gap-4 bg-darkCard/50">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyberCyan text-sm">
+                        <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-white text-base flex items-center gap-2">
+                            <span>RADAR QUÉT THỊ TRƯỜNG THỜI GIAN THỰC (LIVE SCANNER)</span>
+                            <span id="radar-count-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyberCyan border border-cyan-800">50 CẶP COIN</span>
+                        </h2>
+                        <p class="text-[11px] text-gray-400">Phân tích đa khung thời gian: 1H Trend (EMA50/200) + 15m RSI + ADX Lực Sóng</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 font-mono" id="radar-updated-at">Đang cập nhật...</span>
+                    <button onclick="fetchRadar()" class="p-2 rounded-lg bg-darkBase border border-darkBorder text-gray-300 hover:text-cyberCyan transition">
+                        <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto max-h-72 overflow-y-auto">
+                <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="bg-darkBase/90 text-[10px] uppercase tracking-wider text-gray-400 border-b border-darkBorder sticky top-0 z-10 backdrop-blur-md">
+                        <tr>
+                            <th class="px-5 py-2.5">Cặp Coin</th>
+                            <th class="px-5 py-2.5">Giá Hiện Tại</th>
+                            <th class="px-5 py-2.5">Xu Hướng 1H</th>
+                            <th class="px-5 py-2.5">RSI (15m)</th>
+                            <th class="px-5 py-2.5">ADX Lực Trend</th>
+                            <th class="px-5 py-2.5">Funding Rate</th>
+                            <th class="px-5 py-2.5">Trạng Thái Radar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="radar-table-body" class="divide-y divide-darkBorder font-mono">
+                        <tr>
+                            <td colspan="7" class="px-6 py-8 text-center text-gray-400 font-sans">
+                                <i class="fa-solid fa-satellite fa-spin text-cyberCyan mr-2"></i> Đang nạp radar quét thị trường...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section: Active Positions Terminal -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-darkBorder shadow-lg">
+            <div class="px-6 py-4 border-b border-darkBorder flex flex-wrap items-center justify-between gap-4 bg-darkCard/50">
+                <div class="flex items-center space-x-3">
+                    <span class="w-3 h-3 rounded-full bg-profitGreen animate-ping"></span>
+                    <h2 class="font-bold text-white text-base">CÁC VỊ THẾ ĐANG MỞ (LIVE POSITIONS)</h2>
+                    <span id="badge-open-slots" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-darkBase border border-darkBorder text-gray-300">3 vị thế</span>
+                </div>
+                <!-- Controls: Pause & Panic Close -->
+                <div class="flex items-center space-x-3">
+                    <button id="btn-pause" onclick="togglePause()" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 transition flex items-center space-x-2">
+                        <i id="btn-pause-icon" class="fa-solid fa-pause"></i>
+                        <span id="btn-pause-text">Tạm Dừng Bot</span>
+                    </button>
+                    <button onclick="confirmPanicClose()" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-lossRed/90 hover:bg-red-700 text-white border border-red-500/50 shadow-lg shadow-red-900/30 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-radiation"></i>
+                        <span>ĐÓNG TẤT CẢ LỆNH</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="bg-darkBase/80 text-[11px] uppercase tracking-wider text-gray-400 border-b border-darkBorder">
+                        <tr>
+                            <th class="px-5 py-3">Cặp Coin</th>
+                            <th class="px-5 py-3">Chiều</th>
+                            <th class="px-5 py-3">Giá Vào (Entry)</th>
+                            <th class="px-5 py-3">Giá Hiện Tại</th>
+                            <th class="px-5 py-3">Stop Loss</th>
+                            <th class="px-5 py-3">Take Profit</th>
+                            <th class="px-5 py-3">Tiến Trình (SL ➜ TP)</th>
+                            <th class="px-5 py-3">Ký Quỹ</th>
+                            <th class="px-5 py-3">PnL Tạm Tính</th>
+                            <th class="px-5 py-3 text-center">Trạng Thái</th>
+                            <th class="px-5 py-3 text-center">Thao Tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-table-body" class="divide-y divide-darkBorder font-mono text-xs sm:text-sm">
+                        <tr>
+                            <td colspan="11" class="px-6 py-8 text-center text-gray-400 font-sans">
+                                <i class="fa-solid fa-spinner fa-spin text-binanceGold mr-2"></i> Đang tải danh sách vị thế thời gian thực...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section: Interactive Equity Curve Chart -->
+        <div class="glass-card rounded-2xl p-5 border border-darkBorder">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-darkBorder">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-area text-profitGreen"></i>
+                    <h2 class="font-bold text-white text-base">BIỂU ĐỒ LỢI NHUẬN TÍCH LŨY (EQUITY CURVE)</h2>
+                </div>
+                <div class="text-xs text-gray-400 flex items-center gap-4">
+                    <span><i class="fa-solid fa-circle text-[8px] text-profitGreen mr-1"></i>PnL Tích Lũy ($)</span>
+                    <span>Tự động cập nhật theo từng lệnh đóng</span>
+                </div>
+            </div>
+            <div class="h-64 sm:h-72 w-full mt-4">
+                <canvas id="equityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Section: Recent Closed Trades History -->
+        <div class="glass-card rounded-2xl overflow-hidden border border-darkBorder shadow-lg">
+            <div class="px-6 py-4 border-b border-darkBorder flex flex-wrap items-center justify-between gap-4 bg-darkCard/50">
+                <div class="flex items-center space-x-3">
+                    <i class="fa-solid fa-clock-rotate-left text-binanceGold"></i>
+                    <h2 class="font-bold text-white text-base">NHẬT KÝ LỆNH ĐÃ ĐÓNG (TRADE HISTORY)</h2>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative">
+                        <input type="text" id="history-search" oninput="applyHistoryFilter()" placeholder="Tìm theo coin..." class="bg-darkBase text-xs px-3 py-1.5 pl-8 rounded-lg border border-darkBorder text-white focus:outline-none focus:border-binanceGold w-36 sm:w-44">
+                        <i class="fa-solid fa-magnifying-glass text-gray-500 absolute left-2.5 top-2.5 text-xs"></i>
+                    </div>
+                    <button onclick="setFilterType('all')" id="btn-filter-all" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-binanceGold text-black">Tất cả</button>
+                    <button onclick="setFilterType('win')" id="btn-filter-win" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-darkBase text-gray-300 border border-darkBorder hover:text-profitGreen">Thắng 🟢</button>
+                    <button onclick="setFilterType('loss')" id="btn-filter-loss" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-darkBase text-gray-300 border border-darkBorder hover:text-lossRed">Thua 🔴</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="bg-darkBase/80 text-[11px] uppercase tracking-wider text-gray-400 border-b border-darkBorder">
+                        <tr>
+                            <th class="px-5 py-3">Thời Gian</th>
+                            <th class="px-5 py-3">Cặp Coin</th>
+                            <th class="px-5 py-3">Chiều</th>
+                            <th class="px-5 py-3">Giá Vào</th>
+                            <th class="px-5 py-3">Giá Đóng</th>
+                            <th class="px-5 py-3">Khối Lượng</th>
+                            <th class="px-5 py-3">PnL ($)</th>
+                            <th class="px-5 py-3">PnL (%)</th>
+                            <th class="px-5 py-3">Lý Do Đóng Vị Thế</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body" class="divide-y divide-darkBorder font-mono text-xs">
+                        <tr>
+                            <td colspan="9" class="px-6 py-6 text-center text-gray-400 font-sans">Đang tải lịch sử giao dịch...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-darkBorder py-6 mt-12 bg-darkCard/40 text-center text-xs text-gray-500">
+        <p>Binance Futures Quantitative Trading Bot 2.0 PRO • Được bảo vệ bởi Cloud VPS Watchdog & Multi-Timeframe Pullback Strategy</p>
+    </footer>
+
+    <!-- Client-Side Script Logic -->
+    <script>
+        let equityChartInstance = null;
+        let rawHistoryTrades = [];
+        let currentFilterType = 'all';
+        let isAudioEnabled = true;
+        let audioCtx = null;
+        let lastKnownPositionsCount = 0;
+        let lastKnownRealizedPnl = 0;
+
+        // Current Config State for Settings Modal
+        let currentConfig = {
+            trading_mode: 'MARKET_ALL',
+            leverage: 5,
+            risk_percent: 1.0,
+            use_trailing_stop: true
+        };
+
+        // Web Audio Synthesizer
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playChime(type = 'fill') {
+            if (!isAudioEnabled) return;
+            try {
+                const ctx = getAudioContext();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                const now = ctx.currentTime;
+                if (type === 'fill') {
+                    // Gentle high-tech ting
+                    osc.frequency.setValueAtTime(587.33, now); // D5
+                    osc.frequency.exponentialRampToValueAtTime(880.0, now + 0.15); // A5
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                    osc.start(now);
+                    osc.stop(now + 0.35);
+                } else if (type === 'tp') {
+                    // Triumphant double chime
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                    osc.frequency.setValueAtTime(1046.50, now + 0.2); // C6
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+                    osc.start(now);
+                    osc.stop(now + 0.5);
+                } else if (type === 'alert') {
+                    // Warning low beep
+                    osc.frequency.setValueAtTime(330.0, now);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                }
+            } catch (e) {
+                console.debug("Audio error:", e);
+            }
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const icon = document.getElementById('icon-audio');
+            if (isAudioEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-sm text-profitGreen';
+                showToast("Đã BẬT âm thanh thông báo web 🔔", "success");
+                playChime('fill');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-sm text-gray-500';
+                showToast("Đã TẮT âm thanh thông báo web", "info");
+            }
+        }
+
+        // Play cute robotic chirp synthesizer
+        function playRoboticChirp() {
+            if (!isAudioEnabled) return;
+            try {
+                const ctx = getAudioCtx();
+                const now = ctx.currentTime;
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(580, now);
+                osc.frequency.exponentialRampToValueAtTime(1180, now + 0.08);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.16);
+
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.linearRampToValueAtTime(0.12, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            } catch (e) {}
+        }
+
+        // Mascot Interaction Trigger
+        function triggerMascotClick() {
+            playRoboticChirp();
+            const box = document.getElementById('robot-avatar-box');
+            if (box) {
+                box.classList.remove('robot-jumping');
+                void box.offsetWidth;
+                box.classList.add('robot-jumping');
+            }
+            updateMascotCommentary(true);
+        }
+
+        // Update Mascot Speech, Mood, and Eyes from backend
+        async function updateMascotCommentary(isManual = false) {
+            try {
+                const res = await fetch('/api/ai_mascot');
+                const data = await res.json();
+
+                const speechElem = document.getElementById('robot-speech');
+                if (speechElem && data.speech) {
+                    speechElem.style.opacity = '0';
+                    setTimeout(() => {
+                        speechElem.innerText = `"${data.speech}"`;
+                        speechElem.style.opacity = '1';
+                    }, 150);
+                }
+
+                // Update Mood Badge
+                const moodText = document.getElementById('robot-mood-text');
+                const moodChip = document.getElementById('robot-mood-chip');
+                if (moodText && data.mood_title) {
+                    moodText.innerText = data.mood_title;
+                }
+
+                // Toggle Digital Eye Expression
+                const happyEyes = document.getElementById('robot-eyes-happy');
+                const normalEyes = document.getElementById('robot-eyes-normal');
+                const alertEyes = document.getElementById('robot-eyes-alert');
+
+                if (data.mood === 'happy') {
+                    if (happyEyes) happyEyes.classList.remove('hidden');
+                    if (normalEyes) normalEyes.classList.add('hidden');
+                    if (alertEyes) alertEyes.classList.add('hidden');
+                    if (moodChip) moodChip.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-950/60 text-profitGreen border border-emerald-500/50 flex items-center gap-1";
+                } else if (data.mood === 'alert') {
+                    if (happyEyes) happyEyes.classList.add('hidden');
+                    if (normalEyes) normalEyes.classList.add('hidden');
+                    if (alertEyes) alertEyes.classList.remove('hidden');
+                    if (moodChip) moodChip.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-950/60 text-lossRed border border-red-500/50 flex items-center gap-1";
+                } else {
+                    if (happyEyes) happyEyes.classList.add('hidden');
+                    if (normalEyes) normalEyes.classList.remove('hidden');
+                    if (alertEyes) alertEyes.classList.add('hidden');
+                    if (moodChip) moodChip.className = "px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-cyan-950/60 text-cyberCyan border border-cyan-500/50 flex items-center gap-1";
+                }
+
+                // AI Neural Link tag
+                const aiTag = document.getElementById('badge-ai-model-tag');
+                if (aiTag) {
+                    aiTag.innerText = data.ai_connected ? 'GEMINI 2.5 FLASH ACTIVE' : 'QUANT NEURAL LINK';
+                    aiTag.className = data.ai_connected 
+                        ? 'text-[10px] px-2 py-0.5 rounded font-mono bg-green-950/60 text-profitGreen border border-green-600/50 hidden sm:inline'
+                        : 'text-[10px] px-2 py-0.5 rounded font-mono bg-cyan-900/30 text-cyan-300 border border-cyan-700/40 hidden sm:inline';
+                }
+
+                if (isManual) {
+                    showToast("Cyber-Nova vừa cập nhật bình luận thị trường!", "info");
+                }
+            } catch (err) {
+                console.error("Lỗi cập nhật mascot:", err);
+            }
+        }
+
+        function triggerRobotDialogue() {
+            triggerMascotClick();
+        }
+
+        // AI Copilot Modal & Chat Handlers
+        function openAiModal() {
+            document.getElementById('ai-chat-modal').classList.remove('hidden');
+            document.getElementById('ai-chat-input').focus();
+        }
+
+        function closeAiModal() {
+            document.getElementById('ai-chat-modal').classList.add('hidden');
+        }
+
+        function sendQuickPrompt(promptText) {
+            document.getElementById('ai-chat-input').value = promptText;
+            sendAiMessage();
+        }
+
+        async function sendAiMessage() {
+            const input = document.getElementById('ai-chat-input');
+            const userMsg = input.value.trim();
+            if (!userMsg) return;
+
+            const chatBody = document.getElementById('ai-chat-body');
+            input.value = '';
+
+            // User Message Bubble
+            const userBubble = document.createElement('div');
+            userBubble.className = "flex gap-2.5 items-start justify-end";
+            userBubble.innerHTML = `
+                <div class="p-3 rounded-2xl bg-cyan-950/60 border border-cyan-700/40 text-cyan-100 max-w-[85%] leading-relaxed shadow-sm">
+                    ${userMsg}
+                </div>
+                <div class="w-7 h-7 rounded-lg bg-gray-800 border border-gray-600 flex items-center justify-center text-gray-300 text-xs flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+            `;
+            chatBody.appendChild(userBubble);
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            // Loading Robot Bubble
+            const loadingBubble = document.createElement('div');
+            loadingBubble.className = "flex gap-2.5 items-start";
+            loadingBubble.innerHTML = `
+                <div class="w-7 h-7 rounded-lg bg-cyan-950 border border-cyberCyan/50 flex items-center justify-center text-cyberCyan text-xs flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-robot fa-spin"></i>
+                </div>
+                <div class="p-3 rounded-2xl bg-darkCard border border-cyan-900/30 text-gray-400 max-w-[85%] leading-relaxed shadow-sm flex items-center gap-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-cyberCyan animate-ping"></span>
+                    <span>Cyber-Nova đang phân tích thị trường...</span>
+                </div>
+            `;
+            chatBody.appendChild(loadingBubble);
+            chatBody.scrollTop = chatBody.scrollHeight;
+
+            try {
+                const res = await fetch('/api/ai_chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: userMsg})
+                });
+                const data = await res.json();
+                loadingBubble.remove();
+
+                let formattedReply = (data.reply || "Em chưa nhận được phản hồi.")
+                    .replace(/
+/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+                const botBubble = document.createElement('div');
+                botBubble.className = "flex gap-2.5 items-start";
+                botBubble.innerHTML = `
+                    <div class="w-7 h-7 rounded-lg bg-cyan-950 border border-cyberCyan/50 flex items-center justify-center text-cyberCyan text-xs flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div class="p-3.5 rounded-2xl bg-darkCard border border-cyan-900/40 text-gray-100 max-w-[85%] leading-relaxed shadow-md">
+                        ${formattedReply}
+                    </div>
+                `;
+                chatBody.appendChild(botBubble);
+                chatBody.scrollTop = chatBody.scrollHeight;
+
+                const badge = document.getElementById('ai-connected-badge');
+                if (badge) {
+                    badge.innerText = data.ai_connected ? 'GEMINI 2.5 FLASH' : 'LOCAL QUANT BRAIN';
+                    badge.className = data.ai_connected 
+                        ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-green-950 text-profitGreen border border-green-700/50'
+                        : 'px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyberCyan border border-cyan-700/50';
+                }
+            } catch (err) {
+                loadingBubble.remove();
+                const errBubble = document.createElement('div');
+                errBubble.className = "flex gap-2.5 items-start";
+                errBubble.innerHTML = `
+                    <div class="w-7 h-7 rounded-lg bg-red-950 border border-lossRed/50 flex items-center justify-center text-lossRed text-xs flex-shrink-0 mt-0.5">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-darkCard border border-red-900/30 text-lossRed max-w-[85%] leading-relaxed">
+                        Lỗi kết nối AI: ${err}
+                    </div>
+                `;
+                chatBody.appendChild(errBubble);
+                chatBody.scrollTop = chatBody.scrollHeight;
+            }
+        }
+
+        // Toast System
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgClass = 'bg-gray-800 border-gray-700 text-white';
+            let icon = '<i class="fa-solid fa-circle-info text-blue-400 mr-2"></i>';
+            if (type === 'success') {
+                bgClass = 'bg-darkCard border-profitGreen/50 text-white glow-green';
+                icon = '<i class="fa-solid fa-circle-check text-profitGreen mr-2"></i>';
+            } else if (type === 'error') {
+                bgClass = 'bg-darkCard border-lossRed/50 text-white glow-red';
+                icon = '<i class="fa-solid fa-circle-xmark text-lossRed mr-2"></i>';
+            } else if (type === 'warning') {
+                bgClass = 'bg-darkCard border-binanceGold/50 text-white glow-gold';
+                icon = '<i class="fa-solid fa-triangle-exclamation text-binanceGold mr-2"></i>';
+            }
+
+            toast.className = `p-3 rounded-xl text-xs font-semibold border shadow-xl flex items-center transition-all duration-300 transform translate-y-2 opacity-0 pointer-events-auto ${bgClass}`;
+            toast.innerHTML = `${icon}<span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.remove('translate-y-2', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Chart.js Setup
+        function initChart(chartData) {
+            const ctx = document.getElementById('equityChart').getContext('2d');
+            if (equityChartInstance) equityChartInstance.destroy();
+
+            const labels = chartData.map(d => `#${d.trade_num} (${d.symbol || ''})`);
+            const dataPoints = chartData.map(d => d.cum_pnl);
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+            gradient.addColorStop(0, 'rgba(14, 203, 129, 0.35)');
+            gradient.addColorStop(1, 'rgba(14, 203, 129, 0.0)');
+
+            equityChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels.length > 0 ? labels : ['Chưa có lệnh'],
+                    datasets: [{
+                        label: 'PnL Tích Lũy ($)',
+                        data: dataPoints.length > 0 ? dataPoints : [0],
+                        borderColor: '#0ECB81',
+                        borderWidth: 2.5,
+                        fill: true,
+                        backgroundColor: gradient,
+                        tension: 0.3,
+                        pointBackgroundColor: '#0ECB81',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1.5,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#10141e',
+                            titleColor: '#fff',
+                            bodyColor: '#0ECB81',
+                            borderColor: '#1c2436',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    const sign = context.parsed.y >= 0 ? '+' : '';
+                                    return ` Lợi nhuận tích lũy: ${sign}$${context.parsed.y.toFixed(2)} USDT`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: { color: '#6c757d', font: { family: 'JetBrains Mono', size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: {
+                                color: '#6c757d',
+                                font: { family: 'JetBrains Mono', size: 10 },
+                                callback: function(value) { return '$' + value; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Live Status Fetch
+        async function fetchStatus(isManual = false) {
+            const refreshIcon = document.getElementById('btn-refresh-icon');
+            if (isManual && refreshIcon) refreshIcon.classList.add('fa-spin');
+
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+
+                // Check for new position sound
+                if (data.open_positions_count > lastKnownPositionsCount) {
+                    playChime('fill');
+                    showToast(`Đã khớp thêm vị thế mới! (${data.open_positions_count}/${data.max_positions})`, "success");
+                }
+                lastKnownPositionsCount = data.open_positions_count;
+
+                // Sync current settings
+                currentConfig.trading_mode = data.trading_mode || 'MARKET_ALL';
+                currentConfig.leverage = data.leverage || 5;
+                currentConfig.risk_percent = data.risk_percent || 1.0;
+                currentConfig.use_trailing_stop = data.use_trailing_stop !== false;
+
+                // Update Badges & Clock
+                document.getElementById('clock').innerText = data.last_updated || '';
+                document.getElementById('trading-mode-text').innerText = data.trading_mode === 'BLUECHIP_ONLY' ? 'CHỈ BTC/ETH' : 'ALL MARKET';
+                
+                const statusBadge = document.getElementById('badge-status');
+                const btnPauseText = document.getElementById('btn-pause-text');
+                const btnPauseIcon = document.getElementById('btn-pause-icon');
+
+                // Robot Eye Color & Pulse
+                const eyeL = document.getElementById('robot-eye-left');
+                const eyeR = document.getElementById('robot-eye-right');
+
+                if (data.is_paused) {
+                    statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-900/30 text-binanceGold border border-yellow-700/50 flex items-center gap-1.5";
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-binanceGold"></span> TẠM DỪNG';
+                    btnPauseText.innerText = "Tiếp Tục Quét";
+                    btnPauseIcon.className = "fa-solid fa-play";
+                    if (eyeL) eyeL.setAttribute('fill', '#F0B90B');
+                    if (eyeR) eyeR.setAttribute('fill', '#F0B90B');
+                } else {
+                    statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-green-900/30 text-profitGreen border border-green-700/50 flex items-center gap-1.5";
+                    statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span> ĐANG CHẠY';
+                    btnPauseText.innerText = "Tạm Dừng Bot";
+                    btnPauseIcon.className = "fa-solid fa-pause";
+                    if (eyeL) eyeL.setAttribute('fill', data.total_unrealized_pnl >= 0 ? '#0ECB81' : '#F6465D');
+                    if (eyeR) eyeR.setAttribute('fill', data.total_unrealized_pnl >= 0 ? '#0ECB81' : '#F6465D');
+                }
+
+                // Metrics
+                document.getElementById('metric-balance').innerHTML = `$${data.balance.toLocaleString('en-US', {minimumFractionDigits: 2})} <span class="text-xs font-normal text-gray-400">USDT</span>`;
+                const roiElem = document.getElementById('metric-roi');
+                const roiSign = data.roi_percent >= 0 ? '+' : '';
+                roiElem.innerText = `${roiSign}${data.roi_percent.toFixed(2)}%`;
+                roiElem.className = `font-bold font-mono ${data.roi_percent >= 0 ? 'text-profitGreen' : 'text-lossRed'}`;
+                document.getElementById('metric-leverage').innerText = `${data.leverage}x (${data.margin_type})`;
+
+                // PnL
+                const uPnlElem = document.getElementById('metric-unrealized-pnl');
+                const uSign = data.total_unrealized_pnl >= 0 ? '+' : '';
+                uPnlElem.innerText = `${uSign}$${data.total_unrealized_pnl.toFixed(2)}`;
+                uPnlElem.className = `text-2xl lg:text-3xl font-extrabold font-mono ${data.total_unrealized_pnl >= 0 ? 'text-profitGreen' : 'text-lossRed'}`;
+                document.getElementById('metric-open-count').innerText = `${data.open_positions_count} / ${data.max_positions} vị thế`;
+                document.getElementById('badge-open-slots').innerText = `${data.open_positions_count} / ${data.max_positions} vị thế`;
+                const slotPercent = (data.open_positions_count / data.max_positions) * 100.0;
+                document.getElementById('metric-slot-bar').style.width = `${slotPercent}%`;
+
+                // Watchdog
+                if (data.health && Object.keys(data.health).length > 0) {
+                    const h = data.health;
+                    document.getElementById('metric-uptime').innerText = h.uptime || '--';
+                    document.getElementById('metric-cpu').innerText = `${h.cpu_percent}%`;
+                    document.getElementById('metric-ram').innerText = `${h.ram_percent}%`;
+                    document.getElementById('metric-disk').innerText = `Trống ${h.disk_free_gb} GB`;
+                    document.getElementById('ram-progress-bar').style.width = `${h.ram_percent}%`;
+                    if (h.binance_latency_ms) {
+                        document.getElementById('ping-latency').innerText = `${h.binance_latency_ms} ms`;
+                    }
+                }
+
+                // Render Table
+                renderPositionsTable(data.positions);
+
+                if (isManual) showToast("Đã cập nhật dữ liệu mới nhất!", "success");
+
+            } catch (err) {
+                console.error("Lỗi cập nhật status:", err);
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        function renderPositionsTable(positions) {
+            const tbody = document.getElementById('positions-table-body');
+            if (!positions || positions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11" class="px-6 py-10 text-center text-gray-400 font-sans"><i class="fa-solid fa-magnifying-glass text-binanceGold mr-2"></i> Không có vị thế nào đang mở. Bot đang liên tục quét cơ hội...</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = positions.map(p => {
+                const isLong = p.side === 'BUY';
+                const sideBadge = isLong 
+                    ? '<span class="px-2.5 py-1 rounded text-xs font-bold bg-green-950/60 text-profitGreen border border-green-700/50">LONG</span>' 
+                    : '<span class="px-2.5 py-1 rounded text-xs font-bold bg-red-950/60 text-lossRed border border-red-700/50">SHORT</span>';
+                
+                const pnlClass = p.pnl_usdt >= 0 ? 'text-profitGreen font-bold' : 'text-lossRed font-bold';
+                const sign = p.pnl_usdt >= 0 ? '+' : '';
+
+                let statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] bg-darkBase text-gray-400 border border-darkBorder">Đang chạy</span>';
+                if (p.trailing_active) {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] bg-purple-900/40 text-purple-400 border border-purple-700/40 animate-pulse">🚀 Trailing Stop</span>';
+                } else if (p.partial_tp) {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] bg-green-900/40 text-profitGreen border border-green-700/40">🎯 Chốt 50%</span>';
+                } else if (p.breakeven) {
+                    statusBadge = '<span class="px-2 py-0.5 rounded text-[11px] bg-yellow-900/40 text-binanceGold border border-yellow-700/40">🛡️ SL Hòa Vốn</span>';
+                }
+
+                const sliderVal = p.slider_pct || 50;
+                const sliderColor = p.pnl_usdt >= 0 ? 'bg-profitGreen' : 'bg-lossRed';
+
+                return `
+                    <tr class="hover:bg-darkBase/40 transition">
+                        <td class="px-5 py-4 font-bold text-white font-sans">${p.symbol}</td>
+                        <td class="px-5 py-4 font-sans">${sideBadge}</td>
+                        <td class="px-5 py-4">$${p.entry_price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="px-5 py-4 font-bold text-white">$${p.current_price.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="px-5 py-4 text-lossRed font-semibold">$${p.stop_loss.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="px-5 py-4 text-profitGreen font-semibold">$${p.take_profit.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                        <td class="px-5 py-4 w-36">
+                            <div class="w-full bg-darkBase h-2 rounded-full overflow-hidden border border-darkBorder relative">
+                                <div class="${sliderColor} h-full transition-all duration-300" style="width: ${sliderVal}%"></div>
+                            </div>
+                            <div class="flex justify-between text-[9px] text-gray-500 mt-1">
+                                <span>SL</span>
+                                <span class="text-gray-300 font-semibold">${sliderVal}%</span>
+                                <span>TP</span>
+                            </div>
+                        </td>
+                        <td class="px-5 py-4">$${p.margin.toFixed(2)}</td>
+                        <td class="px-5 py-4 ${pnlClass}">${sign}$${p.pnl_usdt.toFixed(2)} (${sign}${p.pnl_percent.toFixed(2)}%)</td>
+                        <td class="px-5 py-4 text-center font-sans">${statusBadge}</td>
+                        <td class="px-5 py-4 text-center font-sans">
+                            <button onclick="closeSinglePosition('${p.symbol}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-800 hover:bg-lossRed text-gray-300 hover:text-white transition">
+                                Đóng
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Live Scanner Radar Fetch
+        async function fetchRadar() {
+            try {
+                const res = await fetch('/api/scanner_radar');
+                const data = await res.json();
+
+                const tbody = document.getElementById('radar-table-body');
+                document.getElementById('radar-updated-at').innerText = data.updated_at || '';
+                document.getElementById('radar-count-badge').innerText = `${data.scanned_count} CẶP COIN`;
+
+                if (!data.radar || data.radar.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-6 text-center text-gray-400 font-sans">Đang chờ chu kỳ quét kế tiếp...</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.radar.map(r => {
+                    const trendColor = r.trend.includes('Up') ? 'text-profitGreen' : (r.trend.includes('Down') ? 'text-lossRed' : 'text-gray-400');
+                    const adxColor = r.adx >= 20 ? 'text-profitGreen font-bold' : 'text-lossRed';
+                    const rsiColor = r.rsi <= 35 ? 'text-profitGreen font-bold' : (r.rsi >= 65 ? 'text-lossRed font-bold' : 'text-gray-300');
+
+                    let statusBadge = '<span class="text-gray-400">Đang chờ Pullback</span>';
+                    if (r.status.includes('Tín hiệu')) {
+                        statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-green-950 text-profitGreen border border-green-700 animate-pulse">' + r.status + '</span>';
+                    } else if (r.status.includes('ADX yếu')) {
+                        statusBadge = '<span class="text-yellow-600 italic">' + r.status + '</span>';
+                    }
+
+                    return `
+                        <tr class="hover:bg-darkBase/40 transition">
+                            <td class="px-5 py-2.5 font-bold text-white font-sans">${r.symbol}</td>
+                            <td class="px-5 py-2.5">$${r.price.toFixed(4)}</td>
+                            <td class="px-5 py-2.5 font-semibold ${trendColor}">${r.trend}</td>
+                            <td class="px-5 py-2.5 ${rsiColor}">${r.rsi}</td>
+                            <td class="px-5 py-2.5 ${adxColor}">${r.adx}</td>
+                            <td class="px-5 py-2.5 text-gray-400">${r.funding_rate}%</td>
+                            <td class="px-5 py-2.5 font-sans">${statusBadge}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                console.error("Lỗi nạp radar:", err);
+            }
+        }
+
+        // Fetch History
+        async function fetchHistory() {
+            try {
+                const res = await fetch('/api/history');
+                const data = await res.json();
+
+                if (data.summary) {
+                    const s = data.summary;
+                    document.getElementById('metric-total-closed').innerText = s.total;
+                    document.getElementById('metric-wins').innerText = s.wins;
+                    document.getElementById('metric-losses').innerText = s.losses;
+                    document.getElementById('metric-winrate').innerText = `${s.win_rate}%`;
+
+                    const rPnl = document.getElementById('metric-realized-pnl');
+                    const sign = s.net_pnl >= 0 ? '+' : '';
+                    rPnl.innerText = `${sign}$${s.net_pnl.toFixed(2)}`;
+                    rPnl.className = `text-2xl lg:text-3xl font-extrabold font-mono ${s.net_pnl >= 0 ? 'text-profitGreen' : 'text-lossRed'}`;
+
+                    // Check if new profit trade closed -> Play celebration sound
+                    if (s.net_pnl > lastKnownRealizedPnl && lastKnownRealizedPnl !== 0) {
+                        playChime('tp');
+                        showToast(`Chúc mừng! Vừa chốt lời thành công! Lãi ròng hiện tại: $${s.net_pnl.toFixed(2)}`, "success");
+                    }
+                    lastKnownRealizedPnl = s.net_pnl;
+                }
+
+                if (data.chart_data && data.chart_data.length > 0) {
+                    initChart(data.chart_data);
+                }
+
+                rawHistoryTrades = data.trades || [];
+                applyHistoryFilter();
+
+            } catch (err) {
+                console.error("Lỗi nạp history:", err);
+            }
+        }
+
+        function setFilterType(type) {
+            currentFilterType = type;
+            ['all', 'win', 'loss'].forEach(t => {
+                const btn = document.getElementById(`btn-filter-${t}`);
+                if (t === type) {
+                    btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-binanceGold text-black";
+                } else {
+                    btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-darkBase text-gray-300 border border-darkBorder hover:text-white";
+                }
+            });
+            applyHistoryFilter();
+        }
+
+        function applyHistoryFilter() {
+            const searchKeyword = document.getElementById('history-search').value.toUpperCase().trim();
+            const tbody = document.getElementById('history-table-body');
+
+            let filtered = rawHistoryTrades.filter(t => {
+                const symMatch = !searchKeyword || (t.symbol && t.symbol.toUpperCase().includes(searchKeyword));
+                const pnl = parseFloat(t.pnl_usdt || 0);
+                if (currentFilterType === 'win') return symMatch && pnl > 0;
+                if (currentFilterType === 'loss') return symMatch && pnl < 0;
+                return symMatch;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="px-6 py-6 text-center text-gray-400 font-sans">Không tìm thấy giao dịch nào phù hợp bộ lọc.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(t => {
+                const isWin = parseFloat(t.pnl_usdt || 0) >= 0;
+                const pnlColor = isWin ? 'text-profitGreen' : 'text-lossRed';
+                const sideColor = t.side === 'BUY' ? 'text-profitGreen' : 'text-lossRed';
+
+                return `
+                    <tr class="hover:bg-darkBase/30 transition">
+                        <td class="px-5 py-3 text-gray-400">${t.timestamp}</td>
+                        <td class="px-5 py-3 font-bold text-white font-sans">${t.symbol}</td>
+                        <td class="px-5 py-3 font-semibold ${sideColor} font-sans">${t.side}</td>
+                        <td class="px-5 py-3">$${parseFloat(t.entry_price).toFixed(2)}</td>
+                        <td class="px-5 py-3 font-semibold text-white">$${parseFloat(t.exit_price).toFixed(2)}</td>
+                        <td class="px-5 py-3">${t.qty}</td>
+                        <td class="px-5 py-3 font-bold ${pnlColor}">${t.pnl_usdt}</td>
+                        <td class="px-5 py-3 font-bold ${pnlColor}">${t.pnl_percent}</td>
+                        <td class="px-5 py-3 text-gray-300 italic font-sans">${t.exit_reason}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Settings Modal Handlers
+        function openSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+            selectTradingMode(currentConfig.trading_mode);
+            selectLeverage(currentConfig.leverage);
+            selectRisk(currentConfig.risk_percent);
+            document.getElementById('chk-trailing-stop').checked = currentConfig.use_trailing_stop;
+            if (currentConfig.ai_api_key) {
+                document.getElementById('input-ai-key').value = currentConfig.ai_api_key;
+            }
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function selectTradingMode(mode) {
+            currentConfig.trading_mode = mode;
+            const bB = document.getElementById('opt-mode-bluechip');
+            const bA = document.getElementById('opt-mode-all');
+            if (mode === 'BLUECHIP_ONLY') {
+                bB.className = "p-3 rounded-xl border text-left flex flex-col justify-between transition border-cyan-500 bg-cyan-950/30 text-cyberCyan";
+                bA.className = "p-3 rounded-xl border text-left flex flex-col justify-between transition border-darkBorder bg-darkBase text-gray-300";
+            } else {
+                bA.className = "p-3 rounded-xl border text-left flex flex-col justify-between transition border-binanceGold bg-yellow-950/20 text-binanceGold";
+                bB.className = "p-3 rounded-xl border text-left flex flex-col justify-between transition border-darkBorder bg-darkBase text-gray-300";
+            }
+        }
+
+        function selectLeverage(lev) {
+            currentConfig.leverage = lev;
+            [3, 5, 10, 15].forEach(l => {
+                const btn = document.getElementById(`opt-lev-${l}`);
+                if (l === lev) {
+                    btn.className = "py-2 rounded-lg font-mono font-bold border border-binanceGold bg-yellow-950/30 text-binanceGold";
+                } else {
+                    btn.className = "py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300";
+                }
+            });
+        }
+
+        function selectRisk(risk) {
+            currentConfig.risk_percent = risk;
+            [0.5, 1.0, 1.5, 2.0].forEach(r => {
+                const id = 'opt-risk-' + (r === 0.5 ? '05' : (r === 1.0 ? '10' : (r === 1.5 ? '15' : '20')));
+                const btn = document.getElementById(id);
+                if (r === risk) {
+                    btn.className = "py-2 rounded-lg font-mono font-bold border border-profitGreen bg-green-950/30 text-profitGreen";
+                } else {
+                    btn.className = "py-2 rounded-lg font-mono font-bold border border-darkBorder bg-darkBase text-gray-300";
+                }
+            });
+        }
+
+        async function saveLiveSettings() {
+            currentConfig.use_trailing_stop = document.getElementById('chk-trailing-stop').checked;
+            const aiKeyInput = document.getElementById('input-ai-key');
+            if (aiKeyInput) {
+                currentConfig.ai_api_key = aiKeyInput.value.trim();
+            }
+            try {
+                const res = await fetch('/api/update_settings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(currentConfig)
+                });
+                const data = await res.json();
+                closeSettingsModal();
+                if (data.success) {
+                    playChime('tp');
+                    showToast(data.message, "success");
+                    fetchStatus();
+                    fetchRadar();
+                    updateMascotCommentary();
+                } else {
+                    showToast(data.message, "error");
+                }
+            } catch (err) {
+                showToast("Lỗi cập nhật cấu hình: " + err, "error");
+            }
+        }
+
+        // Pause & Panic Close
+        async function togglePause() {
+            try {
+                const res = await fetch('/api/toggle_pause', {method: 'POST'});
+                const data = await res.json();
+                playChime('alert');
+                showToast(data.message, "info");
+                fetchStatus();
+            } catch (err) {
+                showToast("Lỗi khi pause bot: " + err, "error");
+            }
+        }
+
+        function confirmPanicClose() {
+            document.getElementById('confirm-modal').classList.remove('hidden');
+            document.getElementById('modal-confirm-btn').onclick = executePanicClose;
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        }
+
+        async function executePanicClose() {
+            closeConfirmModal();
+            try {
+                playChime('alert');
+                showToast("Đang gửi lệnh đóng toàn bộ vị thế...", "warning");
+                const res = await fetch('/api/panic_close', {method: 'POST'});
+                const data = await res.json();
+                showToast(data.message, "success");
+                fetchStatus();
+                fetchHistory();
+            } catch (err) {
+                showToast("Lỗi khi đóng khẩn cấp: " + err, "error");
+            }
+        }
+
+        async function closeSinglePosition(symbol) {
+            if (!confirm(`Bạn có chắc muốn đóng vị thế ${symbol} ngay lập tức?`)) return;
+            try {
+                const res = await fetch('/api/close_single', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({symbol: symbol})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message, "success");
+                } else {
+                    showToast(data.message, "error");
+                }
+                fetchStatus();
+                fetchHistory();
+            } catch (err) {
+                showToast("Lỗi đóng vị thế: " + err, "error");
+            }
+        }
+
+        // Auto Refresh
+        fetchStatus();
+        fetchHistory();
+        fetchRadar();
+        updateMascotCommentary();
+        setInterval(fetchStatus, 3000);
+        setInterval(fetchRadar, 10000);
+        setInterval(fetchHistory, 15000);
+        setInterval(updateMascotCommentary, 12000);
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.bak
+venv/
+env/
+*.log
+bot_state.json
+trade_history*.csv
+.env
+scratch/
+
+# PC Desktop App (Node / Electron)
+pc-app/node_modules/
+pc-app/dist/
+pc-app/build/
+
+# iOS Mobile App (Flutter)
+ios-app/.dart_tool/
+ios-app/.flutter-plugins
+ios-app/.flutter-plugins-dependencies
+ios-app/.packages
+ios-app/build/
+ios-app/ios/Pods/
+ios-app/ios/.symlinks/
+ios-app/ios/Flutter/Flutter.framework
+ios-app/ios/Flutter/Flutter.podspec
+
+# OS
+.DS_Store
+Thumbs.db

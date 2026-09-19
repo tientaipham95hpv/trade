@@ -1,0 +1,52 @@
+{
+  "name": "binance-quant-pro-desktop",
+  "version": "1.0.0",
+  "description": "Binance Futures Institutional Quant Pro Terminal for PC",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win --x64"
+  },
+  "keywords": [
+    "binance",
+    "futures",
+    "quant",
+    "trading",
+    "desktop"
+  ],
+  "author": "Antigravity Quant Systems",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^34.3.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.quantpro.binancedesktop",
+    "productName": "Binance Quant Pro",
+    "copyright": "Copyright © 2026",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Binance Quant Pro"
+    }
+  }
+}

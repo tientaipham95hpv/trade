@@ -1,0 +1,73 @@
+{
+  "trained_at": "2026-09-18 21:46:32 (VN)",
+  "sample_size": 3,
+  "training_status": "ĐÃ TỐI ƯU HÓA HOÀN TẤT",
+  "model_version": "AI-APEX-F5.4",
+  "model_confidence": 72,
+  "win_rate": 0.0,
+  "projected_winrate": 4.2,
+  "profit_factor": 0.0,
+  "projected_pf": 0.0,
+  "net_pnl": -29.88,
+  "optimal_rsi_buy": 24,
+  "optimal_rsi_sell": 76,
+  "optimal_atr_mult": 1.4,
+  "optimal_rr": 2.0,
+  "optimal_holding_time": "15 phút - 4 giờ (Khung Pullback M15)",
+  "coin_rankings": [
+    {
+      "symbol": "BTCUSDT",
+      "trades": 1,
+      "winrate": 0.0,
+      "net_pnl": -9.88,
+      "profit_factor": 0.0,
+      "ai_conviction": 10.0,
+      "recommendation": "HA TY TRONG / NE BAO",
+      "bias_weight": 0.65
+    },
+    {
+      "symbol": "ETHUSDT",
+      "trades": 1,
+      "winrate": 0.0,
+      "net_pnl": -10.0,
+      "profit_factor": 0.0,
+      "ai_conviction": 10.0,
+      "recommendation": "HA TY TRONG / NE BAO",
+      "bias_weight": 0.65
+    },
+    {
+      "symbol": "SOLUSDT",
+      "trades": 1,
+      "winrate": 0.0,
+      "net_pnl": -10.0,
+      "profit_factor": 0.0,
+      "ai_conviction": 10.0,
+      "recommendation": "HA TY TRONG / NE BAO",
+      "bias_weight": 0.65
+    }
+  ],
+  "asset_ranking_text": "• <b>BTCUSDT</b>: Win 0.0% | PnL <code>$-9.88</code> ➜ <i>HA TY TRONG / NE BAO</i>\n• <b>ETHUSDT</b>: Win 0.0% | PnL <code>$-10.0</code> ➜ <i>HA TY TRONG / NE BAO</i>\n• <b>SOLUSDT</b>: Win 0.0% | PnL <code>$-10.0</code> ➜ <i>HA TY TRONG / NE BAO</i>",
+  "ai_insight": "Mô hình phát hiện tín hiệu nhiễu gần đây. Đã tự động siết chặt bộ lọc RSI vào vùng quá bán sâu (<24) và nâng R:R lên 2.0 để bảo vệ vốn tối đa.",
+  "pattern_insights": [
+    "Mô hình phát hiện tín hiệu nhiễu gần đây. Đã tự động siết chặt bộ lọc RSI vào vùng quá bán sâu (<24) và nâng R:R lên 2.0 để bảo vệ vốn tối đa.",
+    "Đã tối ưu hóa RSI (24/76) và đòn bẩy Stop Loss 1.4x ATR."
+  ],
+  "last_trained_at_vn": "2026-09-18 21:46:32 (VN)",
+  "recommendations": {
+    "rsi_boundaries": [
+      24,
+      76
+    ],
+    "atr_stop_multiplier": 1.4,
+    "target_risk_reward": 2.0,
+    "favored_symbols": [],
+    "avoid_symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ]
+  },
+  "exit_patterns": {
+    "Cắt Lỗ (Stop Loss 🛑)": 3
+  }
+}

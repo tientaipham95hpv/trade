@@ -1,0 +1,18 @@
+[Unit]
+Description=Binance Futures Quantitative Trading Bot Service
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/bot_binance
+ExecStart=/root/bot_binance/venv/bin/python run_bot.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

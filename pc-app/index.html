@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ Thống Giao Dịch Định Lượng Binance Quant Pro</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            darkBase: '#080a0f',
+            darkCard: '#10141e',
+            darkCardHover: '#141a27',
+            darkBorder: '#1c2436',
+            binanceGold: '#F0B90B',
+            profitGreen: '#0ECB81',
+            lossRed: '#F6465D',
+            cyberCyan: '#00F0FF'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #080a0f;
+      color: #e2e8f0;
+      user-select: none;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080a0f;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1c2436;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #2a374f;
+    }
+    .glow-gold {
+      box-shadow: 0 0 15px rgba(240, 185, 11, 0.15);
+    }
+    .glow-green {
+      box-shadow: 0 0 15px rgba(14, 203, 129, 0.2);
+    }
+    .glow-red {
+      box-shadow: 0 0 15px rgba(246, 70, 93, 0.2);
+    }
+  </style>
+</head>
+<body class="h-screen flex flex-col font-sans overflow-hidden">
+
+  <!-- THANH ĐIỀU HÀNH TRÊN CÙNG (TOP BAR) -->
+  <header class="h-14 border-b border-darkBorder bg-darkCard/80 backdrop-blur px-4 flex items-center justify-between z-20">
+    <div class="flex items-center space-x-3">
+      <div class="w-8 h-8 rounded-lg bg-binanceGold/10 border border-binanceGold/40 flex items-center justify-center text-binanceGold font-bold text-lg">
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="font-bold text-sm tracking-wide text-white">BINANCE QUANT PRO</span>
+          <span class="text-[10px] bg-binanceGold/20 text-binanceGold border border-binanceGold/30 px-1.5 py-0.5 rounded font-mono font-semibold">BẢN MÁY TÍNH v1.0</span>
+        </div>
+        <div class="flex items-center space-x-2 text-[11px] text-gray-400">
+          <span id="connIndicator" class="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+          <span id="connStatus">Đang kết nối VPS...</span>
+          <span class="text-gray-600">•</span>
+          <span id="pingLatency" class="font-mono text-gray-400">-- ms</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CÁC NÚT ĐIỀU KHIỂN CHẾ ĐỘ Ở GIỮA -->
+    <div class="flex items-center space-x-2">
+      <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5 text-xs font-mono">
+        <button id="btnModeBluechip" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">BLUECHIP (BTC/ETH)</button>
+        <button id="btnModeMarket" class="px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition">QUÉT TOÀN THỊ TRƯỜNG (TOP 80)</button>
+      </div>
+
+      <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5 text-xs font-mono">
+        <button id="btnPauseResume" class="px-3 py-1 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 flex items-center space-x-1 hover:bg-yellow-500/20 transition">
+          <i class="fa-solid fa-play text-[10px]"></i>
+          <span id="pauseResumeText">Đang chạy</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- CÁC NÚT THAO TÁC BÊN PHẢI -->
+    <div class="flex items-center space-x-3">
+      <button id="btnAudioToggle" class="w-8 h-8 rounded-lg bg-darkBase border border-darkBorder text-gray-400 hover:text-white flex items-center justify-center transition" title="Bật/Tắt âm thanh sàn giao dịch">
+        <i class="fa-solid fa-volume-high text-xs text-binanceGold"></i>
+      </button>
+
+      <button id="btnEmergencyClose" class="px-3 py-1.5 rounded-lg bg-lossRed/20 hover:bg-lossRed text-lossRed hover:text-white border border-lossRed/40 text-xs font-bold font-mono tracking-wider flex items-center space-x-1.5 transition glow-red" title="Cắt sạch toàn bộ vị thế trên sàn Binance ngay lập tức [Ctrl+Shift+K]">
+        <i class="fa-solid fa-radiation"></i>
+        <span>CẮT KHẨN CẤP [KILL-SWITCH]</span>
+      </button>
+
+      <button id="btnLoginOpen" class="px-2.5 py-1 rounded-lg bg-darkBase border border-darkBorder text-gray-400 hover:text-binanceGold flex items-center space-x-1 text-xs transition" title="Tài khoản đăng nhập">
+        <i class="fa-solid fa-user-shield"></i>
+        <span id="userBadge">Đăng nhập</span>
+      </button>
+
+      <button id="btnSettings" class="w-8 h-8 rounded-lg bg-darkBase border border-darkBorder text-gray-400 hover:text-white flex items-center justify-center transition" title="Cài đặt kết nối máy chủ">
+        <i class="fa-solid fa-gear text-xs"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- THANH CHỈ SỐ HUD THỜI GIAN THỰC -->
+  <div class="bg-darkBase border-b border-darkBorder px-4 py-2.5 grid grid-cols-5 gap-3">
+    <!-- Thẻ Tổng Vốn -->
+    <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+      <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tổng Vốn Khả Dụng</div>
+      <div id="statBalance" class="text-lg font-bold font-mono text-white mt-0.5">$0.00 USDT</div>
+      <div class="text-[10px] text-gray-500 font-mono mt-0.5">Binance Futures Isolated</div>
+    </div>
+
+    <!-- Thẻ PnL Tạm Tính -->
+    <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+      <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Lãi Lỗ Tạm Tính (Active)</div>
+      <div id="statUnrealized" class="text-lg font-bold font-mono text-profitGreen mt-0.5">+$0.00 USDT</div>
+      <div id="statUnrealizedPct" class="text-[10px] text-profitGreen font-mono mt-0.5">+0.00%</div>
+    </div>
+
+    <!-- Thẻ Xu Hướng Bitcoin (BTC Regime) -->
+    <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+      <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
+        <span>Lá Chắn Xu Hướng BTC</span>
+        <span class="text-[9px] bg-blue-500/20 text-blue-400 px-1 rounded">Khung 1H/4H</span>
+      </div>
+      <div id="statBtcRegime" class="text-sm font-bold font-mono text-cyan-400 mt-1 flex items-center space-x-1">
+        <i class="fa-solid fa-shield-halved"></i>
+        <span>BULL (CẤM SHORT 100%)</span>
+      </div>
+      <div id="statBtcDetails" class="text-[10px] text-gray-400 font-mono mt-0.5 truncate">Đang đồng bộ dữ liệu...</div>
+    </div>
+
+    <!-- Thẻ Chỉ Số Tâm Lý (Fear & Greed) -->
+    <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+      <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tâm Lý Thị Trường</div>
+      <div id="statFng" class="text-sm font-bold font-mono text-binanceGold mt-1 flex items-center space-x-1">
+        <i class="fa-solid fa-fire text-amber-500"></i>
+        <span>71/100 (Tham Lam)</span>
+      </div>
+      <div class="text-[10px] text-gray-400 font-mono mt-0.5">Đồng hồ đo cảm xúc Crypto</div>
+    </div>
+
+    <!-- Thẻ Cầu Dao An Toàn (Circuit Breaker) -->
+    <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+      <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Cầu Dao Bảo Vệ Vốn</div>
+      <div id="statCircuit" class="text-sm font-bold font-mono text-profitGreen mt-1 flex items-center space-x-1">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>AN TOÀN HOẠT ĐỘNG</span>
+      </div>
+      <div class="text-[10px] text-gray-400 font-mono mt-0.5">Ngắt nghỉ: $30/ngày (12 tiếng)</div>
+    </div>
+  </div>
+
+  <!-- BÀN LÀM VIỆC CHÍNH (MAIN WORKSPACE) -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- CỘT TRÁI: VỊ THẾ & RADAR QUÉT (60%) -->
+    <div class="w-3/5 border-r border-darkBorder flex flex-col overflow-hidden">
+      <!-- KHUNG VỊ THẾ ĐANG CHẠY (Trên 55%) -->
+      <div class="flex-1 border-b border-darkBorder flex flex-col overflow-hidden">
+        <div class="px-4 py-2 bg-darkCard/50 border-b border-darkBorder flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Vị Thế Đang Mở (Live Positions)</span>
+            <span id="badgePosCount" class="text-[10px] bg-binanceGold/20 text-binanceGold px-1.5 py-0.2 rounded font-mono font-bold">0/3</span>
+          </div>
+          <span class="text-[11px] text-gray-400 font-mono">Chốt Lời 3 Nấc: 33% @ 1R | 33% @ 2R | 34% Runner</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-3">
+          <table class="w-full text-left text-xs font-mono">
+            <thead>
+              <tr class="text-gray-400 border-b border-darkBorder pb-2">
+                <th class="py-1">Cặp Coin</th>
+                <th class="py-1">Chiều</th>
+                <th class="py-1">Giá Vào (Entry)</th>
+                <th class="py-1">Giá Hiện Tại</th>
+                <th class="py-1">Cắt Lỗ (SL)</th>
+                <th class="py-1">TP1 / TP2</th>
+                <th class="py-1">Lãi Lỗ (PnL)</th>
+                <th class="py-1 text-right">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="positionsTableBody" class="divide-y divide-darkBorder/40">
+              <tr>
+                <td colspan="8" class="text-center py-8 text-gray-500">Đang nạp dữ liệu vị thế từ VPS...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- KHUNG RADAR QUÉT THỊ TRƯỜNG (Dưới 45%) -->
+      <div class="h-2/5 flex flex-col overflow-hidden">
+        <div class="px-4 py-2 bg-darkCard/50 border-b border-darkBorder flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Radar Quét Top 80 Cặp Coin (Live Scanner)</span>
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+          </div>
+          <span class="text-[11px] text-gray-400 font-mono">Chiến lược Trend Pullback Khung 15m/1H</span>
+        </div>
+        <div class="flex-1 overflow-y-auto p-3">
+          <div id="radarCardsGrid" class="grid grid-cols-4 gap-2">
+            <div class="col-span-4 text-center py-6 text-gray-500 font-mono text-xs">Đang nạp dữ liệu Radar...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CỘT PHẢI: AI THẨM ĐỊNH & TRỢ LÝ ĐÀM THOẠI (40%) -->
+    <div class="w-2/5 flex flex-col bg-darkCard/40 overflow-hidden">
+      <!-- Luồng AI Gatekeeper Thẩm Định Lệnh (Trên 45%) -->
+      <div class="h-[45%] border-b border-darkBorder flex flex-col overflow-hidden">
+        <div class="px-4 py-2 bg-darkCard border-b border-darkBorder flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-brain text-purple-400 text-xs"></i>
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Nhật Ký AI Thẩm Định Trước Khi Vào Lệnh</span>
+          </div>
+          <span class="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono">DeepSeek V4.1 Flash</span>
+        </div>
+        <div id="aiAuditFeed" class="flex-1 overflow-y-auto p-3 space-y-2 text-xs font-mono">
+          <div class="text-gray-500 text-center py-4">Đang theo dõi các quyết định phê duyệt của AI...</div>
+        </div>
+      </div>
+
+      <!-- Trợ Lý Quant Định Lượng Đàm Thoại (Dưới 55%) -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <div class="px-4 py-2 bg-darkCard border-b border-darkBorder flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-robot text-cyan-400 text-xs"></i>
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Trợ Lý Quant Định Lượng Tiếng Việt</span>
+          </div>
+          <span class="text-[10px] text-gray-400 font-mono">Động Cơ Kép: DeepSeek + Gemini</span>
+        </div>
+
+        <div id="aiChatMessages" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs">
+          <div class="bg-darkBase/70 border border-darkBorder rounded-lg p-2.5 text-gray-300">
+            Xin chào! Tôi là Trợ Lý Quant Định Lượng. Tôi đang trực tiếp giám sát danh mục, bộ lọc xu hướng BTC và các điểm chốt lời đa tầng trên máy chủ VPS. Bạn có thể hỏi tôi về trạng thái rủi ro, dự phóng thị trường hoặc phân tích bất kỳ coin nào!
+          </div>
+        </div>
+
+        <!-- Khung Nhập Câu Hỏi -->
+        <div class="p-2.5 border-t border-darkBorder bg-darkCard">
+          <form id="aiChatForm" class="flex space-x-2">
+            <input id="aiChatInput" type="text" placeholder="Hỏi AI về xu hướng BTC, rủi ro danh mục hoặc phân tích coin..." class="flex-1 bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-binanceGold font-mono">
+            <button type="submit" class="px-4 py-2 bg-binanceGold text-black font-bold text-xs rounded-lg hover:bg-yellow-400 transition font-mono flex items-center space-x-1">
+              <span>Gửi</span>
+              <i class="fa-solid fa-paper-plane text-[10px]"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- MODAL ĐĂNG NHẬP TIẾNG VIỆT 100% -->
+  <div id="loginModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden">
+    <div class="bg-darkCard border border-darkBorder rounded-xl w-[420px] p-6 glow-gold">
+      <div class="flex items-center justify-between border-b border-darkBorder pb-3">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-shield-halved text-binanceGold text-lg"></i>
+          <span class="font-bold text-sm text-white">ĐĂNG NHẬP QUẢN TRỊ VIÊN</span>
+        </div>
+        <button id="btnCloseLogin" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="mt-4 space-y-3 text-xs">
+        <div id="loginErrorMsg" class="hidden bg-lossRed/10 border border-lossRed/30 text-lossRed p-2 rounded-lg text-xs"></div>
+        
+        <div>
+          <label class="block text-gray-400 font-medium mb-1">Tên Đăng Nhập:</label>
+          <input id="loginUsername" type="text" value="admin" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white font-mono focus:border-binanceGold focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-medium mb-1">Mật Khẩu Quản Trị:</label>
+          <input id="loginPassword" type="password" value="admin123456" placeholder="Nhập mật khẩu..." class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white font-mono focus:border-binanceGold focus:outline-none">
+        </div>
+
+        <div class="text-[11px] text-gray-500">
+          * Mặc định tài khoản: <code>admin</code> | Mật khẩu: <code>admin123456</code>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end space-x-2">
+        <button id="btnLoginSubmit" class="w-full py-2.5 rounded-lg bg-binanceGold text-black font-bold text-xs hover:bg-yellow-400 transition font-mono flex items-center justify-center space-x-1.5">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span>XÁC NHẬN ĐĂNG NHẬP</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CẤU HÌNH KẾT NỐI (SETTINGS) -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-darkCard border border-darkBorder rounded-xl w-[480px] p-5 glow-gold">
+      <div class="flex items-center justify-between border-b border-darkBorder pb-3">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-sliders text-binanceGold"></i>
+          <span class="font-bold text-sm text-white">Cấu Hình Kết Nối Máy Chủ Desktop</span>
+        </div>
+        <button id="btnCloseSettings" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="mt-4 space-y-3 text-xs">
+        <div>
+          <label class="block text-gray-400 font-medium mb-1">Địa Chỉ Máy Chủ VPS (Server URL):</label>
+          <input id="cfgServerUrl" type="text" value="https://trader.noza.site" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white font-mono focus:border-binanceGold focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-medium mb-1">Token Quản Trị / Auth Token (Tùy chọn):</label>
+          <input id="cfgAuthToken" type="password" placeholder="Dán token nếu có..." class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white font-mono focus:border-binanceGold focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-medium mb-1">Phím Tắt Đóng Lệnh Khẩn Cấp Toàn Cục:</label>
+          <input id="cfgHotkey" type="text" value="CommandOrControl+Shift+K" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white font-mono focus:border-binanceGold focus:outline-none">
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <label class="text-gray-300">Âm thanh sàn giao dịch (Audio Alerts):</label>
+          <input id="cfgSound" type="checkbox" checked class="w-4 h-4 accent-yellow-400">
+        </div>
+
+        <div class="flex items-center justify-between">
+          <label class="text-gray-300">Thu nhỏ xuống khay Taskbar khi đóng:</label>
+          <input id="cfgMinimizeTray" type="checkbox" checked class="w-4 h-4 accent-yellow-400">
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end space-x-2">
+        <button id="btnCancelSettings" class="px-4 py-1.5 rounded-lg border border-darkBorder text-gray-400 hover:text-white text-xs">Hủy</button>
+        <button id="btnSaveSettings" class="px-4 py-1.5 rounded-lg bg-binanceGold text-black font-bold text-xs hover:bg-yellow-400">Lưu Cấu Hình</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
