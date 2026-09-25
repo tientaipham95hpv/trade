@@ -1,0 +1,352 @@
+{
+  "release_id": "UI_V2_RC1_PHASE6B_12e92c3",
+  "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+  "file_count": 49,
+  "secret_scan_clean": true,
+  "core_execution_files_included": 0,
+  "files": [
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/__init__.py",
+      "sha256": "7a78e10b007e6941766a670a0023f4b93de071cda3ef2bc1e285aec5d18060c8",
+      "category": "web_python",
+      "size": 76
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/app.py",
+      "sha256": "3d5ae79260cf02ad71157a6c70575a5bfd6bd1a926ae5764180980dff899cf5b",
+      "category": "web_python",
+      "size": 507936
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/portal.py",
+      "sha256": "5bcf33dcc38d2ee5e2da6e8aa88c96d05b75c96be218986d9882602628b17655",
+      "category": "web_python",
+      "size": 22682
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/css/client.css",
+      "sha256": "5ae00b808eea961a6299aa8564c62d5e394753123936f0d72fdd440e717ba21a",
+      "category": "web_static_assets",
+      "size": 51846
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/css/common.css",
+      "sha256": "9d80ed5fae9082465590b2b3e590c504d79d9f49d53268dd9c22866ac06c54c9",
+      "category": "web_static_assets",
+      "size": 7584
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/css/portal_dashboard.css",
+      "sha256": "4708e4cc3c0581c31d9cc3356a310eaf987bbcec43057b600ddf22c376f64a51",
+      "category": "web_static_assets",
+      "size": 31907
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/css/responsive.css",
+      "sha256": "0d4516b30a0969a5bd6a2af22495bb46f8be5c484363484b2839dc7511178e5a",
+      "category": "web_static_assets",
+      "size": 6998
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/favicon.svg",
+      "sha256": "e6fe6d21df0a5dbf60b5bc31c5b79c864e2af6d77bcdee55d7b8bff116187c1a",
+      "category": "web_static_assets",
+      "size": 372
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/images/sprites/sprite_01_pm.png",
+      "sha256": "d3f6ed83a155d542075238523617c46f337439726bd69336b913b492db48d937",
+      "category": "web_static_assets",
+      "size": 139399
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/images/sprites/sprite_02_risk.png",
+      "sha256": "14df5b8b7afd767db8aa824708f702c755b811dc59cebfcb68ca1b168fab81b4",
+      "category": "web_static_assets",
+      "size": 155606
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/js/theme.js",
+      "sha256": "acefc38db82933e75de7d21bc674e2e0b8078110ab004a26b9d25054f93c08b9",
+      "category": "web_static_assets",
+      "size": 1992
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/logo.png",
+      "sha256": "e3b730d90dcc6eacaf84d1b3328552cce8b6e6de54adbce7a750bd6fa269d6ba",
+      "category": "web_static_assets",
+      "size": 734993
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/base.css",
+      "sha256": "b349c4c724c1acbebd9aa2d8ac580236d5dde6ea7a087ece7856561217b8e694",
+      "category": "web_static_v2",
+      "size": 2839
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/components.css",
+      "sha256": "cd28f8159b43349fbc50f4220b72034e0d79d877a9dfd676f5b487339f9c90d8",
+      "category": "web_static_v2",
+      "size": 17993
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/activity.js",
+      "sha256": "58f30f11d92547c073a8e9e201941ef4ba38f62e0d8f52a364b65a6168f5ea66",
+      "category": "web_static_v2",
+      "size": 4764
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/api.js",
+      "sha256": "bb220721741ffae3bccf0bc9ecff086dc3ffc6c10393768f3f966e2b4313a642",
+      "category": "web_static_v2",
+      "size": 2521
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/dashboard.js",
+      "sha256": "0a234a2e911afe1985bacde4f9374e937811ba89444ed9ca007e304601148979",
+      "category": "web_static_v2",
+      "size": 6744
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/formatters.js",
+      "sha256": "73810e9fec36fe730d374469024f9405e80c739d7cd49a58d5859a0dedffddb7",
+      "category": "web_static_v2",
+      "size": 3842
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/overview.js",
+      "sha256": "c5af194aae98dfdb282e7262286c07532a50512281a017a73bbc515a505208fd",
+      "category": "web_static_v2",
+      "size": 14656
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/polling.js",
+      "sha256": "f2905fe785a3b60a714beb4ed06acbd8e7b4fc69af7be71afd432f93a2af4628",
+      "category": "web_static_v2",
+      "size": 4738
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/positions.js",
+      "sha256": "c5402acba681b0379144c99bec74c4ede8fa3b8255647465acb9e57b137a1c35",
+      "category": "web_static_v2",
+      "size": 10943
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/risk.js",
+      "sha256": "340eae3c394fb7838165d712b7f667ad0bdf330600337eb4bb9d26a373d4f3b4",
+      "category": "web_static_v2",
+      "size": 14993
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/state.js",
+      "sha256": "5719b877693f1b0ebc89b27cc569b1572c6c39fead701ce8e9d215d5e17fea9f",
+      "category": "web_static_v2",
+      "size": 1499
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/js/system.js",
+      "sha256": "0938505bbc018ce38d14f72cca29fd2991d497cdddbd63ac866219adf83f1b51",
+      "category": "web_static_v2",
+      "size": 10303
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/layout.css",
+      "sha256": "bac737ebed8752363fad6fb1ca1a6826a476103416021d09eb558e0e4e201be6",
+      "category": "web_static_v2",
+      "size": 4754
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/obsidian_quants.css",
+      "sha256": "954234abeda087625fad92ab509e16b35c6d9458a2f7be0d0761deb1573b3265",
+      "category": "web_static_v2",
+      "size": 256
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/responsive.css",
+      "sha256": "98557cf74666a42523fdf0c74a1090eef67d6d3b8c994b697862ce466fd3647a",
+      "category": "web_static_v2",
+      "size": 3021
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/static/ui_v2/tokens.css",
+      "sha256": "e39eaa2a1196e8e1ea8271e9db987e21c342f9ba7dfe19dcce1279e6be5a74d5",
+      "category": "web_static_v2",
+      "size": 2592
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/api_settings.html",
+      "sha256": "f281af1a0146fcf1e7b9d6acdfd4592cb9d439ae422824a5736d159bf53505ba",
+      "category": "web_templates_legacy",
+      "size": 962
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/dashboard.html",
+      "sha256": "55c7e8d88eca07743b68ba47d0e16747c2ff919ed4015381b5ec6d51c04a914a",
+      "category": "web_templates_legacy",
+      "size": 41913
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/index.html",
+      "sha256": "6abd1b1e3ca1bc1bf3dd6da972bd55aa721a5cafa4cb0925aa8aaa600bc878e0",
+      "category": "web_templates_legacy",
+      "size": 18675
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/login.html",
+      "sha256": "cb148738ac579886d74df84d361050d5b70d7ac963a9327fac5826870996d4e4",
+      "category": "web_templates_legacy",
+      "size": 11447
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/privacy.html",
+      "sha256": "486784dcf146609429b358bafd32067505bbdbf8e9197a5063e4d26c3421cc33",
+      "category": "web_templates_legacy",
+      "size": 8589
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/register.html",
+      "sha256": "d57fb0dd8141b316765ebc8d7048386184a63a7eed0d32d9710e91f23f96dfc4",
+      "category": "web_templates_legacy",
+      "size": 15617
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/risk_warning.html",
+      "sha256": "662fbff3d767281efcdb84c11af94e7ae7b3387b0e80b77169f63e3e67ba4360",
+      "category": "web_templates_legacy",
+      "size": 8973
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/terms.html",
+      "sha256": "5dfa1ac63876a9111bb7d5f31f2a5329ba0fe0a9177b9d4d0f060e2b73fbf575",
+      "category": "web_templates_legacy",
+      "size": 8759
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/track_record.html",
+      "sha256": "4dcc08707925a39f15f14fe462698339c7ebbbea465ea62816ddca3c7f7fed39",
+      "category": "web_templates_legacy",
+      "size": 19051
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/base.html",
+      "sha256": "b2c6d3026c4edf09c18df5a16fbf6ba781a80f5096bbfd05f60c848f51ca243c",
+      "category": "web_templates_v2",
+      "size": 1018
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/dashboard.html",
+      "sha256": "d8276b13f56113e2212a8452a04ee75d0ca7abcdc67fe499685ae67bf7922e62",
+      "category": "web_templates_v2",
+      "size": 2849
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/landing.html",
+      "sha256": "79b527b8778f3b584e915c923fecc908f6ac74084c243afd28e8b4d28bde67b8",
+      "category": "web_templates_v2",
+      "size": 5163
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/login.html",
+      "sha256": "79a1013835d7c59eb7eaacb5ab2eaa261fdd3f5e7e074e33dc7233a6dd0bfc55",
+      "category": "web_templates_v2",
+      "size": 5659
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/partials/navigation.html",
+      "sha256": "da06fc067a5f60c5ae05526649c474fcd0ff65efae721ab2258d2c4c35bb93f2",
+      "category": "web_templates_v2",
+      "size": 1437
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/partials/telemetry_bar.html",
+      "sha256": "552e38390f645266e5e41b625c34be860909e01886b0225362e06a889d3d17c4",
+      "category": "web_templates_v2",
+      "size": 2206
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/privacy.html",
+      "sha256": "6910abd90e8aeb7e52794b3fe7c7a6fc2d4678423f1c46bd523e89a11410f9d8",
+      "category": "web_templates_v2",
+      "size": 3434
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/risk_warning.html",
+      "sha256": "72b6973461ad86908c11ebbbe951953765f04f2ebeb75037bb9a05593390afc8",
+      "category": "web_templates_v2",
+      "size": 3441
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2/terms.html",
+      "sha256": "6891fe1d03f58f43517fb2d898666781fb48ee7f14b407328ab51f6c0d5bd6e3",
+      "category": "web_templates_v2",
+      "size": 3561
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/templates/ui_v2_preview.html",
+      "sha256": "74a73d5578ddb6ef19b764a550f0febce5f20b7d3b9f3b2babe36ecb20ba99ba",
+      "category": "web_templates_legacy",
+      "size": 14251
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/track_record.py",
+      "sha256": "3c4d2bc8e670c39962691212285c807baa919c6ad52ac946bc1abf63746721d7",
+      "category": "web_python",
+      "size": 33966
+    },
+    {
+      "release_commit": "12e92c38a26befd3a575887355b7337c89cacad4",
+      "path": "web/view_models.py",
+      "sha256": "6455a22630cee23b9253a6a1d11c012593e031fe3ba6ea26d30eb0731801f4cb",
+      "category": "web_python",
+      "size": 4188
+    }
+  ]
+}
