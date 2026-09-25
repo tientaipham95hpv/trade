@@ -1,26 +1,182 @@
 import os
+from pathlib import Path
 import csv
 import json
+import time
+import math
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from config.settings import BotConfig
 from core.binance_client import BinanceFuturesClient
 from notifier.telegram_bot import TelegramNotifier
+from risk.risk_manager import RiskManager
+from core.execution.models import PositionLedgerEntry, PositionOwner
 
 logger = logging.getLogger("OrderManager")
 
 VIETNAM_TZ = timezone(timedelta(hours=7))
 
 
+class ApplicationStoreFacade:
+    """
+    Read-only / IPC query facade for Application process.
+    Guarantees 0 direct SQLite writers and 0 direct execution.db writers from application.
+    All state mutations must be commanded through Execution Service IPC.
+    """
+    def __init__(self, state_file_path: str, client_getter=None):
+        self.state_file = state_file_path
+        self.db_path = f"{state_file_path}.db"
+        self._client_getter = client_getter
+
+    def set_safety_flag(self, flag: str, value: bool, reason: Optional[str] = None):
+        """Application process cannot write safety flags directly to SQLite."""
+        logger.info(f"Application safety flag {flag}={value} requested (no direct DB write in app process)")
+        return None
+
+    def get_safety_flag(self, flag: str) -> Any:
+        client = self._client_getter() if self._client_getter else None
+        if client and hasattr(client, "query_status"):
+            try:
+                status = client.query_status()
+                if not status.get("success", False) or status.get("state") == "UNKNOWN":
+                    return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "value": None}
+                return {"success": True, "state": "KNOWN_VALUE", "value": bool(status.get(flag, False))}
+            except Exception:
+                pass
+        return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "value": None}
+
+    def is_safety_flag_set(self, flag: str) -> bool:
+        res = self.get_safety_flag(flag)
+        if isinstance(res, dict) and res.get("state") == "UNKNOWN":
+            return True  # Fail-closed: if unknown, treat as active halt/safety condition
+        return bool(res.get("value", False)) if isinstance(res, dict) else False
+    def is_global_halt(self) -> Tuple[bool, str]:
+        client = self._client_getter() if self._client_getter else None
+        if client and hasattr(client, "query_status"):
+            try:
+                status = client.query_status()
+                if not status.get("success", False) or status.get("state") == "UNKNOWN":
+                    return True, "🚨 Execution Service unreachable / UNKNOWN state (fail-closed)"
+                if status.get("global_halt"):
+                    return True, status.get("halt_reason", "Global safety halt active in Execution Service")
+                return False, ""
+            except Exception as e:
+                return True, f"🚨 Execution Service query error: {e} (fail-closed)"
+        return True, "🚨 No execution service client configured (fail-closed)"
+
+    def get_positions(self) -> Dict[str, Any]:
+        client = self._client_getter() if self._client_getter else None
+        if client and hasattr(client, "query_positions"):
+            try:
+                res = client.query_positions()
+                if isinstance(res, dict) and (res.get("state") == "UNKNOWN" or not res.get("success", True)):
+                    return {
+                        "success": False,
+                        "state": "UNKNOWN",
+                        "error": "EXECUTION_SERVICE_UNAVAILABLE",
+                        "positions": None,
+                    }
+                return res
+            except Exception as e:
+                logger.error(f"get_positions query failed: {e}")
+        return {
+            "success": False,
+            "state": "UNKNOWN",
+            "error": "EXECUTION_SERVICE_UNAVAILABLE",
+            "positions": None,
+        }
+
+    def get_position(self, symbol: str) -> Any:
+        positions = self.get_positions()
+        if isinstance(positions, dict) and (positions.get("state") == "UNKNOWN" or not positions.get("success", True)):
+            return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "position": None}
+        if isinstance(positions, dict):
+            return positions.get(symbol)
+        return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "position": None}
+
+    def get_pending_orders(self) -> Any:
+        client = self._client_getter() if self._client_getter else None
+        if client and hasattr(client, "query_intents"):
+            try:
+                res = client.query_intents()
+                if isinstance(res, dict) and (res.get("state") == "UNKNOWN" or not res.get("success", True)):
+                    return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "intents": None}
+                if isinstance(res, dict) and "intents" in res:
+                    return res.get("intents", [])
+                if isinstance(res, list):
+                    return res
+            except Exception:
+                pass
+        return {"success": False, "state": "UNKNOWN", "error": "EXECUTION_SERVICE_UNAVAILABLE", "intents": None}
+
+    def load_circuit_breaker(self) -> Dict[str, Any]:
+        client = self._client_getter() if self._client_getter else None
+        if client and hasattr(client, "query_circuit_breaker"):
+            try:
+                res = client.query_circuit_breaker()
+                if isinstance(res, dict) and res.get("success"):
+                    return res.get("circuit_breaker", res)
+                return {
+                    "success": False,
+                    "state": "UNKNOWN",
+                    "error": "EXECUTION_SERVICE_UNAVAILABLE",
+                    "circuit_breaker_triggered": True,
+                }
+            except Exception:
+                pass
+        return {
+            "success": False,
+            "state": "UNKNOWN",
+            "error": "EXECUTION_SERVICE_UNAVAILABLE",
+            "circuit_breaker_triggered": True,
+        }
+
+    def get_circuit_breaker_state(self) -> Tuple[bool, float]:
+        cb = self.load_circuit_breaker()
+        return bool(cb.get("circuit_breaker_triggered", True)), float(cb.get("cooldown_until", 0.0))
+
+    def is_circuit_breaker_active(self) -> bool:
+        triggered, _ = self.get_circuit_breaker_state()
+        return triggered
+
+    def save_circuit_breaker(self, *args, **kwargs):
+        """Application process cannot write circuit breaker state directly to DB."""
+        pass
+
+    def commit_position(self, *args, **kwargs):
+        """Application process cannot commit positions to execution DB."""
+        pass
+
+    def remove_position(self, *args, **kwargs):
+        """Application process cannot remove positions from execution DB."""
+        pass
+
+    def update_position(self, *args, **kwargs):
+        """Application process cannot update positions in execution DB."""
+        pass
+
+    def update_intent_state(self, *args, **kwargs):
+        """Application process cannot update intent states in execution DB."""
+        pass
+
+    def reserve_symbol_and_capital(self, *args, **kwargs):
+        """Application process cannot reserve symbol/capital directly."""
+        return False, None, None, "Application has no reservation write authority"
+
+    def release_reservation(self, *args, **kwargs):
+        pass
+
+    def process_receipt(self, *args, **kwargs):
+        pass
+
+
 class OrderManager:
     """
-    Module Quản lý Vòng Đời Lệnh Nâng Cao:
-    - Mở lệnh Market + Cài đặt Hard Stop Loss và Take Profit.
-    - Lưu & Phục hồi trạng thái (State Persistence - bot_state.json) chống mất điện/sập nguồn.
-    - Xuất nhật ký giao dịch chi tiết ra file CSV (trade_history.csv) chuẩn Excel.
-    - Chốt lời từng phần (Partial Take Profit): Chốt 50% tại 1R + Kéo Stop Loss về hòa vốn (Breakeven) gồng 50% còn lại.
-    - Hỗ trợ đầy đủ Paper Trading (Dry-run simulation) và Live Trading.
+    Module Quản lý Vòng Đời Lệnh Nâng Cao (Pure IPC Facade):
+    - Toàn bộ thao tác giao dịch (Open/Close/Panic) đều ủy quyền qua Execution Service IPC.
+    - Zero local ExecutionEngine, zero execution.db direct writers/readers trong Application.
     """
 
     def __init__(self, config: BotConfig, client: BinanceFuturesClient, notifier: TelegramNotifier):
@@ -28,66 +184,197 @@ class OrderManager:
         self.client = client
         self.notifier = notifier
         self.active_positions: Dict[str, Dict[str, Any]] = {}
+        if hasattr(self.config, "__dict__"):
+            self.config.active_positions = self.active_positions
         self.trade_history: List[Dict[str, Any]] = []
         self.last_known_balance: float = 1000.0
+        self._order_lock = threading.Lock()
+        self._state_lock = threading.Lock()
+        self._state_version = 0
+        self._pending_symbols = set()
+        self._pending_margin = 0.0
+        self.recovery_required = False
+
+        state_file_path = getattr(self.config, "state_file", "bot_state.json")
+        self._state_file_path = state_file_path
+
+        # Application Process: 0 local execution engine, 0 execution DB writers
+        self.execution_engine = None
+
+        # IPC Client to Execution Service
+        from core.execution_service.client import ExecutionServiceClient
+        svc_port = getattr(self.config, "execution_service_port", 50051)
+        svc_host = getattr(self.config, "execution_service_host", "127.0.0.1")
+        svc_token = getattr(self.config, "ipc_token_strategy", "")
+        if svc_token:
+            self.execution_service_client = ExecutionServiceClient(
+                host=svc_host, port=svc_port, auth_token=svc_token, principal="strategy-client"
+            )
+        else:
+            logger.error("Execution Service strategy credential is not configured; mutations are disabled")
+            self.execution_service_client = None
+
+        # Store facade: read-only/IPC queries, zero direct DB writing
+        self.store = ApplicationStoreFacade(state_file_path, client_getter=self._get_service_client)
+        self.execution_store = self.store
+        self.risk_manager = RiskManager(self.config)
+        self.coordinator = None
+
+        # Dọn dẹp file lock của chính bot cũ bị crash
+        try:
+            state_dir = os.path.dirname(os.path.abspath(state_file_path))
+            bot_lock = os.path.join(state_dir, "order_manager.lock")
+            if os.path.exists(bot_lock):
+                try:
+                    os.remove(bot_lock)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # Tự động nạp trạng thái đã lưu trước đó nếu có
         saved_bal = self.load_state()
-        if saved_bal is not None and saved_bal > 0:
-            self.last_known_balance = saved_bal
+        if saved_bal is not None:
+            self.last_known_balance = float(saved_bal)
+
+        # Đối soát vị thế với sàn khi khởi động (Startup Reconciliation)
+        self.reconcile_with_exchange()
+        self.save_state()
+
+    def _get_service_client(self):
+        try:
+            import sys
+            web_mod = sys.modules.get("web.app")
+            if web_mod:
+                ctx = getattr(web_mod, "_bot_context", None)
+                if ctx and hasattr(ctx, "execution_service_client") and ctx.execution_service_client is not None:
+                    return ctx.execution_service_client
+        except Exception:
+            pass
+        return getattr(self, "execution_service_client", None)
 
     def save_state(self, simulated_balance: Optional[float] = None):
-        """Lưu toàn bộ vị thế đang mở và số dư ra file JSON để phục hồi khi khởi động lại"""
-        if simulated_balance is not None and simulated_balance > 0:
-            self.last_known_balance = simulated_balance
+        """Lưu toàn bộ vị thế đang mở và số dư ra file JSON nguyên tử (atomic write) kèm monotonic version guard"""
+        target_bal = float(simulated_balance) if simulated_balance is not None else self.last_known_balance
+        self.last_known_balance = target_bal
+
+        with self._state_lock:
+            self._state_version += 1
+            current_version = self._state_version
 
         try:
-            serializable_positions = {}
-            for sym, pos in self.active_positions.items():
-                p_copy = pos.copy()
-                if isinstance(p_copy.get("opened_at"), datetime):
-                    p_copy["opened_at"] = p_copy["opened_at"].isoformat()
-                serializable_positions[sym] = p_copy
+            with self._order_lock:
+                serializable_positions = {}
+                for sym, pos in self.active_positions.items():
+                    if not isinstance(pos, dict):
+                        continue
+                    p_copy = pos.copy()
+                    if isinstance(p_copy.get("opened_at"), datetime):
+                        p_copy["opened_at"] = p_copy["opened_at"].isoformat()
+                    serializable_positions[sym] = p_copy
+
+            pending = self.store.get_pending_orders()
 
             state_data = {
+                "version": current_version,
                 "updated_at": datetime.now(VIETNAM_TZ).isoformat(),
-                "simulated_balance": self.last_known_balance,
+                "simulated_balance": target_bal,
                 "active_positions": serializable_positions,
+                "pending_orders": pending,
                 "total_trades_count": len(self.trade_history)
             }
 
-            with open(self.config.state_file, "w", encoding="utf-8") as f:
-                json.dump(state_data, f, indent=2, ensure_ascii=False)
+            state_file = os.path.abspath(self.config.state_file)
+            state_dir = os.path.dirname(state_file)
+            os.makedirs(state_dir, exist_ok=True)
+            tmp_file = f"{state_file}.tmp.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}"
+
+            try:
+                with open(tmp_file, "w", encoding="utf-8") as f:
+                    json.dump(state_data, f, indent=2, ensure_ascii=False)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                with self._state_lock:
+                    if current_version < self._state_version:
+                        try:
+                            os.remove(tmp_file)
+                        except Exception:
+                            pass
+                        return
+                    replaced = False
+                    for _ in range(10):
+                        try:
+                            os.replace(tmp_file, state_file)
+                            replaced = True
+                            break
+                        except (PermissionError, OSError):
+                            time.sleep(0.02)
+                    if not replaced:
+                        os.replace(tmp_file, state_file)
+            except Exception:
+                if os.path.exists(tmp_file):
+                    try:
+                        os.remove(tmp_file)
+                    except Exception:
+                        pass
+                raise
+
             logger.debug("Đã lưu trạng thái hệ thống vào %s", self.config.state_file)
         except Exception as e:
             logger.error("Lỗi khi lưu state: %s", e)
 
     def load_state(self) -> Optional[float]:
-        """Đọc và phục hồi trạng thái từ file JSON nếu file tồn tại"""
+        """Đọc và phục hồi trạng thái từ SQLite (authoritative) và JSON nếu file tồn tại"""
+        db_positions = self.store.get_positions()
+        if isinstance(db_positions, dict):
+            if db_positions.get("state") == "UNKNOWN" or not db_positions.get("success", True):
+                self.recovery_required = True
+            else:
+                for sym, pos in db_positions.items():
+                    if sym not in ("success", "state", "error", "positions") and isinstance(pos, dict):
+                        self.active_positions[sym] = pos
+
         if not os.path.exists(self.config.state_file):
             return None
 
         try:
-            with open(self.config.state_file, "r", encoding="utf-8") as f:
-                state_data = json.load(f)
+            content = None
+            for _ in range(10):
+                try:
+                    with open(self.config.state_file, "r", encoding="utf-8") as f:
+                        c = f.read()
+                        if c.strip():
+                            content = c
+                            break
+                except (PermissionError, OSError):
+                    time.sleep(0.02)
+            if content is None:
+                with open(self.config.state_file, "r", encoding="utf-8") as f:
+                    content = f.read()
 
-            saved_positions = state_data.get("active_positions", {})
-            for sym, pos in saved_positions.items():
-                if "opened_at" in pos and isinstance(pos["opened_at"], str):
-                    try:
-                        pos["opened_at"] = datetime.fromisoformat(pos["opened_at"])
-                    except Exception:
-                        pos["opened_at"] = datetime.now(VIETNAM_TZ)
-                self.active_positions[sym] = pos
+            if not content.strip():
+                logger.debug("File state rỗng (%s).", self.config.state_file)
+                return None
 
-            logger.info("Đã phục hồi %d vị thế từ %s", len(self.active_positions), self.config.state_file)
+            state_data = json.loads(content)
+
+            # Authoritative SQLite owns active positions and pending orders completely.
+            # Stale JSON positions/pending_orders must NEVER resurrect into DB or alter runtime safety truth.
+            db_pending = self.store.get_pending_orders()
+            if any(isinstance(o, dict) and o.get("state") in ("UNKNOWN", "SUBMITTING", "SUBMITTED") for o in db_pending):
+                logger.critical("Phát hiện pending orders ở trạng thái UNKNOWN/SUBMITTING trong DB! Đánh dấu recovery_required.")
+                self.recovery_required = True
+                self.store.set_safety_flag("recovery_required", True)
+
+            logger.info("Đã phục hồi %d vị thế từ SQLite/State", len(self.active_positions))
             return state_data.get("simulated_balance")
         except Exception as e:
-            logger.warning("Không thể đọc file state cũ (%s), tạo mới: %s", self.config.state_file, e)
+            logger.debug("Không thể đọc file state non-authoritative JSON (%s): %s", self.config.state_file, e)
             return None
 
-    def record_trade_to_csv(self, trade: Dict[str, Any]):
-        """Ghi nhận giao dịch đã đóng vào file CSV để xem thống kê trên Excel (Giờ Việt Nam UTC+7)"""
+    def log_trade_to_csv(self, trade: Dict[str, Any]):
+        """Ghi nhận nhật ký trade đã đóng ra file CSV"""
         file_path = self.config.trade_history_file
         file_exists = os.path.exists(file_path)
 
@@ -130,86 +417,32 @@ class OrderManager:
                 ])
             logger.info("Đã ghi nhận giao dịch %s vào %s", trade.get("symbol"), file_path)
 
-            # Tự động kích hoạt AI Quant Self-Training ngầm để học từ lệnh vừa đóng
-            try:
-                import threading
-                from core.ai_trade_trainer import AITradeTrainer
-                def _bg_train():
-                    try:
-                        rep = AITradeTrainer().train_from_history()
-                        logger.info(
-                            "🧠 [AI AUTO-TRAIN] Đã tự động học lại từ trade vừa đóng! (Mẫu: %s lệnh, Winrate: %s%%, PF: %s, RSI: %s, ATR: %sx)",
-                            rep.get("sample_size"),
-                            rep.get("win_rate"),
-                            rep.get("profit_factor"),
-                            rep.get("recommendations", {}).get("rsi_boundaries"),
-                            rep.get("recommendations", {}).get("atr_stop_multiplier")
-                        )
-                    except Exception as err:
-                        logger.debug("Lỗi ngầm AI auto-train: %s", err)
-
-                threading.Thread(target=_bg_train, daemon=True, name="AIAutoTrainThread").start()
-            except Exception as e:
-                logger.debug("Không thể khởi chạy thread AI auto-train: %s", e)
-
-            # Tự động kiểm tra cột mốc 50, 100 lệnh đã đóng để gửi báo cáo kiểm toán Telegram
-            try:
-                self._check_and_notify_milestones()
-            except Exception as e:
-                logger.debug("Lỗi ngầm kiểm tra milestone trade: %s", e)
+            if not getattr(self.config, "dry_run", False):
+                try:
+                    from core.ai_trade_trainer import AITradeTrainer
+                    def _bg_train():
+                        try:
+                            AITradeTrainer().train_from_history()
+                        except Exception:
+                            pass
+                    threading.Thread(target=_bg_train, daemon=True, name="AIAutoTrainThread").start()
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("Lỗi khi ghi trade ra CSV: %s", e)
 
-    def _check_and_notify_milestones(self):
-        """Kiểm tra xem số lượng lệnh đã đóng có chạm các cột mốc 50, 100... để tự động gửi thông báo kiểm toán Telegram"""
-        try:
-            if not self.notifier or not getattr(self.notifier, "enabled", False):
-                return
-
-            file_path = self.config.trade_history_file
-            if not os.path.exists(file_path):
-                return
-
-            total_closed = 0
-            with open(file_path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                total_closed = sum(1 for _ in reader)
-
-            milestones = [50, 100]
-            base_dir = os.path.dirname(file_path) or "."
-            state_file = os.path.join(base_dir, "milestone_notifications.json")
-
-            sent_milestones = []
-            if os.path.exists(state_file):
-                try:
-                    with open(state_file, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                        sent_milestones = data.get("sent_milestones", [])
-                except Exception:
-                    sent_milestones = []
-
-            for m in milestones:
-                if total_closed >= m and m not in sent_milestones:
-                    logger.info("🎉 Đạt mốc %d lệnh đã đóng! Gửi báo cáo kiểm toán cột mốc %d qua Telegram...", total_closed, m)
-                    if hasattr(self.notifier, "send_milestone_report"):
-                        ok = self.notifier.send_milestone_report(milestone=m)
-                        if ok:
-                            sent_milestones.append(m)
-                            try:
-                                with open(state_file, "w", encoding="utf-8") as f:
-                                    json.dump({
-                                        "sent_milestones": sent_milestones,
-                                        "last_reported_count": total_closed,
-                                        "updated_at": datetime.now(VIETNAM_TZ).strftime("%Y-%m-%d %H:%M:%S (VN)")
-                                    }, f, indent=2, ensure_ascii=False)
-                            except Exception as fe:
-                                logger.warning("Không thể lưu milestone state: %s", fe)
-        except Exception as e:
-            logger.error("Lỗi khi kiểm tra cột mốc milestone: %s", e)
-
     def get_open_position_count(self) -> int:
-        """Số lượng vị thế đang mở"""
         return len(self.active_positions)
+
+    def _broadcast_to_clients(self, action: str, **kwargs):
+        """Phân bổ lệnh đồng thời tới các tài khoản Copy-Trade phi lưu ký"""
+        try:
+            from core.order_multiplexer import get_order_multiplexer
+            mux = get_order_multiplexer(use_testnet=getattr(self.config, "use_testnet", False))
+            payload = {"action": action, **kwargs}
+            mux.broadcast_order_to_clients(payload)
+        except Exception as e:
+            logger.debug("Không thể phân bổ lệnh %s tới copy clients: %s", action, e)
 
     def execute_entry(
         self,
@@ -220,519 +453,676 @@ class OrderManager:
         stop_loss: float,
         take_profit: float,
         margin: float,
-        risk_amount: float,
+        risk_amount: float = 0.0,
         leverage: Optional[int] = None,
-        ai_score: Optional[float] = None
+        ai_score: Optional[float] = None,
+        simulated_balance_holder: Optional[Dict[str, Any]] = None,
+        source: str = "strategy",
+        **kwargs
     ) -> bool:
-        """Thực thi mở vị thế mới kèm SL và TP kết hợp Đòn bẩy thích ứng (Dynamic Leverage) & AI Gatekeeper score"""
-        if symbol in self.active_positions:
-            logger.warning("%s đã có vị thế mở, bỏ qua tín hiệu mới.", symbol)
+        """
+        Pure IPC facade: routes all entry submissions exclusively to Execution Service.
+        Fails closed with zero local fallback if service is down or unavailable.
+        """
+        if getattr(self.config, "dry_run", False) or getattr(self.client, "is_dry_run", False):
+            self.active_positions[symbol] = {
+                "symbol": symbol,
+                "side": side,
+                "entry_price": entry_price,
+                "qty": qty,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "margin": margin,
+                "leverage": leverage or getattr(self.config, "leverage", 5),
+                "tp1_done": False,
+                "tp2_done": False,
+                "partial_tp_activated": False,
+                "breakeven_activated": False,
+            }
+            self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
+            self._broadcast_to_clients("OPEN", symbol=symbol, side=side, entry_price=entry_price, stop_loss=stop_loss, take_profit=take_profit, margin=margin, leverage=(leverage or getattr(self.config, "leverage", 5)), qty=qty)
+            return True
+        client = self._get_service_client()
+        if client is None:
+            logger.error(f"🚨 [HARD CUTOVER] Execution Service client unavailable. Rejecting entry for {symbol}.")
             return False
 
         effective_leverage = leverage or getattr(self.config, "leverage", 5)
+        hard_cap = getattr(self.config, "real_trading_hard_cap", 0.0) if not getattr(self.config, "dry_run", False) else 1000.0
+        if hard_cap <= 0:
+            hard_cap = 1000.0
 
-        logger.info("==> Mở vị thế %s cho %s tại $%s | SL: $%s | TP: $%s | Đòn bẩy: %dx (Thích ứng)%s",
-                    side, symbol, f"{entry_price:,.4f}", f"{stop_loss:,.4f}", f"{take_profit:,.4f}", effective_leverage,
-                    f" | AI Score: {ai_score}/10" if ai_score else "")
-
-        # 1. Cấu hình Leverage & Margin Isolated trên Binance
-        self.client.set_leverage_and_margin(symbol, effective_leverage, self.config.margin_type)
-
-        # Smart Scaling: Cho phép vào 50% Market trước, bảo đảm khớp vị thế
-        smart_scaling = getattr(self.config, "enable_smart_scaling", False)
-        exec_qty = round(qty * 0.5, 4) if smart_scaling else qty
-        exec_margin = round(margin * 0.5, 2) if smart_scaling else margin
-        if smart_scaling:
-            logger.info("⚡ [Smart Scaling Active] Vào trước 50%% Market (%s) cho %s", exec_qty, symbol)
-
-        # 2. Gửi lệnh Market Entry
-        market_order = self.client.place_market_order(symbol, side, exec_qty)
-        if not market_order:
-            logger.error("Thất bại khi gửi lệnh Market %s cho %s", side, symbol)
+        try:
+            command_id = kwargs.get("command_id")
+            res = client.open_position(
+                symbol=symbol,
+                side=side,
+                qty=qty,
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                leverage=effective_leverage,
+                total_capital=hard_cap,
+                source=source,
+                command_id=command_id,
+            )
+            if res and res.success:
+                logger.info(f"✅ Entry for {symbol} submitted via Execution Service (Receipt: {res.execution_receipt_id})")
+                self._broadcast_to_clients("OPEN", command_id=res.command_id, symbol=symbol, side=side, entry_price=entry_price, stop_loss=stop_loss, take_profit=take_profit, margin=margin, leverage=effective_leverage, qty=qty)
+                return True
+            err = res.error if res else "Unknown IPC failure"
+            logger.warning(f"❌ Execution Service rejected entry for {symbol}: {err}")
+            return False
+        except Exception as e:
+            logger.error(f"Error communicating with Execution Service: {e}")
             return False
 
-        # 3. Gửi lệnh Hard Stop Loss và Take Profit
-        exit_side = "SELL" if side == "BUY" else "BUY"
-        sl_order = self.client.place_stop_loss_order(symbol, exit_side, stop_loss)
-        tp_order = self.client.place_take_profit_order(symbol, exit_side, take_profit)
-
-        # 4. Lưu trạng thái vị thế vào bộ nhớ
-        position_record = {
-            "symbol": symbol,
-            "side": side,
-            "entry_price": entry_price,
-            "initial_sl": stop_loss,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "qty": exec_qty,
-            "initial_qty": exec_qty,
-            "orig_qty": exec_qty,
-            "margin": exec_margin,
-            "orig_margin": exec_margin,
-            "risk_amount": risk_amount,
-            "leverage": effective_leverage,
-            "ai_score": ai_score,
-            "tp1_done": False,
-            "tp2_done": False,
-            "opened_at": datetime.now(VIETNAM_TZ),
-            "breakeven_activated": False,
-            "partial_tp_activated": False,
-            "sl_order": sl_order,
-            "tp_order": tp_order
-        }
-        self.active_positions[symbol] = position_record
-        self.save_state()
-
-        # 5. Báo cáo Telegram
-        self.notifier.notify_order_filled(
-            symbol=symbol,
-            side=side,
-            qty=exec_qty,
-            price=entry_price,
-            margin=exec_margin,
-            sl=stop_loss,
-            tp=take_profit,
-            is_dry_run=self.config.dry_run,
-            leverage=effective_leverage,
-            ai_score=ai_score
-        )
-        return True
-
     def check_and_update_positions(self, current_prices: Dict[str, float], simulated_balance_holder: Optional[Dict[str, float]] = None):
-        """
-        Kiểm tra và cập nhật các vị thế đang chạy:
-        - Chốt lời từng phần 50% khi chạm 1R lợi nhuận.
-        - Dời Stop Loss về Break-Even khi đạt 1R.
-        - Khớp toàn bộ SL/TP khi chạm mục tiêu cuối.
-        - Tự động lưu trạng thái (State Persistence) và xuất file CSV.
-        """
-        closed_symbols = []
+        """Kiểm tra và cập nhật các vị thế đang chạy, chốt lời từng phần và dời Stop Loss về Breakeven"""
+        # 1. Đối soát các lệnh khớp trễ từ sàn
+        try:
+            ex_pos_list = self.client.get_open_positions()
+            if ex_pos_list is None:
+                logger.error("Periodic positions query returned None (outage). Activating global halt.")
+                self.store.set_safety_flag("global_halt", True)
+                self.recovery_required = True
+                return
+            if isinstance(ex_pos_list, list):
+                ex_map = {
+                    p.get("symbol"): abs(float(p.get("positionAmt", p.get("amount", 0.0))))
+                    for p in ex_pos_list if isinstance(p, dict)
+                }
+                for s, p in list(self.active_positions.items()):
+                    ex_q = ex_map.get(s, 0.0)
+                    if ex_q > p.get("qty", 0.0):
+                        p["qty"] = ex_q
+                        p["margin"] = ex_q * p.get("entry_price", 100.0) / p.get("leverage", 5)
+                        self.store.commit_position(
+                            s, p["side"], ex_q, p["entry_price"], p["margin"],
+                            p.get("leverage", 5), p.get("stop_loss"), p.get("take_profit")
+                        )
+        except Exception as e:
+            logger.error("Periodic positions query failed: %s. Activating global halt.", e)
+            self.store.set_safety_flag("global_halt", True)
+            self.recovery_required = True
+            return
 
         for symbol, pos in list(self.active_positions.items()):
-            cur_price = current_prices.get(symbol)
-            if not cur_price:
+            if pos.get("owner") in ("EXTERNAL", "MANUAL_EXTERNAL", "UNKNOWN_EXTERNAL") or pos.get("owner_type") in ("EXTERNAL", "MANUAL_EXTERNAL", "UNKNOWN_EXTERNAL"):
                 continue
 
-            side = pos["side"]
+            cur_price = current_prices.get(symbol)
+            if not cur_price or cur_price <= 0:
+                continue
+
             entry = pos["entry_price"]
-            sl = pos["stop_loss"]
-            tp = pos["take_profit"]
-            qty = pos["qty"]
-            margin = pos["margin"]
+            is_short = pos["side"] in ["SELL", "SHORT"]
+            exit_side = "BUY" if is_short else "SELL"
 
-            # Khoảng cách 1R rủi ro ban đầu
-            initial_risk_dist = abs(entry - pos.get("initial_sl", sl))
+            # Kiểm tra Take Profit 1 (Chốt lời 1R / 50% hoặc Multi-TP)
+            r_distance = abs(entry - pos.get("initial_sl", pos["stop_loss"]))
+            is_multi_tp = getattr(self.config, "enable_multi_stage_tp", True) and getattr(self.config, "use_multi_tp", True)
+            use_partial = getattr(self.config, "use_partial_tp", True)
+            tp_ratio = 0.33 if is_multi_tp else getattr(self.config, "partial_tp_ratio", 0.5)
 
-            # 1. Cơ chế Chốt Lời Đa Nấc (Smart Multi-TP Scaling Out 33% - 33% - 34%)
-            pos.setdefault("tp1_done", pos.get("partial_tp_activated", False))
-            pos.setdefault("tp2_done", False)
-            pos.setdefault("orig_qty", pos.get("initial_qty", qty))
-            pos.setdefault("orig_margin", pos.get("margin", margin))
+            tp1_target = (entry - r_distance) if is_short else (entry + r_distance)
+            hit_tp1 = use_partial and ((cur_price <= tp1_target) if is_short else (cur_price >= tp1_target))
 
-            if getattr(self.config, "enable_multi_stage_tp", getattr(self.config, "use_multi_tp", True)):
-                # Nấc 1: Đạt +1R -> Chốt 33% và dời Stop Loss về Hòa Vốn (Breakeven)
-                hit_1r = (side == "BUY" and cur_price >= entry + initial_risk_dist) or (side == "SHORT" and cur_price <= entry - initial_risk_dist)
-                if hit_1r and not pos["tp1_done"]:
-                    close_qty = round(pos["orig_qty"] * 0.33, 4)
-                    if 0 < close_qty < pos["qty"]:
-                        pnl = (cur_price - entry) * close_qty if side == "BUY" else (entry - cur_price) * close_qty
-                        part_margin = pos["orig_margin"] * 0.33
+            should_do_tp1 = False
+            with self._order_lock:
+                if hit_tp1 and not pos.get("tp1_done", False) and not pos.get("tp1_submitting", False):
+                    pos["tp1_submitting"] = True
+                    should_do_tp1 = True
+
+            if should_do_tp1:
+                try:
+                    step_size = 0.01
+                    filter_info = self.client.get_symbol_filter_info(symbol) if hasattr(self.client, "get_symbol_filter_info") else None
+                    if filter_info and filter_info.get("step_size"):
+                        step_size = float(filter_info["step_size"])
+
+                    orig_q = pos.get("orig_qty", pos.get("initial_qty", pos["qty"]))
+                    close_qty = RiskManager._round_step_size(orig_q * tp_ratio, step_size)
+                    if close_qty <= 0 or close_qty >= pos["qty"]:
+                        close_qty = RiskManager._round_step_size(pos["qty"] * tp_ratio, step_size)
+                    if close_qty <= 0:
+                        close_qty = RiskManager._round_step_size(pos["qty"], step_size)
+
+                    order_res = None
+                    if getattr(self.config, "dry_run", False):
+                        order_res = {"orderId": "sim-tp1", "status": "FILLED", "executedQty": str(close_qty), "avgPrice": str(cur_price)}
+                    else:
+                        _ipc = self._get_service_client()
+                        if _ipc is not None:
+                            try:
+                                _res = _ipc.close_position(symbol=symbol, qty=close_qty, reason="TP1", source="order_manager")
+                                if _res and _res.success:
+                                    order_res = {"orderId": _res.execution_receipt_id, "status": "FILLED", "executedQty": str(close_qty), "avgPrice": str(cur_price)}
+                            except Exception:
+                                order_res = None
+
+                    # Chống xử lý receipt trùng lặp
+                    receipt_id = order_res.get("orderId") if isinstance(order_res, dict) else None
+                    if receipt_id and pos.get("last_tp_order_id") == receipt_id:
+                        continue
+                    pos["last_tp_order_id"] = receipt_id
+
+                    actual_tp_qty = 0.0
+                    if isinstance(order_res, dict):
+                        status = order_res.get("status")
+                        if status not in ("REJECTED",):
+                            try:
+                                q_val = float(order_res.get("executedQty", 0.0))
+                                if math.isfinite(q_val) and q_val > 0:
+                                    actual_tp_qty = q_val
+                            except Exception:
+                                pass
+
+                    cur_ex_qty = pos["qty"]
+                    if not self.config.dry_run:
+                        try:
+                            ex_pos = self.client.get_open_positions()
+                        except TypeError:
+                            ex_pos = self.client.get_open_positions(symbol)
+                        except Exception:
+                            ex_pos = None
+
+                        if isinstance(ex_pos, list):
+                            for p in ex_pos:
+                                if isinstance(p, dict) and p.get("symbol") == symbol:
+                                    cur_ex_qty = abs(float(p.get("positionAmt", p.get("amount", 0.0))))
+                                    actual_tp_qty = max(0.0, pos["qty"] - cur_ex_qty)
+                                    break
+                        elif actual_tp_qty > 0:
+                            cur_ex_qty = max(0.0, pos["qty"] - actual_tp_qty)
+                        else:
+                            cur_ex_qty = pos["qty"]
+                    else:
+                        cur_ex_qty = max(0.0, pos["qty"] - close_qty)
+                        actual_tp_qty = close_qty
+
+                    applied_delta = max(0.0, pos["qty"] - cur_ex_qty)
+                    if applied_delta > 0:
+                        pos["qty"] = cur_ex_qty
+                        pos["margin"] = (cur_ex_qty * entry) / pos.get("leverage", 5)
+
+                        fill_p = None
+                        if not self.config.dry_run:
+                            if hasattr(self.client, "client") and hasattr(self.client.client, "events"):
+                                fills = [e for e in self.client.client.events("fill") if e.get("symbol") == symbol]
+                                if fills:
+                                    fill_p = float(fills[-1].get("price", 0.0))
+                            if (fill_p is None or fill_p <= 0) and isinstance(order_res, dict) and order_res.get("avgPrice"):
+                                try:
+                                    fill_p = float(order_res["avgPrice"])
+                                except Exception:
+                                    pass
+                            if fill_p is None or fill_p <= 0:
+                                try:
+                                    fill_p = float(self.client.get_symbol_price(symbol))
+                                except Exception:
+                                    fill_p = float(cur_price)
+                        else:
+                            fill_p = float(cur_price)
+
+                        pnl = applied_delta * (fill_p - entry) * (-1 if is_short else 1)
+                        if simulated_balance_holder and isinstance(simulated_balance_holder, dict):
+                            simulated_balance_holder["balance"] = simulated_balance_holder.get("balance", 1000.0) + pnl
+                            self.last_known_balance = simulated_balance_holder["balance"]
+
+                        part_margin = (applied_delta * entry) / pos.get("leverage", 5)
                         part_pct = (pnl / part_margin * 100.0) if part_margin > 0 else 0.0
-                        if simulated_balance_holder is not None:
-                            simulated_balance_holder["balance"] += pnl
-                        pos["qty"] = round(pos["qty"] - close_qty, 4)
-                        pos["margin"] = round(pos["margin"] - part_margin, 2)
-                        pos["stop_loss"] = entry  # Dời SL về Breakeven
-                        pos["tp1_done"] = True
-                        pos["partial_tp_activated"] = True
-                        pos["breakeven_activated"] = True
-                        logger.info(f"[{symbol}] 🎯 CHỐT LỜI NẤC 1 (33% @ 1R) tại ${cur_price:,.4f}! PnL: +${pnl:.2f} (+{part_pct:.2f}%). Dời SL về Hòa Vốn (${entry:,.4f})")
-                        self.record_trade_to_csv({
+                        self.log_trade_to_csv({
                             "symbol": symbol,
-                            "side": side,
+                            "side": pos["side"],
                             "entry_price": entry,
-                            "exit_price": cur_price,
-                            "qty": close_qty,
-                            "margin": part_margin,
+                            "exit_price": fill_p,
+                            "qty": applied_delta,
+                            "margin": round(part_margin, 2),
                             "pnl_usdt": round(pnl, 2),
                             "pnl_percent": round(part_pct, 2),
-                            "closed_at": datetime.now(VIETNAM_TZ),
-                            "exit_reason": "Chốt lời Nấc 1 (33% @ 1R) 🎯 + SL Hòa Vốn"
-                        })
-                        if hasattr(self.notifier, "notify_multi_tp"):
-                            self.notifier.notify_multi_tp(
-                                symbol=symbol, tier=1, close_qty=close_qty, rem_qty=pos["qty"],
-                                exit_price=cur_price, pnl_usdt=pnl, pnl_percent=part_pct,
-                                new_sl=entry, is_dry_run=self.config.dry_run
-                            )
-                        self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-                        continue
-
-                # Nấc 2: Đạt +2R -> Chốt tiếp 33% và nâng Stop Loss lên mức +1R để Khóa Lãi
-                hit_2r = (side == "BUY" and cur_price >= entry + (initial_risk_dist * 2.0)) or (side == "SHORT" and cur_price <= entry - (initial_risk_dist * 2.0))
-                if hit_2r and pos["tp1_done"] and not pos["tp2_done"]:
-                    close_qty = round(pos["orig_qty"] * 0.33, 4)
-                    if 0 < close_qty < pos["qty"]:
-                        pnl = (cur_price - entry) * close_qty if side == "BUY" else (entry - cur_price) * close_qty
-                        part_margin = pos["orig_margin"] * 0.33
-                        part_pct = (pnl / part_margin * 100.0) if part_margin > 0 else 0.0
-                        new_sl = round(entry + initial_risk_dist, 4) if side == "BUY" else round(entry - initial_risk_dist, 4)
-                        if simulated_balance_holder is not None:
-                            simulated_balance_holder["balance"] += pnl
-                        pos["qty"] = round(pos["qty"] - close_qty, 4)
-                        pos["margin"] = round(pos["margin"] - part_margin, 2)
-                        pos["stop_loss"] = new_sl  # Khóa lãi tại +1R
-                        pos["tp2_done"] = True
-                        logger.info(f"[{symbol}] 🚀 CHỐT LỜI NẤC 2 (33% @ 2R) tại ${cur_price:,.4f}! PnL: +${pnl:.2f} (+{part_pct:.2f}%). Dời SL lên +1R (${new_sl:,.4f}) khóa chắc lãi!")
-                        self.record_trade_to_csv({
-                            "symbol": symbol,
-                            "side": side,
-                            "entry_price": entry,
-                            "exit_price": cur_price,
-                            "qty": close_qty,
-                            "margin": part_margin,
-                            "pnl_usdt": round(pnl, 2),
-                            "pnl_percent": round(part_pct, 2),
-                            "closed_at": datetime.now(VIETNAM_TZ),
-                            "exit_reason": "Chốt lời Nấc 2 (33% @ 2R) 🚀 + Khóa Lãi +1R"
-                        })
-                        if hasattr(self.notifier, "notify_multi_tp"):
-                            self.notifier.notify_multi_tp(
-                                symbol=symbol, tier=2, close_qty=close_qty, rem_qty=pos["qty"],
-                                exit_price=cur_price, pnl_usdt=pnl, pnl_percent=part_pct,
-                                new_sl=new_sl, is_dry_run=self.config.dry_run
-                            )
-                        self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-                        continue
-
-            # 1.5. Chốt Lời 50% theo phong cách cũ nếu không bật Multi-TP
-            elif self.config.use_partial_tp and not pos.get("partial_tp_activated", False):
-                hit_1r = False
-                if side == "BUY" and cur_price >= entry + initial_risk_dist:
-                    hit_1r = True
-                elif side == "SHORT" and cur_price <= entry - initial_risk_dist:
-                    hit_1r = True
-
-                if hit_1r:
-                    close_qty = round(qty * self.config.partial_tp_ratio, 4)
-                    if close_qty > 0 and close_qty < qty:
-                        partial_pnl = (cur_price - entry) * close_qty if side == "BUY" else (entry - cur_price) * close_qty
-                        partial_margin = margin * self.config.partial_tp_ratio
-                        partial_pct = (partial_pnl / partial_margin) * 100.0 if partial_margin > 0 else 0.0
-                        if simulated_balance_holder is not None:
-                            simulated_balance_holder["balance"] += partial_pnl
-                        pos["qty"] = round(qty - close_qty, 4)
-                        pos["margin"] = round(margin - partial_margin, 2)
-                        pos["stop_loss"] = entry
-                        pos["partial_tp_activated"] = True
-                        pos["breakeven_activated"] = True
-                        logger.info(f"[{symbol}] 🎯 CHỐT LỜI 50% TẠI 1R (${cur_price:,.4f})! PnL: +${partial_pnl:.2f} (+{partial_pct:.2f}%).")
-                        self.record_trade_to_csv({
-                            "symbol": symbol,
-                            "side": side,
-                            "entry_price": entry,
-                            "exit_price": cur_price,
-                            "qty": close_qty,
-                            "margin": partial_margin,
-                            "pnl_usdt": round(partial_pnl, 2),
-                            "pnl_percent": round(partial_pct, 2),
                             "closed_at": datetime.now(VIETNAM_TZ),
                             "exit_reason": "Chốt lời 50% (TP1 @ 1R)"
                         })
-                        if hasattr(self.notifier, "notify_partial_tp"):
-                            self.notifier.notify_partial_tp(
-                                symbol=symbol, close_qty=close_qty, rem_qty=pos["qty"],
-                                exit_price=cur_price, pnl_usdt=partial_pnl, pnl_percent=partial_pct,
-                                breakeven_sl=entry, final_tp=tp, is_dry_run=self.config.dry_run
-                            )
+
+                        # Dời Stop Loss về Breakeven
+                        new_sl = None
+                        if getattr(self.config, "dry_run", False):
+                            new_sl = entry
+                        else:
+                            _ipc = self._get_service_client()
+                            if _ipc is not None:
+                                try:
+                                    _res = _ipc.place_or_update_sl(symbol=symbol, stop_loss_price=entry, source="order_manager")
+                                    if _res and _res.success:
+                                        new_sl = entry
+                                except Exception:
+                                    new_sl = None
+
+                        if new_sl or self.config.dry_run:
+                            pos["stop_loss"] = entry
+                            pos["breakeven_activated"] = True
+
+                        pos["tp1_done"] = True
+                        pos["partial_tp_activated"] = True
+                        self.store.update_position(symbol, qty=pos["qty"], margin=pos["margin"], stop_loss=pos["stop_loss"], tp1_done=1)
                         self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-                        continue
+                        self._broadcast_to_clients("PARTIAL_TP", symbol=symbol, side=exit_side, ratio=tp_ratio, price=cur_price)
+                    else:
+                        pos["tp1_done"] = False
+                finally:
+                    with self._order_lock:
+                        pos["tp1_submitting"] = False
 
-            # 2. Cơ chế Dời SL hòa vốn thông thường nếu không bật Partial TP
-            elif self.config.use_breakeven_stop and not pos["breakeven_activated"]:
-                if side == "BUY" and cur_price >= entry + initial_risk_dist:
-                    pos["stop_loss"] = entry
-                    pos["breakeven_activated"] = True
-                    logger.info(f"[{symbol}] Đã dời SL về Break-even (${entry:,.4f}) sau khi đạt +1R lợi nhuận!")
-                    self.save_state()
-                elif side == "SHORT" and cur_price <= entry - initial_risk_dist:
-                    pos["stop_loss"] = entry
-                    pos["breakeven_activated"] = True
-                    logger.info(f"[{symbol}] Đã dời SL về Break-even (${entry:,.4f}) sau khi đạt +1R lợi nhuận!")
-                    self.save_state()
+            # Kiểm tra Take Profit 2 (Chốt lời Nấc 2: 2R cho Multi-TP)
+            if is_multi_tp and use_partial and pos.get("tp1_done", False) and not pos.get("tp2_done", False):
+                tp2_target = (entry - 2.0 * r_distance) if is_short else (entry + 2.0 * r_distance)
+                hit_tp2 = (cur_price <= tp2_target) if is_short else (cur_price >= tp2_target)
+                should_do_tp2 = False
+                with self._order_lock:
+                    if hit_tp2 and not pos.get("tp2_submitting", False):
+                        pos["tp2_submitting"] = True
+                        should_do_tp2 = True
 
-            # 2.5. Cơ chế Trailing Stop Loss Động (Dynamic Trailing Stop)
-            if self.config.use_trailing_stop:
-                activation_dist = initial_risk_dist * self.config.trailing_activation_rr
-                step_ratio = self.config.trailing_step_percent / 100.0
+                if should_do_tp2:
+                    try:
+                        step_size = 0.01
+                        filter_info = self.client.get_symbol_filter_info(symbol) if hasattr(self.client, "get_symbol_filter_info") else None
+                        if filter_info and filter_info.get("step_size"):
+                            step_size = float(filter_info["step_size"])
 
-                if side == "BUY" and cur_price >= entry + activation_dist:
+                        orig_q = pos.get("orig_qty", pos.get("initial_qty", pos["qty"]))
+                        close_qty = RiskManager._round_step_size(orig_q * 0.33, step_size)
+                        if close_qty <= 0 or close_qty >= pos["qty"]:
+                            close_qty = RiskManager._round_step_size(pos["qty"] * 0.5, step_size)
+                        if close_qty <= 0:
+                            close_qty = RiskManager._round_step_size(pos["qty"], step_size)
+
+                        order_res = None
+                        if getattr(self.config, "dry_run", False):
+                            order_res = {"orderId": "sim-tp2", "status": "FILLED", "executedQty": str(close_qty), "avgPrice": str(cur_price)}
+                        else:
+                            _ipc = self._get_service_client()
+                            if _ipc is not None:
+                                try:
+                                    _res = _ipc.close_position(symbol=symbol, qty=close_qty, reason="TP2", source="order_manager")
+                                    if _res and _res.success:
+                                        order_res = {"orderId": _res.execution_receipt_id, "status": "FILLED", "executedQty": str(close_qty), "avgPrice": str(cur_price)}
+                                except Exception:
+                                    order_res = None
+
+                        actual_tp2_qty = 0.0
+                        if isinstance(order_res, dict):
+                            status = order_res.get("status")
+                            if status not in ("REJECTED",):
+                                try:
+                                    q_val = float(order_res.get("executedQty", 0.0))
+                                    if math.isfinite(q_val) and q_val > 0:
+                                        actual_tp2_qty = q_val
+                                except Exception:
+                                    pass
+
+                        cur_ex_qty = pos["qty"]
+                        if not self.config.dry_run:
+                            try:
+                                ex_pos = self.client.get_open_positions()
+                            except TypeError:
+                                ex_pos = self.client.get_open_positions(symbol)
+                            except Exception:
+                                ex_pos = None
+
+                            if isinstance(ex_pos, list):
+                                for p in ex_pos:
+                                    if isinstance(p, dict) and p.get("symbol") == symbol:
+                                        cur_ex_qty = abs(float(p.get("positionAmt", p.get("amount", 0.0))))
+                                        actual_tp2_qty = max(0.0, pos["qty"] - cur_ex_qty)
+                                        break
+                            elif actual_tp2_qty > 0:
+                                cur_ex_qty = max(0.0, pos["qty"] - actual_tp2_qty)
+                            else:
+                                cur_ex_qty = pos["qty"]
+                        else:
+                            cur_ex_qty = max(0.0, pos["qty"] - close_qty)
+                            actual_tp2_qty = close_qty
+
+                        applied_delta = max(0.0, pos["qty"] - cur_ex_qty)
+                        if applied_delta > 0:
+                            pos["qty"] = cur_ex_qty
+                            pos["margin"] = (cur_ex_qty * entry) / pos.get("leverage", 5)
+
+                            fill_p = None
+                            if isinstance(order_res, dict) and order_res.get("avgPrice"):
+                                try:
+                                    fill_p = float(order_res["avgPrice"])
+                                except Exception:
+                                    pass
+                            if fill_p is None or fill_p <= 0:
+                                sdk_obj = getattr(self.client, "client", None)
+                                ledger_obj = getattr(sdk_obj, "_ledger", sdk_obj)
+                                if hasattr(ledger_obj, "events"):
+                                    fills = [e for e in ledger_obj.events("fill") if e.get("symbol") == symbol and e.get("reduce")]
+                                    if fills:
+                                        fill_p = float(fills[-1].get("price", 0.0))
+                            if fill_p is None or fill_p <= 0:
+                                fill_p = float(cur_price)
+
+                            pnl = applied_delta * (fill_p - entry) * (-1 if is_short else 1)
+                            if simulated_balance_holder and isinstance(simulated_balance_holder, dict):
+                                simulated_balance_holder["balance"] = simulated_balance_holder.get("balance", 1000.0) + pnl
+                                self.last_known_balance = simulated_balance_holder["balance"]
+
+                            new_sl = round(entry - r_distance, 4) if is_short else round(entry + r_distance, 4)
+                            sl_placed = False
+                            if getattr(self.config, "dry_run", False):
+                                sl_placed = True
+                            else:
+                                _ipc = self._get_service_client()
+                                if _ipc is not None:
+                                    try:
+                                        _res = _ipc.place_or_update_sl(symbol=symbol, stop_loss_price=new_sl, source="order_manager")
+                                        if _res and _res.success:
+                                            sl_placed = True
+                                    except Exception:
+                                        sl_placed = False
+
+                            if sl_placed:
+                                pos["stop_loss"] = new_sl
+                            pos["tp2_done"] = True
+                            self.store.update_position(symbol, qty=pos["qty"], margin=pos["margin"], stop_loss=pos["stop_loss"], tp2_done=1)
+                            self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
+                        else:
+                            pos["tp2_done"] = False
+                    finally:
+                        with self._order_lock:
+                            pos["tp2_submitting"] = False
+
+            # Dynamic Trailing Stop
+            if getattr(self.config, "use_trailing_stop", False):
+                activation_dist = r_distance * getattr(self.config, "trailing_activation_rr", 1.5)
+                step_ratio = getattr(self.config, "trailing_step_percent", 1.0) / 100.0
+
+                if not is_short and cur_price >= entry + activation_dist:
                     step_dist = cur_price * step_ratio
                     new_sl = round(cur_price - step_dist, 4)
                     if new_sl > pos["stop_loss"]:
-                        old_sl = pos["stop_loss"]
-                        pos["stop_loss"] = new_sl
-                        pos["trailing_active"] = True
-                        logger.info(f"[{symbol}] 🚀 DÂNG TRAILING STOP: ${new_sl:,.4f} (cũ: ${old_sl:,.4f}) để khóa lợi nhuận!")
-                        self.save_state()
+                        sl_placed = False
+                        if getattr(self.config, "dry_run", False):
+                            sl_placed = True
+                        else:
+                            _ipc = self._get_service_client()
+                            if _ipc is not None:
+                                try:
+                                    _res = _ipc.place_or_update_sl(symbol=symbol, stop_loss_price=new_sl, source="order_manager")
+                                    if _res and _res.success:
+                                        sl_placed = True
+                                except Exception:
+                                    sl_placed = False
+                        if sl_placed:
+                            pos["stop_loss"] = new_sl
+                            pos["trailing_active"] = True
+                            self.store.update_position(symbol, stop_loss=new_sl)
+                            self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
 
-                elif side == "SHORT" and cur_price <= entry - activation_dist:
+                elif is_short and cur_price <= entry - activation_dist:
                     step_dist = cur_price * step_ratio
                     new_sl = round(cur_price + step_dist, 4)
                     if new_sl < pos["stop_loss"]:
-                        old_sl = pos["stop_loss"]
-                        pos["stop_loss"] = new_sl
-                        pos["trailing_active"] = True
-                        logger.info(f"[{symbol}] 🚀 HẠ TRAILING STOP: ${new_sl:,.4f} (cũ: ${old_sl:,.4f}) để khóa lợi nhuận!")
-                        self.save_state()
+                        sl_placed = False
+                        if getattr(self.config, "dry_run", False):
+                            sl_placed = True
+                        else:
+                            _ipc = self._get_service_client()
+                            if _ipc is not None:
+                                try:
+                                    _res = _ipc.place_or_update_sl(symbol=symbol, stop_loss_price=new_sl, source="order_manager")
+                                    if _res and _res.success:
+                                        sl_placed = True
+                                except Exception:
+                                    sl_placed = False
+                        if sl_placed:
+                            pos["stop_loss"] = new_sl
+                            pos["trailing_active"] = True
+                            self.store.update_position(symbol, stop_loss=new_sl)
+                            self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
 
-            # 2.8. Cơ chế Bắt Đỉnh Kiệt Sức Động Lượng (Volume Exhaustion Trailing TP - Bản 5.0)
-            hit_exhaustion_zone = (side == "BUY" and cur_price >= entry + (initial_risk_dist * 1.5)) or (side == "SHORT" and cur_price <= entry - (initial_risk_dist * 1.5))
-            if hit_exhaustion_zone and not pos.get("exhaustion_tp_done", False):
-                tight_step = cur_price * 0.003
-                ultra_sl = round(cur_price - tight_step, 4) if side == "BUY" else round(cur_price + tight_step, 4)
-                should_update = (side == "BUY" and ultra_sl > pos["stop_loss"]) or (side == "SHORT" and ultra_sl < pos["stop_loss"])
-                if should_update:
-                    pos["stop_loss"] = ultra_sl
-                    pos["exhaustion_tp_done"] = True
-                    pos["trailing_active"] = True
-                    logger.info(f"[{symbol}] 🔥 BẮT ĐỈNH KIỆT SỨC: Đã siết chặt Trailing Stop về ${ultra_sl:,.4f} để khóa đỉnh lợi nhuận!")
-                    if hasattr(self.notifier, "send_message"):
-                        self.notifier.send_message(
-                            f"🔥 <b>BẮT ĐỈNH KIỆT SỨC (VOLUME EXHAUSTION TP) - {symbol}</b>\n"
-                            f"━━━━━━━━━━━━━━━━━━━━\n"
-                            f"• Vị thế đã đạt mức lãi ấn tượng (+1.5R)\n"
-                            f"• <b>Trailing Stop Đỉnh:</b> Đã siết chặt về <code>${ultra_sl:,.4f}</code> (0.3% cách giá thị trường)\n"
-                            f"• <i>Khóa chắc đỉnh sóng lợi nhuận, chống rủi ro rút râu đảo chiều!</i>"
-                        )
-                    self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-
-            # 3. Xử lý khớp SL hoặc Take Profit cuối cùng
-            if self.config.dry_run:
+        # Kiểm tra Take Profit hoặc Stop Loss cuối cùng (Dry Run)
+        for symbol, pos in list(self.active_positions.items()):
+            cur_price = current_prices.get(symbol)
+            if not cur_price or cur_price <= 0:
+                continue
+            entry = pos["entry_price"]
+            is_short = pos["side"] in ["SELL", "SHORT"]
+            if self.config.dry_run and symbol in self.active_positions:
+                tp_val = pos.get("take_profit")
+                sl_val = pos.get("stop_loss")
                 is_hit_tp = False
                 is_hit_sl = False
 
-                if side == "BUY":
-                    if cur_price >= tp:
+                if not is_short:
+                    if tp_val and cur_price >= tp_val:
                         is_hit_tp = True
-                    elif cur_price <= pos["stop_loss"]:
+                    elif sl_val and cur_price <= sl_val:
                         is_hit_sl = True
-                else:  # SHORT
-                    if cur_price <= tp:
+                else:
+                    if tp_val and cur_price <= tp_val:
                         is_hit_tp = True
-                    elif cur_price >= pos["stop_loss"]:
+                    elif sl_val and cur_price >= sl_val:
                         is_hit_sl = True
 
                 if is_hit_tp or is_hit_sl:
-                    exit_price = tp if is_hit_tp else pos["stop_loss"]
-                    is_be = (exit_price == entry)
-
-                    if is_hit_tp:
-                        exit_reason = "Chốt Lời Toàn Phần (Final TP 🎯)"
-                    elif is_be:
-                        exit_reason = "Hòa Vốn (Breakeven 🛡️)"
-                    elif pos.get("trailing_active") and ((side == "BUY" and exit_price > entry) or (side == "SELL" and exit_price < entry)):
-                        exit_reason = "Chốt Lãi Trailing Stop 🚀"
-                    else:
-                        exit_reason = "Cắt Lỗ (Stop Loss 🛑)"
-
-                    # Tính PnL cho khối lượng còn lại
+                    exit_price = tp_val if is_hit_tp else sl_val
                     rem_qty = pos["qty"]
-                    if side == "BUY":
-                        pnl_usdt = (exit_price - entry) * rem_qty
-                    else:
-                        pnl_usdt = (entry - exit_price) * rem_qty
+                    pnl_usdt = (exit_price - entry) * rem_qty * (-1 if is_short else 1)
+                    pnl_pct = (pnl_usdt / pos["margin"] * 100.0) if pos.get("margin", 0.0) > 0 else 0.0
 
-                    pnl_pct = (pnl_usdt / pos["margin"]) * 100.0 if pos["margin"] > 0 else 0.0
+                    if simulated_balance_holder and isinstance(simulated_balance_holder, dict):
+                        simulated_balance_holder["balance"] = simulated_balance_holder.get("balance", 1000.0) + pnl_usdt
+                        self.last_known_balance = simulated_balance_holder["balance"]
 
-                    # Cập nhật số dư giả lập
-                    if simulated_balance_holder is not None:
-                        simulated_balance_holder["balance"] += pnl_usdt
-
-                    # Ghi lịch sử bộ nhớ và file CSV
-                    closed_record = {
-                        **pos,
+                    exit_reason = "Chốt Lời Toàn Phần (Final TP)" if is_hit_tp else "Cắt Lỗ (Stop Loss)"
+                    self.log_trade_to_csv({
+                        "symbol": symbol,
+                        "side": pos["side"],
+                        "entry_price": entry,
                         "exit_price": exit_price,
-                        "exit_reason": exit_reason,
+                        "qty": rem_qty,
+                        "margin": round(pos.get("margin", 0.0), 2),
                         "pnl_usdt": round(pnl_usdt, 2),
                         "pnl_percent": round(pnl_pct, 2),
-                        "closed_at": datetime.now(VIETNAM_TZ)
-                    }
-                    self.trade_history.append(closed_record)
-                    closed_symbols.append(symbol)
-
-                    self.record_trade_to_csv(closed_record)
-
-                    # Báo cáo Telegram & Console
-                    self.notifier.notify_position_closed(
-                        symbol=symbol,
-                        exit_reason=exit_reason,
-                        pnl_usdt=pnl_usdt,
-                        pnl_percent=pnl_pct,
-                        exit_price=exit_price,
-                        is_dry_run=True
-                    )
-                    logger.info(f"[{symbol}] Đóng vị thế: {exit_reason} | PnL: ${pnl_usdt:+.2f} ({pnl_pct:+.2f}%)")
-
-        for s in closed_symbols:
-            del self.active_positions[s]
-
-        if closed_symbols:
-            self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-
-    def close_all_positions(
-        self,
-        reason: str = "ĐÓNG KHẨN CẤP (PANIC CLOSE)",
-        current_prices: Optional[Dict[str, float]] = None,
-        simulated_balance_holder: Optional[Dict[str, float]] = None
-    ) -> Dict[str, Any]:
-        """
-        NÚT DỪNG KHẨN CẤP (PANIC BUTTON):
-        - Hủy toàn bộ lệnh chờ (SL / TP) trên sàn.
-        - Đóng sạch toàn bộ các vị thế đang mở bằng lệnh Market.
-        - Cập nhật số dư, ghi vào trade_history.csv và lưu state.
-        """
-        if not self.active_positions:
-            return {"success": True, "closed_count": 0, "total_pnl": 0.0, "message": "Không có vị thế nào đang mở"}
-
-        current_prices = current_prices or {}
-        closed_count = 0
-        total_pnl = 0.0
-        closed_details = []
-
-        logger.warning("🚨 [PANIC BUTTON] Đang kích hoạt đóng toàn bộ %d vị thế khẩn cấp! Lý do: %s", len(self.active_positions), reason)
-
-        for symbol, pos in list(self.active_positions.items()):
-            side = pos["side"]
-            qty = pos["qty"]
-            entry = pos["entry_price"]
-
-            # Lấy giá thị trường hiện tại
-            cur_price = current_prices.get(symbol)
-            if not cur_price:
-                filter_info = self.client.get_symbol_filter_info(symbol)
-                cur_price = entry  # Fallback
-
-            # 1. Hủy toàn bộ lệnh chờ của symbol trên sàn
-            self.client.cancel_all_symbol_orders(symbol)
-
-            # 2. Đặt lệnh Market ngược chiều để đóng vị thế ngay
-            exit_side = "SELL" if side == "BUY" else "BUY"
-            self.client.place_market_order(symbol, exit_side, qty)
-
-            # 3. Tính PnL
-            if side == "BUY":
-                pnl = (cur_price - entry) * qty
-            else:
-                pnl = (entry - cur_price) * qty
-            pnl_pct = (pnl / pos["margin"]) * 100.0 if pos["margin"] > 0 else 0.0
-
-            total_pnl += pnl
-            closed_count += 1
-
-            if simulated_balance_holder is not None:
-                simulated_balance_holder["balance"] += pnl
-
-            # 4. Ghi nhận giao dịch
-            record = {
-                **pos,
-                "exit_price": cur_price,
-                "exit_reason": reason,
-                "pnl_usdt": round(pnl, 2),
-                "pnl_percent": round(pnl_pct, 2),
-                "closed_at": datetime.now(VIETNAM_TZ)
-            }
-            self.trade_history.append(record)
-            self.record_trade_to_csv(record)
-
-            self.notifier.notify_position_closed(
-                symbol=symbol,
-                exit_reason=reason,
-                pnl_usdt=pnl,
-                pnl_percent=pnl_pct,
-                exit_price=cur_price,
-                is_dry_run=self.config.dry_run
-            )
-            closed_details.append(f"{symbol}: {pnl:+.2f} USDT")
-
-        # Xóa sạch vị thế và lưu state
-        self.active_positions.clear()
-        self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-
-        summary_msg = f"Đã đóng thành công {closed_count} vị thế. Tổng PnL: {total_pnl:+.2f} USDT ({', '.join(closed_details)})"
-        logger.info("🚨 [PANIC CLOSE HOÀN TẤT]: %s", summary_msg)
-        return {
-            "success": True,
-            "closed_count": closed_count,
-            "total_pnl": round(total_pnl, 2),
-            "message": summary_msg
-        }
+                        "closed_at": datetime.now(VIETNAM_TZ),
+                        "exit_reason": exit_reason
+                    })
+                    self.active_positions.pop(symbol, None)
+                    self.store.remove_position(symbol)
+                    self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
+                    self._broadcast_to_clients("CLOSE", symbol=symbol, exit_price=exit_price, reason=exit_reason)
 
     def close_single_position(
         self,
         symbol: str,
-        reason: str = "Đóng thủ công từ Web Dashboard",
         current_prices: Optional[Dict[str, float]] = None,
-        simulated_balance_holder: Optional[Dict[str, float]] = None
+        simulated_balance_holder: Optional[Dict[str, float]] = None,
+        reason: str = "Thủ công",
+        source: str = "order_manager",
+        command_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Đóng một vị thế cụ thể theo yêu cầu từ Web Dashboard hoặc Telegram"""
-        if symbol not in self.active_positions:
-            return {"success": False, "message": f"Không tìm thấy vị thế mở cho {symbol}"}
+        """Pure IPC facade for closing single position via Execution Service."""
+        client = self._get_service_client()
+        if client is None:
+            return {"success": False, "message": "Execution Service unavailable (Hard Cutover)"}
 
-        pos = self.active_positions[symbol]
-        side = pos["side"]
-        qty = pos["qty"]
-        entry = pos["entry_price"]
+        try:
+            res = client.close_position(symbol=symbol, reason=reason, source=source, command_id=command_id)
+            if res and res.success:
+                self.active_positions.pop(symbol, None)
+                self.save_state()
+                self._broadcast_to_clients("CLOSE", command_id=res.command_id, symbol=symbol, reason=reason)
+                return {"success": True, "symbol": symbol, "receipt": res.execution_receipt_id, "message": f"Closed {symbol}"}
+            return {"success": False, "message": res.error if res else "Failed to close position"}
+        except Exception as e:
+            return {"success": False, "message": f"Execution Service exception: {e}"}
 
-        current_prices = current_prices or {}
-        cur_price = current_prices.get(symbol)
-        if not cur_price:
-            cur_price = entry
+    def close_all_positions(
+        self,
+        current_prices: Optional[Dict[str, float]] = None,
+        simulated_balance_holder: Optional[Dict[str, float]] = None,
+        reason: str = "Panic close",
+        source: str = "order_manager",
+        command_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Pure IPC facade for emergency closing all positions via Execution Service."""
+        client = self._get_service_client()
+        if client is None:
+            return {"success": False, "message": "Execution Service unavailable (Hard Cutover)"}
 
-        # 1. Hủy lệnh chờ trên sàn
-        self.client.cancel_all_symbol_orders(symbol)
+        try:
+            res = client.emergency_close_all(reason=reason, source=source, command_id=command_id)
+            if res and res.success:
+                self.active_positions.clear()
+                self.save_state()
+                self._broadcast_to_clients("CLOSE_ALL", command_id=res.command_id, reason=reason)
+                return {"success": True, "message": "All positions closed via Execution Service", "receipt": res.execution_receipt_id}
+            return {"success": False, "message": res.error if res else "Failed panic close"}
+        except Exception as e:
+            return {"success": False, "message": f"Execution Service exception: {e}"}
 
-        # 2. Đặt lệnh Market ngược chiều nếu không phải dry_run
-        exit_side = "SELL" if side == "BUY" else "BUY"
-        self.client.place_market_order(symbol, exit_side, qty)
+    def reconcile_with_exchange(self, simulated_balance_holder: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+        """Pure IPC facade for reconciliation via Execution Service (no local mutation authority)."""
+        client = self._get_service_client()
+        if client is not None:
+            try:
+                res = client.reconcile(source="order_manager")
+                if res and res.success:
+                    return {"status": "ok", "success": True, "reconciled": []}
+                err = res.error if res else "Reconciliation failed"
+                return {"status": "error", "success": False, "error": err, "reconciled": []}
+            except Exception as e:
+                return {"status": "error", "success": False, "error": str(e), "reconciled": []}
+        return {"status": "error", "success": False, "error": "EXECUTION_SERVICE_UNAVAILABLE", "reconciled": []}
 
-        # 3. Tính PnL
+    def execute_manual_order(
+        self,
+        symbol: str,
+        side: str,
+        balance: float,
+        risk_percent: Optional[float] = None,
+        leverage: Optional[int] = None,
+        simulated_balance_holder: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Thực thi đặt lệnh thủ công qua chốt kiểm tra rủi ro tập trung"""
+        if hasattr(self, "risk_manager") and self.risk_manager:
+            can_open, reason = self.risk_manager.can_open_new_position(len(self.active_positions), balance)
+            if not can_open:
+                logger.warning("Lệnh thủ công bị từ chối bởi Risk Manager: %s", reason)
+                return {"success": False, "message": reason}
+
+        if len(self.active_positions) >= self.config.max_concurrent_positions:
+            return {"success": False, "message": f"Đã đạt giới hạn tối đa {self.config.max_concurrent_positions} vị thế cùng lúc!"}
+
+        side = side.upper()
+        if side not in ["BUY", "SELL"]:
+            return {"success": False, "message": "Chiều lệnh phải là BUY hoặc SELL"}
+
+        # Lấy giá thị trường hiện tại (fail-closed, không fallback về $100)
+        cur_price = 0.0
+        try:
+            p = self.client.get_symbol_price(symbol)
+            if isinstance(p, (int, float)) and p > 0:
+                cur_price = float(p)
+            else:
+                ltf_df = self.client.get_klines_df(symbol, interval=self.config.ltf, limit=10)
+                if hasattr(ltf_df, "empty") and not ltf_df.empty and "close" in ltf_df.columns:
+                    val = float(ltf_df.iloc[-1]["close"])
+                    if val > 0:
+                        cur_price = val
+        except Exception:
+            pass
+
+        if cur_price <= 0:
+            logger.error("Không thể lấy giá thị trường cho %s. Từ chối đặt lệnh thủ công.", symbol)
+            return {"success": False, "message": f"Không thể lấy giá thị trường cho {symbol}"}
+
+        eff_lev = leverage or self.config.leverage
+        filter_info = {}
+        try:
+            filter_info = self.client.get_symbol_filter_info(symbol) if hasattr(self.client, "get_symbol_filter_info") else {}
+        except Exception:
+            pass
+
+        sl_pct = 0.015
         if side == "BUY":
-            pnl = (cur_price - entry) * qty
+            stop_loss = round(cur_price * (1 - sl_pct), 4)
+            take_profit = round(cur_price * (1 + sl_pct * self.config.risk_reward_ratio), 4)
         else:
-            pnl = (entry - cur_price) * qty
-        pnl_pct = (pnl / pos["margin"]) * 100.0 if pos["margin"] > 0 else 0.0
+            stop_loss = round(cur_price * (1 + sl_pct), 4)
+            take_profit = round(cur_price * (1 - sl_pct * self.config.risk_reward_ratio), 4)
 
-        if simulated_balance_holder is not None:
-            simulated_balance_holder["balance"] += pnl
+        used_risk = risk_percent if (risk_percent and risk_percent > 0) else self.config.risk_per_trade_percent
+        risk_amount = balance * (used_risk / 100.0)
+        risk_distance = abs(cur_price - stop_loss)
+        raw_qty = (risk_amount / risk_distance) if risk_distance > 0 else 0.0
 
-        # 4. Ghi nhận giao dịch
-        record = {
-            **pos,
-            "exit_price": cur_price,
-            "exit_reason": reason,
-            "pnl_usdt": round(pnl, 2),
-            "pnl_percent": round(pnl_pct, 2),
-            "closed_at": datetime.now(VIETNAM_TZ)
-        }
-        self.trade_history.append(record)
-        self.record_trade_to_csv(record)
+        hard_cap = getattr(self.config, "real_trading_hard_cap", 0.0)
+        current_total_margin = sum(p.get("margin", 0.0) for p in self.active_positions.values())
+        max_margin = balance
+        if hard_cap and hard_cap > 0:
+            remaining_cap = hard_cap - current_total_margin
+            if remaining_cap <= 0:
+                return {"success": False, "message": "Đã đạt giới hạn Hard Cap tổng ký quỹ"}
+            max_margin = min(max_margin, remaining_cap)
 
-        self.notifier.notify_position_closed(
+        calculated_margin = (raw_qty * cur_price) / eff_lev
+        if calculated_margin > max_margin:
+            calculated_margin = max_margin
+            raw_qty = (calculated_margin * eff_lev) / cur_price
+            risk_amount = raw_qty * risk_distance
+
+        step = float(filter_info.get("step_size", 0.001) or 0.001)
+        qty = RiskManager._round_step_size(raw_qty, step)
+        min_qty = float(filter_info.get("min_qty", 0.001) or 0.001)
+        if qty < min_qty:
+            qty = min_qty
+
+        final_margin = (qty * cur_price) / eff_lev
+        if final_margin > balance:
+            logger.warning("Khối lượng tối thiểu yêu cầu margin (%s) vượt quá số dư (%s)", final_margin, balance)
+            return {"success": False, "message": f"Ký quỹ {final_margin:.2f} vượt quá số dư khả dụng {balance:.2f}"}
+
+        success = self.execute_entry(
             symbol=symbol,
-            exit_reason=reason,
-            pnl_usdt=pnl,
-            pnl_percent=pnl_pct,
-            exit_price=cur_price,
-            is_dry_run=self.config.dry_run
+            side=side,
+            entry_price=cur_price,
+            qty=qty,
+            stop_loss=stop_loss,
+            take_profit=take_profit,
+            margin=final_margin,
+            risk_amount=risk_amount,
+            leverage=eff_lev,
+            simulated_balance_holder=simulated_balance_holder
         )
 
-        del self.active_positions[symbol]
-        self.save_state(simulated_balance_holder.get("balance") if simulated_balance_holder else None)
-
-        msg = f"Đã đóng thành công vị thế {symbol} tại giá ${cur_price:,.4f}. PnL: {pnl:+.2f} USDT ({pnl_pct:+.2f}%)"
-        logger.info(msg)
-        return {"success": True, "symbol": symbol, "pnl": round(pnl, 2), "pnl_percent": round(pnl_pct, 2), "message": msg}
+        return {
+            "success": success,
+            "order": {
+                "symbol": symbol,
+                "side": side,
+                "entry_price": cur_price,
+                "qty": qty,
+                "margin": final_margin,
+                "stop_loss": stop_loss,
+                "take_profit": take_profit,
+                "leverage": eff_lev
+            } if success else None,
+            "symbol": symbol,
+            "side": side,
+            "entry_price": cur_price,
+            "qty": qty,
+            "margin": final_margin,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit,
+            "leverage": eff_lev
+        }
 
     def get_symbol_performance_breakdown(self) -> Dict[str, Any]:
         """Thống kê chi tiết lãi/lỗ và tỷ lệ thắng theo từng cặp coin"""
@@ -741,8 +1131,6 @@ class OrderManager:
             return {"by_symbol": {}, "best_symbol": None, "worst_symbol": None, "max_win_streak": 0, "max_loss_streak": 0, "total_closed": 0}
 
         by_sym: Dict[str, Dict[str, Any]] = {}
-        trade_pnl_list = []
-
         try:
             with open(history_file, "r", encoding="utf-8") as f:
                 reader = list(csv.DictReader(f))
@@ -752,7 +1140,6 @@ class OrderManager:
                         pnl = float(r.get("pnl_usdt", 0.0))
                     except Exception:
                         pnl = 0.0
-                    trade_pnl_list.append(pnl)
 
                     if sym not in by_sym:
                         by_sym[sym] = {"trades": 0, "wins": 0, "losses": 0, "net_pnl": 0.0, "win_rate": 0.0}
@@ -768,131 +1155,9 @@ class OrderManager:
                 st["net_pnl"] = round(st["net_pnl"], 2)
                 st["win_rate"] = round((st["wins"] / st["trades"] * 100.0) if st["trades"] > 0 else 0.0, 1)
 
-            sorted_symbols = sorted(by_sym.items(), key=lambda x: x[1]["net_pnl"], reverse=True)
-            best_sym = sorted_symbols[0] if sorted_symbols else None
-            worst_sym = sorted_symbols[-1] if sorted_symbols else None
-
-            # Tính win streak / loss streak
-            cur_win = 0
-            max_win = 0
-            cur_loss = 0
-            max_loss = 0
-            for p in trade_pnl_list:
-                if p > 0:
-                    cur_win += 1
-                    cur_loss = 0
-                    if cur_win > max_win:
-                        max_win = cur_win
-                elif p < 0:
-                    cur_loss += 1
-                    cur_win = 0
-                    if cur_loss > max_loss:
-                        max_loss = cur_loss
-                else:
-                    cur_win = 0
-                    cur_loss = 0
-
             return {
-                "by_symbol": dict(sorted_symbols),
-                "best_symbol": {"symbol": best_sym[0], **best_sym[1]} if best_sym else None,
-                "worst_symbol": {"symbol": worst_sym[0], **worst_sym[1]} if worst_sym else None,
-                "max_win_streak": max_win,
-                "max_loss_streak": max_loss,
-                "total_closed": len(trade_pnl_list)
+                "by_symbol": by_sym,
+                "total_closed": sum(st["trades"] for st in by_sym.values()),
             }
-        except Exception as e:
-            logger.error(f"Lỗi phân tích performance: {e}")
-            return {"by_symbol": {}, "best_symbol": None, "worst_symbol": None, "max_win_streak": 0, "max_loss_streak": 0, "total_closed": 0}
-
-    def execute_manual_order(
-        self,
-        symbol: str,
-        side: str,
-        balance: float,
-        leverage: Optional[int] = None,
-        risk_percent: Optional[float] = None,
-        simulated_balance_holder: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Mở lệnh thủ công 1-Click từ Web Dashboard hoặc Telegram Bot"""
-        if symbol in self.active_positions:
-            return {"success": False, "message": f"Vị thế {symbol} đã đang mở từ trước!"}
-
-        if len(self.active_positions) >= self.config.max_concurrent_positions:
-            return {"success": False, "message": f"Đã đạt giới hạn tối đa {self.config.max_concurrent_positions} vị thế cùng lúc!"}
-
-        side = side.upper()
-        if side not in ["BUY", "SELL"]:
-            return {"success": False, "message": "Chiều lệnh phải là BUY hoặc SELL"}
-
-        # Lấy giá hiện tại
-        ltf_df = self.client.get_klines_df(symbol, interval=self.config.ltf, limit=10)
-        if ltf_df.empty:
-            return {"success": False, "message": f"Không lấy được giá thị trường cho {symbol}"}
-
-        cur_price = float(ltf_df.iloc[-1]['close'])
-        filter_info = self.client.get_symbol_filter_info(symbol)
-
-        # Tính khoảng cách Stop Loss (1.5% mặc định) và Take Profit (1:2 R:R)
-        sl_pct = 0.015
-        if side == "BUY":
-            stop_loss = round(cur_price * (1 - sl_pct), 4)
-            take_profit = round(cur_price * (1 + sl_pct * self.config.risk_reward_ratio), 4)
-        else:
-            stop_loss = round(cur_price * (1 + sl_pct), 4)
-            take_profit = round(cur_price * (1 - sl_pct * self.config.risk_reward_ratio), 4)
-
-        # Tính khối lượng
-        used_risk = risk_percent if (risk_percent and risk_percent > 0) else self.config.risk_per_trade_percent
-        risk_amount = balance * (used_risk / 100.0)
-        risk_distance = abs(cur_price - stop_loss)
-        if risk_distance <= 0:
-            return {"success": False, "message": "Khoảng cách SL không hợp lệ"}
-
-        raw_qty = risk_amount / risk_distance
-        step = filter_info.get("step_size", 0.001)
-        precision = 0
-        if "." in str(step):
-            precision = len(str(step).split(".")[1].rstrip("0"))
-        qty = round(round(raw_qty / step) * step, precision)
-
-        min_qty = filter_info.get("min_qty", 0.001)
-        if qty < min_qty:
-            qty = min_qty
-
-        margin = (qty * cur_price) / (leverage or self.config.leverage)
-
-        success = self.execute_entry(
-            symbol=symbol,
-            side=side,
-            entry_price=cur_price,
-            qty=qty,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            margin=margin,
-            risk_amount=risk_amount
-        )
-
-        if success:
-            if simulated_balance_holder:
-                self.save_state(simulated_balance_holder.get("balance"))
-            self.notifier.notify_signal(
-                symbol=symbol,
-                signal=side,
-                entry=cur_price,
-                sl=stop_loss,
-                tp=take_profit,
-                reason="Lệnh bán tự động 1-Click (Manual Trigger)"
-            )
-            return {
-                "success": True,
-                "symbol": symbol,
-                "side": side,
-                "entry_price": cur_price,
-                "qty": qty,
-                "margin": round(margin, 2),
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
-                "message": f"Đã khớp lệnh {side} {symbol} thành công tại giá ${cur_price:,.4f}!"
-            }
-        return {"success": False, "message": "Không thể khớp lệnh vào hệ thống"}
-
+        except Exception:
+            return {"by_symbol": {}, "total_closed": 0}

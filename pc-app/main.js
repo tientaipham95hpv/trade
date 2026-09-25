@@ -13,7 +13,6 @@ const configFile = path.join(userDataPath, 'desktop_config.json');
 function loadConfig() {
   const defaults = {
     serverUrl: 'https://trader.noza.site',
-    authToken: '',
     soundEnabled: true,
     minimizeToTray: true,
     hotkeyEmergency: 'CommandOrControl+Shift+K',
@@ -21,7 +20,13 @@ function loadConfig() {
   };
   try {
     if (fs.existsSync(configFile)) {
-      return { ...defaults, ...JSON.parse(fs.readFileSync(configFile, 'utf8')) };
+      const stored = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+      const hadLegacyToken = Object.prototype.hasOwnProperty.call(stored, 'authToken');
+      delete stored.authToken;
+      if (hadLegacyToken) {
+        fs.writeFileSync(configFile, JSON.stringify(stored, null, 2), 'utf8');
+      }
+      return { ...defaults, ...stored };
     }
   } catch (e) {
     console.error('Error loading config:', e);
@@ -31,7 +36,9 @@ function loadConfig() {
 
 function saveConfig(cfg) {
   try {
-    fs.writeFileSync(configFile, JSON.stringify(cfg, null, 2), 'utf8');
+    const safeConfig = { ...(cfg || {}) };
+    delete safeConfig.authToken;
+    fs.writeFileSync(configFile, JSON.stringify(safeConfig, null, 2), 'utf8');
     return true;
   } catch (e) {
     console.error('Error saving config:', e);
@@ -217,7 +224,10 @@ ipcMain.handle('get-app-config', () => {
 });
 
 ipcMain.handle('save-app-config', (event, newCfg) => {
-  appConfig = { ...appConfig, ...newCfg };
+  const safeConfig = { ...(newCfg || {}) };
+  delete safeConfig.authToken;
+  appConfig = { ...appConfig, ...safeConfig };
+  delete appConfig.authToken;
   saveConfig(appConfig);
   registerGlobalHotkeys();
   return true;

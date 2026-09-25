@@ -97,6 +97,27 @@ class BotContext:
         self.current_prices = {}
         self.is_paused = False
 
+        # Wire authoritative IPC Execution Service Client (Hard Cutover)
+        try:
+            from core.execution_service.client import ExecutionServiceClient
+            svc_port = getattr(self.config, "execution_service_port", 50051)
+            svc_host = getattr(self.config, "execution_service_host", "127.0.0.1")
+            svc_token = str(getattr(self.config, "ipc_token_strategy", "") or "").strip()
+            if not svc_token:
+                raise RuntimeError("Strategy IPC credential is not configured")
+            self.execution_service_client = ExecutionServiceClient(
+                host=svc_host, port=svc_port, auth_token=svc_token, principal="strategy-client"
+            )
+            if self.order_manager and getattr(self.order_manager, "execution_service_client", None) is None:
+                self.order_manager.execution_service_client = self.execution_service_client
+            if self.risk_manager:
+                self.risk_manager.execution_service_client = self.execution_service_client
+                self.risk_manager._load_circuit_breaker()
+        except Exception:
+            self.execution_service_client = None
+            if self.risk_manager:
+                self.risk_manager.execution_service_client = None
+
     def get_current_balance(self) -> float:
         if config.dry_run:
             return float(self.simulated_balance_holder.get("balance", 1000.0))
@@ -137,7 +158,7 @@ def main():
 
     # Phục hồi vốn mô phỏng từ file bot_state.json nếu có
     saved_balance = order_manager.load_state()
-    initial_balance = saved_balance if (saved_balance is not None and saved_balance > 0) else 1000.0
+    initial_balance = saved_balance if saved_balance is not None else 1000.0
     simulated_balance_holder = {"balance": initial_balance}
     logger.info("Vốn khởi điểm: $%.2f USDT (Phục hồi từ state: %s)", initial_balance, saved_balance is not None)
 
@@ -389,7 +410,7 @@ def main():
 
                         if success:
                             console.print(f"[bold green][✓] ĐÃ MỞ VỊ THẾ {setup['signal']} CHO {sym}:[/bold green] "
-                                          f"Qty: {sizing['qty']} | Đòn bẩy: {sizing.get('leverage')}x | Ký quỹ: ${sizing['margin']:.2f} | Rủi ro: ${sizing['risk_amount']:.2f} ({sizing['risk_percent_actual']}%)")
+                                          f"Qty: {sizing['qty']} | Đòn bẩy: {sizing.get('leverage')}x | Ký quỹ: ${sizing['margin']:.2f} | Rủi ro: ${sizing.get('risk_amount', 0.0):.2f} ({sizing.get('risk_percent_actual', sizing.get('risk_percent', 1.0))}%)")
 
             if args.test_once:
                 console.print("\n[bold green][✓] Hoàn thành 1 chu kỳ quét kiểm thử (--test-once) thành công![/bold green]")

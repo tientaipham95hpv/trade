@@ -1,0 +1,66 @@
+{% extends "ui_v2/base.html" %}
+
+{% block title %}Binance Quant Pro — Operator Terminal (Obsidian Quants){% endblock %}
+
+{% block body %}
+<div class="terminal-shell">
+    {% include "ui_v2/partials/telemetry_bar.html" %}
+    {% include "ui_v2/partials/navigation.html" %}
+
+    <main id="terminal-viewport" class="terminal-viewport">
+        <!-- Initial skeleton shown before JS hydration -->
+        <div class="terminal-grid-12">
+            <div class="col-span-4">
+                <div class="terminal-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">SYSTEM STATUS</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="skeleton skeleton-text mb-2"></div>
+                        <div class="skeleton skeleton-text mb-2" style="width: 70%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 50%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-span-4">
+                <div class="terminal-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">PNL & PERFORMANCE</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="skeleton skeleton-text mb-2"></div>
+                        <div class="skeleton skeleton-text mb-2" style="width: 80%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 60%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-span-4">
+                <div class="terminal-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">RISK & BREAKER</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="skeleton skeleton-text mb-2"></div>
+                        <div class="skeleton skeleton-text mb-2" style="width: 75%;"></div>
+                        <div class="skeleton skeleton-text" style="width: 45%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-span-12">
+                <div class="terminal-panel">
+                    <div class="panel-header">
+                        <span class="panel-title">LOADING REALTIME TELEMETRY...</span>
+                    </div>
+                    <div class="panel-body py-8 text-center">
+                        <div class="font-mono text-cyan text-sm">CONNECTING TO EXECUTION SERVICE...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/ui_v2/js/dashboard.js"></script>
+{% endblock %}

@@ -11,10 +11,8 @@ class ApiService {
   Future<void> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     serverUrl = prefs.getString('server_url') ?? defaultServerUrl;
-    authToken = prefs.getString('auth_token') ?? '';
-    if (authToken.isEmpty) {
-      await login();
-    }
+    authToken = '';
+    await prefs.remove('auth_token');
   }
 
   Future<void> saveSettings(String url, String token) async {
@@ -22,10 +20,13 @@ class ApiService {
     serverUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
     authToken = token.trim();
     await prefs.setString('server_url', serverUrl);
-    await prefs.setString('auth_token', authToken);
+    await prefs.remove('auth_token');
   }
 
-  Future<bool> login([String username = 'admin', String password = 'admin123456']) async {
+  Future<bool> login([String? username, String? password]) async {
+    if (username == null || username.trim().isEmpty || password == null || password.isEmpty) {
+      return false;
+    }
     try {
       final uri = Uri.parse('$serverUrl/api/login');
       final response = await http.post(
@@ -37,9 +38,7 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success'] == true && data['token'] != null) {
-          authToken = data['token'];
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('auth_token', authToken);
+          authToken = data['token'].toString();
           return true;
         }
       }
@@ -61,16 +60,14 @@ class ApiService {
 
   Future<BotStatus> fetchStatus() async {
     if (authToken.isEmpty) {
-      await login();
+      throw Exception('Yêu cầu đăng nhập quản trị rõ ràng');
     }
     final uri = Uri.parse('$serverUrl/api/status');
     var response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 401) {
-      final ok = await login();
-      if (ok) {
-        response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
-      }
+      authToken = '';
+      throw Exception('Phiên đăng nhập đã hết hạn');
     }
 
     if (response.statusCode == 200) {
@@ -132,16 +129,14 @@ class ApiService {
 
   Future<HistoryData> fetchHistory() async {
     if (authToken.isEmpty) {
-      await login();
+      throw Exception('Yêu cầu đăng nhập quản trị rõ ràng');
     }
     final uri = Uri.parse('$serverUrl/api/history');
     var response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 401) {
-      final ok = await login();
-      if (ok) {
-        response = await http.get(uri, headers: _buildHeaders()).timeout(const Duration(seconds: 10));
-      }
+      authToken = '';
+      throw Exception('Phiên đăng nhập đã hết hạn');
     }
 
     if (response.statusCode == 200) {

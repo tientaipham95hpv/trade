@@ -1,18 +1,24 @@
 [Unit]
-Description=Binance Futures Quantitative Trading Bot Service
+Description=Trader Stack OFFLINE Supervisor
 After=network.target network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/root/bot_binance
-ExecStart=/root/bot_binance/venv/bin/python run_bot.py
-Restart=always
-RestartSec=5
+User=trader
+Group=trader
+WorkingDirectory=/opt/trader-stack
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/trader-stack/venv/bin/python -B scripts/trader_stack_supervisor.py --env-file /opt/trader-stack/.runtime/trader-stack.env
+ExecStop=/usr/bin/touch /opt/trader-stack/.runtime/stop.request
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=90
+TimeoutStopSec=45
+NoNewPrivileges=true
+PrivateTmp=true
 StandardOutput=journal
 StandardError=journal
-Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target

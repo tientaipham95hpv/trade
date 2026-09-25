@@ -1,4 +1,4 @@
 # Config package
-from .settings import config, BotConfig
+from .settings import config, BotConfig, ApplicationConfig, ExecutionServiceConfig
 
-__all__ = ["config", "BotConfig"]
+__all__ = ["config", "BotConfig", "ApplicationConfig", "ExecutionServiceConfig"]

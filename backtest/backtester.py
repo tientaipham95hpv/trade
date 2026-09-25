@@ -42,6 +42,8 @@ class FuturesBacktester:
 
         # Gộp xu hướng HTF sang LTF theo open_time
         htf_cols = ['open_time', 'ema_50', 'ema_200', 'close']
+        if 'close_time' in htf.columns:
+            htf_cols.append('close_time')
         for col in ['ema_50', 'ema_200']:
             if col not in htf.columns:
                 htf[col] = htf['close']
@@ -49,12 +51,32 @@ class FuturesBacktester:
         htf_sub = htf[htf_cols].rename(
             columns={'ema_50': 'htf_ema50', 'ema_200': 'htf_ema200', 'close': 'htf_close'}
         )
+
+        ltf = ltf.sort_values('open_time').reset_index(drop=True)
+        htf_sub = htf_sub.sort_values('open_time').reset_index(drop=True)
+
+        if 'close_time' in ltf.columns:
+            ltf['ltf_close_time'] = ltf['close_time']
+        else:
+            ltf['ltf_close_time'] = ltf['open_time'] + pd.Timedelta(minutes=15)
+
+        if 'close_time' in htf_sub.columns:
+            htf_sub['htf_close_time'] = htf_sub['close_time']
+        else:
+            htf_sub['htf_close_time'] = htf_sub['open_time'] + pd.Timedelta(hours=1)
+
         merged = pd.merge_asof(
-            ltf.sort_values('open_time'),
-            htf_sub.sort_values('open_time'),
-            on='open_time',
-            direction='backward'
+            ltf.sort_values('ltf_close_time'),
+            htf_sub.sort_values('htf_close_time'),
+            left_on='ltf_close_time',
+            right_on='htf_close_time',
+            direction='backward',
+            suffixes=('', '_htf_dup')
         )
+        if 'ltf_close_time' in merged.columns:
+            merged.drop(columns=['ltf_close_time'], inplace=True)
+        if 'htf_close_time' in merged.columns:
+            merged.drop(columns=['htf_close_time'], inplace=True)
 
         balance = self.initial_balance
         peak_balance = balance

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="theme-color" content="#051424">
+    <title>{% block title %}Binance Quant Pro — Obsidian Quants{% endblock %}</title>
+    
+    <!-- Obsidian Quants Design System (Zero External CDNs) -->
+    <link rel="stylesheet" href="/static/ui_v2/tokens.css">
+    <link rel="stylesheet" href="/static/ui_v2/base.css">
+    <link rel="stylesheet" href="/static/ui_v2/layout.css">
+    <link rel="stylesheet" href="/static/ui_v2/components.css">
+    <link rel="stylesheet" href="/static/ui_v2/responsive.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-base text-primary">
+    {% block body %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

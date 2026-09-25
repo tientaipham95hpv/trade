@@ -1,7 +1,9 @@
 import os
+import threading
 import asyncio
 import csv
 import json
+import re
 import time
 import hmac
 import hashlib
@@ -11,11 +13,38 @@ import logging
 from datetime import datetime, timezone, timedelta
 import urllib.request
 import requests
+from html import escape
 from typing import Dict, Any, Optional
 from fastapi import FastAPI, Request, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, Response, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from config.settings import config
+import sys
+from database.connection import get_db_session, init_db
+from database.models import Client, ProfitShareSettlement, ClientOrderLog, RevokedJwtToken
+from database.security import (
+    hash_password,
+    verify_password,
+    create_jwt_token,
+    decode_jwt_token,
+)
+from core.order_multiplexer import get_order_multiplexer
+from web.track_record import calculate_track_record_metrics, render_track_record_html
+from web.portal import (
+    render_portal_login_html,
+    render_portal_register_html,
+    render_portal_api_settings_html,
+    render_portal_dashboard_html
+)
+
+# Enabled web startup is an authority boundary: persistence failures are fatal.
+try:
+    init_db()
+except Exception:
+    if getattr(config, "enable_web", False):
+        raise
+    logging.getLogger("WebDashboard").debug("Copy-trade DB initialization deferred", exc_info=True)
+
 from utils.sentiment import CryptoSentiment
 from backtest.backtester import FuturesBacktester
 from core.funding_arbitrage import FundingArbitrageVault
@@ -63,6 +92,27 @@ logger = logging.getLogger("WebDashboard")
 
 VIETNAM_TZ = timezone(timedelta(hours=7))
 
+_web_halt_generation: Optional[int] = None
+
+_STRICT_DECIMAL_RE = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\Z")
+
+
+def _strict_handler_float(value: Any, field: str, *, positive: bool = False) -> float:
+    """Parse an inbound financial value before it reaches IPC or mutable state."""
+    from core.execution.validation import finite_float
+
+    if isinstance(value, str) and not _STRICT_DECIMAL_RE.fullmatch(value.strip()):
+        raise ValueError(f"{field} is not a strict decimal")
+    return finite_float(value, field, positive=positive)
+
+
+def _strict_handler_int(value: Any, field: str, *, positive: bool = False) -> int:
+    from core.execution.validation import finite_int
+
+    if isinstance(value, str) and not _STRICT_DECIMAL_RE.fullmatch(value.strip()):
+        raise ValueError(f"{field} is not a strict integer")
+    return finite_int(value, field, positive=positive)
+
 
 def normalize_vn_time(ts_str: str) -> str:
     """Chuyển đổi bất kỳ chuỗi thời gian nào sang Giờ Việt Nam (UTC+7) chuẩn xác"""
@@ -80,17 +130,69 @@ def normalize_vn_time(ts_str: str) -> str:
             continue
     return f"{ts_str} (VN)"
 
-app = FastAPI(title="Binance Futures Bot Institutional Dashboard", version="1.0.0")
+app = FastAPI(
+    title="Binance Futures Bot Institutional Dashboard",
+    version="1.0.0",
+    docs_url="/docs" if config.web_expose_api_docs else None,
+    redoc_url="/redoc" if config.web_expose_api_docs else None,
+    openapi_url="/openapi.json" if config.web_expose_api_docs else None,
+)
 
 # Hỗ trợ kết nối Cross-Origin từ App Desktop (PC) và App Di Động (iOS)
 from fastapi.middleware.cors import CORSMiddleware
+allowed_origins = [
+    origin.strip().rstrip("/")
+    for origin in str(getattr(config, "web_allowed_origins", "") or "").split(",")
+    if origin.strip()
+]
+if not allowed_origins or "*" in allowed_origins:
+    raise RuntimeError("WEB_ALLOWED_ORIGINS must contain explicit origins and cannot use wildcard")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Session-Token"],
 )
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com https://telegram.org; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: https:; connect-src 'self' https:; frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
+    )
+    forwarded_proto = request.headers.get("X-Forwarded-Proto", "").lower()
+    if request.url.scheme == "https" or forwarded_proto == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+from fastapi.staticfiles import StaticFiles
+static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+import jinja2
+
+# UI V2 Feature Flags (default false for safe production baseline)
+def is_ui_v2_enabled() -> bool:
+    return os.getenv("UI_V2_ENABLED", "false").lower() in ("true", "1", "yes")
+
+def is_ui_v2_preview_enabled() -> bool:
+    return os.getenv("UI_V2_DEV_PREVIEW_ENABLED", "false").lower() in ("true", "1", "yes")
+
+_ui_v2_jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(os.path.join(os.path.dirname(__file__), "templates")),
+    autoescape=True
+)
+
+def render_ui_v2_template(template_name: str, **context) -> HTMLResponse:
+    """Render a server-side HTML template with the UI V2 Jinja2 environment."""
+    tmpl = _ui_v2_jinja_env.get_template(template_name)
+    return HTMLResponse(content=tmpl.render(**context))
 
 # Biến tham chiếu tới bot context
 _bot_context: Optional[Any] = None
@@ -99,41 +201,240 @@ security = HTTPBasic(auto_error=False)
 
 # ==================== HỆ THỐNG XÁC THỰC PHIÊN LÀM VIỆC (SESSION & MINI APP) ====================
 _active_sessions: Dict[str, Dict[str, Any]] = {}
-MASTER_ADMIN_TOKEN = hashlib.sha256(f"{config.web_username}:{config.web_password}:{config.telegram_bot_token}".encode()).hexdigest()
+_login_attempts: Dict[str, list] = {}
+_login_attempts_lock = threading.Lock()
+
+
+def _login_bucket(request: Request, username: str) -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    address = forwarded.split(",", 1)[0].strip() if forwarded else ""
+    if not address and request.client:
+        address = request.client.host
+    return f"{address or 'unknown'}:{str(username).strip().lower()}"
+
+
+def _login_is_limited(request: Request, username: str) -> bool:
+    now = time.time()
+    cutoff = now - max(30, int(config.web_login_rate_window_seconds))
+    bucket = _login_bucket(request, username)
+    with _login_attempts_lock:
+        attempts = [stamp for stamp in _login_attempts.get(bucket, []) if stamp >= cutoff]
+        _login_attempts[bucket] = attempts
+        return len(attempts) >= max(3, int(config.web_login_rate_limit))
+
+
+def _record_login_failure(request: Request, username: str) -> None:
+    bucket = _login_bucket(request, username)
+    with _login_attempts_lock:
+        _login_attempts.setdefault(bucket, []).append(time.time())
+
+
+def _clear_login_failures(request: Request, username: str) -> None:
+    with _login_attempts_lock:
+        _login_attempts.pop(_login_bucket(request, username), None)
+
+
+def _client_session_version(client: Client) -> str:
+    """Bind durable and in-memory sessions to the current password hash and role."""
+    material = f"{client.password_hash}:{client.role}"
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+def _portal_jwt_from_request(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:].strip() or None
+    return request.cookies.get("client_token")
+
+
+def _jwt_is_revoked(payload: Dict[str, Any], db: Any) -> bool:
+    jti = str(payload.get("jti") or "").strip()
+    if not jti:
+        return True
+    return db.query(RevokedJwtToken).filter(RevokedJwtToken.jti == jti).first() is not None
+
+
+def _revoke_portal_jwt(token: Optional[str]) -> bool:
+    payload = decode_jwt_token(str(token or ""))
+    if not payload or not payload.get("jti"):
+        return False
+    expires_at = datetime.fromtimestamp(float(payload["exp"]), tz=timezone.utc)
+    with get_db_session() as db:
+        if not db.query(RevokedJwtToken).filter(
+            RevokedJwtToken.jti == str(payload["jti"])
+        ).first():
+            db.add(RevokedJwtToken(
+                jti=str(payload["jti"]),
+                client_id=int(payload["client_id"]) if payload.get("client_id") else None,
+                expires_at=expires_at,
+            ))
+            db.commit()
+    return True
 
 
 def create_session_token(username: str, role: str = "admin") -> str:
-    """Tạo token phiên làm việc an toàn 256-bit có thời hạn 30 ngày"""
-    token = secrets.token_hex(32)
-    _active_sessions[token] = {
-        "username": username,
-        "role": role,
-        "created_at": time.time(),
-        "expires_at": time.time() + 30 * 86400
-    }
-    return token
+    """Create a session bound to the current active database identity and password."""
+    with get_db_session() as db:
+        row = db.query(Client).filter(Client.username == username).first()
+        if not row or not row.is_active or row.role != role:
+            raise PermissionError("current active database identity is required")
+        token = secrets.token_hex(32)
+        _active_sessions[token] = {
+            "client_id": row.id,
+            "username": row.username,
+            "role": row.role,
+            "password_hash": row.password_hash,
+            "created_at": time.time(),
+            "expires_at": time.time() + 30 * 86400,
+        }
+        return token
+
+
+def _current_session_client(token: Optional[str], required_role: Optional[str] = None):
+    """Revalidate activation, role, and password version on every request."""
+    token_str = str(token or "").strip()
+    session = _active_sessions.get(token_str)
+    if not session or time.time() >= session.get("expires_at", 0):
+        _active_sessions.pop(token_str, None)
+        return None
+    with get_db_session() as db:
+        row = db.query(Client).filter(Client.id == session.get("client_id")).first()
+        valid = (
+            row is not None
+            and row.is_active
+            and row.username == session.get("username")
+            and row.role == session.get("role")
+            and row.password_hash == session.get("password_hash")
+            and (required_role is None or row.role == required_role)
+        )
+        if not valid:
+            _active_sessions.pop(token_str, None)
+            return None
+        return {"client_id": row.id, "username": row.username, "role": row.role}
 
 
 def is_valid_session_token(token: Optional[str]) -> bool:
-    """Kiểm tra tính hợp lệ của token (chấp nhận Master Token hoặc Session Token còn hạn)"""
-    if not token:
-        return False
-    token_str = str(token).strip()
-    if token_str == MASTER_ADMIN_TOKEN:
-        return True
-    session = _active_sessions.get(token_str)
-    if session:
-        if time.time() < session.get("expires_at", 0):
-            return True
+    return _current_session_client(token) is not None
+
+
+class _TelegramReplayStore(dict):
+    def __init__(self):
+        super().__init__()
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _get_db_paths():
+        import tempfile
+        from pathlib import Path
+        project_root = Path(__file__).resolve().parent.parent
+        paths = []
+        custom_path = os.environ.get("QUANT_TELEGRAM_REPLAY_DB")
+        if custom_path:
+            if os.path.isabs(custom_path):
+                paths.append(os.path.abspath(custom_path))
+            else:
+                paths.append(os.path.abspath(str(project_root / custom_path)))
+        state_file = None
+        if isinstance(config, dict):
+            state_file = config.get("state_file") or config.get("trading", {}).get("state_file")
+        elif hasattr(config, "state_file"):
+            state_file = getattr(config, "state_file")
+        elif hasattr(config, "get"):
+            state_file = config.get("state_file")
+        if state_file:
+            if os.path.isabs(str(state_file)):
+                s_dir = os.path.dirname(os.path.abspath(str(state_file)))
+                paths.append(os.path.abspath(os.path.join(s_dir, "app_security.db")))
+            else:
+                paths.append(os.path.abspath(str(project_root / "data" / "app_security.db")))
         else:
-            del _active_sessions[token_str]
-    return False
+            paths.append(os.path.abspath(str(project_root / "data" / "app_security.db")))
+            paths.append(os.path.abspath(os.path.join(tempfile.gettempdir(), "quant_global_telegram_replay.db")))
+        seen = set()
+        res = []
+        for p in paths:
+            if p not in seen:
+                seen.add(p)
+                res.append(p)
+        return res
+
+    def _consume_global(self, token_hash: str, auth_date: Optional[int] = None) -> bool:
+        import sqlite3
+        now = time.time()
+        expires_at = max(float((auth_date or int(now)) + 86400), now + 86400.0)
+        db_paths = self._get_db_paths()
+
+        # Check all stores first
+        for db_path in db_paths:
+            if os.path.exists(db_path):
+                try:
+                    conn = sqlite3.connect(db_path, timeout=10.0, isolation_level=None)
+                    try:
+                        cursor = conn.execute("SELECT 1 FROM replay_tokens WHERE token_hash = ? AND expires_at > ?;", (token_hash, now))
+                        if cursor.fetchone():
+                            return False
+                    finally:
+                        conn.close()
+                except Exception:
+                    pass
+
+        # Insert into all stores
+        success_count = 0
+        for db_path in db_paths:
+            try:
+                os.makedirs(os.path.dirname(db_path), exist_ok=True)
+                conn = sqlite3.connect(db_path, timeout=30.0, isolation_level=None)
+                try:
+                    conn.execute("PRAGMA journal_mode = WAL;")
+                    conn.execute("PRAGMA busy_timeout = 30000;")
+                    conn.execute("CREATE TABLE IF NOT EXISTS replay_tokens (token_hash TEXT PRIMARY KEY, created_at REAL, expires_at REAL);")
+                    conn.execute("DELETE FROM replay_tokens WHERE expires_at < ?;", (now,))
+                    cursor = conn.execute("SELECT 1 FROM replay_tokens WHERE token_hash = ?;", (token_hash,))
+                    if cursor.fetchone():
+                        return False
+                    conn.execute("INSERT INTO replay_tokens (token_hash, created_at, expires_at) VALUES (?, ?, ?);", (token_hash, now, expires_at))
+                    success_count += 1
+                finally:
+                    conn.close()
+            except sqlite3.IntegrityError:
+                return False
+            except Exception as e:
+                logger.warning("Replay db error on %s: %s", db_path, e)
+                return False  # Fail closed on any DB error/disk full
+        return success_count > 0
+
+    def __setitem__(self, key, value):
+        with self._lock:
+            auth_date = int(value) if isinstance(value, (int, float)) else None
+            if not self._consume_global(key, auth_date=auth_date):
+                raise ValueError("Replay detected across processes")
+            super().__setitem__(key, value)
+
+    def __contains__(self, key):
+        import sqlite3
+        now = time.time()
+        for db_path in self._get_db_paths():
+            if os.path.exists(db_path):
+                try:
+                    conn = sqlite3.connect(db_path, timeout=10.0, isolation_level=None)
+                    try:
+                        cursor = conn.execute("SELECT 1 FROM replay_tokens WHERE token_hash = ? AND expires_at > ?;", (key, now))
+                        if cursor.fetchone():
+                            return True
+                    finally:
+                        conn.close()
+                except Exception:
+                    pass
+        return super().__contains__(key)
+
+
+_telegram_seen_hashes = _TelegramReplayStore()
 
 
 def verify_telegram_webapp_data(init_data: str, bot_token: str) -> Optional[Dict[str, Any]]:
     """
     Xác thực chữ ký số Telegram WebApp theo chuẩn Telegram HMAC-SHA256:
     https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+    Bảo vệ chống tấn công Replay Attack qua bảng băm nonce/hash có thời hạn.
     """
     try:
         parsed_data = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
@@ -144,6 +445,31 @@ def verify_telegram_webapp_data(init_data: str, bot_token: str) -> Optional[Dict
         secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
         calculated_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
         if hmac.compare_digest(calculated_hash, received_hash):
+            now = time.time()
+            # Dọn dẹp cache hash hết hạn
+            for h, exp in list(_telegram_seen_hashes.items()):
+                if exp < now:
+                    _telegram_seen_hashes.pop(h, None)
+
+            auth_date_str = parsed_data.get("auth_date")
+            if not auth_date_str:
+                return None
+            try:
+                auth_date = int(auth_date_str)
+                # Tối đa 86400 giây (24h) chống tấn công Replay Attack (+ 300s skew)
+                if now - auth_date > 86400 or auth_date > now + 300:
+                    logger.warning("Telegram initData đã quá hạn (auth_date=%s)", auth_date)
+                    return None
+            except ValueError:
+                return None
+
+            # Chống Replay Attack: atomic consume
+            try:
+                _telegram_seen_hashes[received_hash] = auth_date
+            except Exception:
+                logger.warning("🚨 [SECURITY] Phát hiện tấn công Replay Attack hoặc lỗi lưu replay token (hash=%s)", received_hash)
+                return None
+
             user_raw = parsed_data.get("user")
             if user_raw:
                 return json.loads(user_raw)
@@ -156,51 +482,85 @@ def verify_telegram_webapp_data(init_data: str, bot_token: str) -> Optional[Dict
 
 def verify_auth(
     request: Request,
-    credentials: Optional[HTTPBasicCredentials] = Depends(security)
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
 ):
-    """
-    Xác thực đa năng tương thích 100% với Telegram Mini App, Mobile WebView & Trình duyệt:
-    1. Cookie 'session_token'
-    2. Header 'X-Session-Token'
-    3. Header 'Authorization: Bearer <token>'
-    4. Query parameter '?token=<token>'
-    5. Fallback HTTP Basic Auth (nếu curl / postman gửi kèm)
-    KHÔNG trả header WWW-Authenticate: Basic để không bao giờ làm treo WebView của Telegram Mini App!
-    """
+    """Authenticate current DB-backed sessions or an active admin via HTTP Basic."""
     if not config.web_auth_enabled:
         return True
 
-    # 1. Cookie
     token = request.cookies.get("session_token")
-
-    # 2. Header X-Session-Token
     if not token:
         token = request.headers.get("X-Session-Token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+    if token and _current_session_client(token):
+        return True
 
-    # 3. Header Authorization: Bearer
+    if credentials:
+        with get_db_session() as db:
+            admin = db.query(Client).filter(Client.username == credentials.username).first()
+            if (
+                admin and admin.is_active and admin.role == "admin"
+                and verify_password(credentials.password, admin.password_hash)
+            ):
+                return True
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Yêu cầu đăng nhập tài khoản quản trị hệ thống bot",
+    )
+
+
+def verify_operator_admin(
+    request: Request,
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
+):
+    """Authenticate and authorize administrative operators.
+
+    Returns client session dict if authenticated with role == 'admin'.
+    Raises HTTP 401 if unauthenticated.
+    Raises HTTP 403 if authenticated but role != 'admin'.
+    """
+    if not config.web_auth_enabled:
+        return {"role": "admin", "username": "unauthenticated_admin"}
+
+    # 1. Check Session Token (Cookies, Header, Bearer)
+    token = request.cookies.get("session_token")
+    if not token:
+        token = request.headers.get("X-Session-Token")
     if not token:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
             token = auth_header[7:].strip()
 
-    # 4. Query param ?token=
-    if not token:
-        token = request.query_params.get("token")
+    if token:
+        client_info = _current_session_client(token)
+        if client_info:
+            if client_info.get("role") == "admin":
+                return client_info
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thực hiện thao tác này.",
+            )
 
-    if token and is_valid_session_token(token):
-        return True
-
-    # 5. Fallback HTTP Basic Auth (nếu có gửi kèm)
+    # 2. Check HTTP Basic Credentials
     if credentials:
-        is_user_correct = secrets.compare_digest(credentials.username, config.web_username)
-        is_pass_correct = secrets.compare_digest(credentials.password, config.web_password)
-        if is_user_correct and is_pass_correct:
-            return True
+        with get_db_session() as db:
+            admin = db.query(Client).filter(Client.username == credentials.username).first()
+            if admin and admin.is_active and verify_password(credentials.password, admin.password_hash):
+                if admin.role == "admin":
+                    return {"client_id": admin.id, "username": admin.username, "role": admin.role}
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bạn không có quyền thực hiện thao tác này.",
+                )
 
-    # Trả về 401 thuần JSON không kèm WWW-Authenticate
+    # 3. Neither valid -> 401
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Yêu cầu đăng nhập tài khoản quản trị hệ thống bot"
+        detail="Yêu cầu đăng nhập tài khoản quản trị hệ thống bot",
     )
 
 
@@ -286,6 +646,58 @@ def calculate_evaluation_metrics() -> Dict[str, Any]:
     }
 
 
+@app.get("/health")
+async def health():
+    """Sanitized process-liveness check for the private tunnel origin."""
+    return JSONResponse({"status": "ok", "service": "trader-web"})
+
+
+@app.get("/ready")
+async def readiness():
+    """Report dependency readiness without collapsing an authoritative HALT into outage."""
+    database_access = False
+    try:
+        from sqlalchemy import text
+
+        with get_db_session() as db:
+            db.execute(text("SELECT 1")).fetchone()
+        database_access = True
+    except Exception:
+        database_access = False
+
+    try:
+        service_status = _get_execution_client_for_surface("web").query_status()
+    except Exception:
+        service_status = {"success": False, "service_available": False, "state": "UNKNOWN"}
+
+    service_reachable = bool(service_status.get("service_available"))
+    service_state = str(service_status.get("state") or "UNKNOWN").upper()
+    recovery_required = bool(service_status.get("recovery_required")) if service_reachable else True
+    if not database_access or not service_reachable:
+        state = "NOT_READY"
+        status_code = 503
+    elif recovery_required:
+        state = "RECOVERY_REQUIRED"
+        status_code = 200
+    elif service_state == "HALTED":
+        state = "HALTED"
+        status_code = 200
+    elif service_state == "HEALTHY":
+        state = "READY"
+        status_code = 200
+    else:
+        state = "NOT_READY"
+        status_code = 503
+    return JSONResponse({
+        "status": state,
+        "service": "trader-web",
+        "web_process": "UP",
+        "execution_service_reachable": service_reachable,
+        "database_access": database_access,
+        "execution_service_state": service_state,
+    }, status_code=status_code)
+
+
 @app.post("/api/login")
 async def api_login(request: Request, response: Response):
     """Đăng nhập bằng tài khoản và mật khẩu quản trị"""
@@ -293,21 +705,28 @@ async def api_login(request: Request, response: Response):
         body = await request.json()
         username = str(body.get("username", "")).strip()
         password = str(body.get("password", "")).strip()
+        if _login_is_limited(request, username):
+            return JSONResponse({"success": False, "code": "LOGIN_RATE_LIMITED", "message": "Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau."}, status_code=429)
 
-        is_user_correct = secrets.compare_digest(username, config.web_username)
-        is_pass_correct = secrets.compare_digest(password, config.web_password)
+        with get_db_session() as db:
+            admin = db.query(Client).filter(Client.username == username).first()
+            authenticated = bool(
+                admin and admin.is_active and admin.role == "admin"
+                and verify_password(password, admin.password_hash)
+            )
 
-        if not (is_user_correct and is_pass_correct):
+        if not authenticated:
+            _record_login_failure(request, username)
             return JSONResponse(
                 {"success": False, "message": "Sai tên đăng nhập hoặc mật khẩu quản trị!"},
                 status_code=401
             )
-
+        _clear_login_failures(request, username)
         token = create_session_token(username, "admin")
         resp = JSONResponse({
             "success": True,
-            "token": token,
             "username": username,
+            "token": token,
             "message": "Đăng nhập thành công!"
         })
         resp.set_cookie(
@@ -315,12 +734,19 @@ async def api_login(request: Request, response: Response):
             value=token,
             max_age=30 * 86400,
             path="/",
-            samesite="lax",
-            httponly=False
+            samesite="strict",
+            httponly=True,
+            secure=True,
         )
         return resp
     except Exception as e:
         return JSONResponse({"success": False, "message": f"Lỗi đăng nhập: {e}"}, status_code=500)
+
+
+@app.get("/telegram-mini-app", response_class=HTMLResponse)
+async def telegram_mini_app_page():
+    """Serve the auth-capable shell; protected APIs remain unavailable until initData verifies."""
+    return await dashboard_page()
 
 
 @app.post("/api/telegram_webapp_auth")
@@ -337,33 +763,45 @@ async def api_telegram_webapp_auth(request: Request, response: Response):
             return JSONResponse({"success": False, "message": "Chữ ký xác thực Telegram không hợp lệ"}, status_code=401)
 
         tg_id = str(user_data.get("id", "")).strip()
-
-        # Danh sách chat ID quản trị được phép
         raw_chats = str(config.telegram_chat_id).replace(";", ",").split(",")
-        authorized_ids = [c.strip() for c in raw_chats if c.strip()]
-        authorized_ids.extend(["8922371876", "8489379902"])
-
+        authorized_ids = {c.strip() for c in raw_chats if c.strip()}
+        pair_config = getattr(config, "telegram_authorized_pairs", "") or os.getenv(
+            "TELEGRAM_AUTHORIZED_PAIRS", ""
+        )
+        for item in str(pair_config).replace(";", ",").split(","):
+            separator = ":" if ":" in item else ("@" if "@" in item else None)
+            if separator:
+                sender_id, _chat_id = (part.strip() for part in item.split(separator, 1))
+                if sender_id:
+                    authorized_ids.add(sender_id)
         if tg_id not in authorized_ids:
             return JSONResponse({
                 "success": False,
-                "message": f"Tài khoản Telegram ID {tg_id} không có quyền quản trị bot!"
+                "message": f"Tài khoản Telegram ID {tg_id} không có quyền quản trị bot!",
             }, status_code=403)
-
-        token = create_session_token(f"tg_{tg_id}", "admin")
+        with get_db_session() as db:
+            admin = (
+                db.query(Client)
+                .filter(Client.role == "admin", Client.is_active.is_(True))
+                .order_by(Client.id.asc())
+                .first()
+            )
+            if not admin:
+                return JSONResponse({
+                    "success": False,
+                    "message": "Không có tài khoản quản trị đang hoạt động.",
+                }, status_code=503)
+            admin_username = admin.username
+        token = create_session_token(admin_username, "admin")
         user_name = user_data.get("first_name", f"Admin {tg_id}")
         resp = JSONResponse({
             "success": True,
-            "token": token,
             "username": f"Telegram: {user_name}",
             "message": f"Chào mừng {user_name} đã kết nối an toàn qua Telegram Mini App!"
         })
         resp.set_cookie(
-            key="session_token",
-            value=token,
-            max_age=30 * 86400,
-            path="/",
-            samesite="lax",
-            httponly=False
+            key="session_token", value=token, max_age=30 * 86400, path="/",
+            samesite="lax", httponly=True, secure=True,
         )
         return resp
     except Exception as e:
@@ -372,222 +810,209 @@ async def api_telegram_webapp_auth(request: Request, response: Response):
 
 @app.get("/api/check_auth")
 async def api_check_auth(request: Request):
-    """Kiểm tra trạng thái đăng nhập hiện tại"""
+    """Check the server-managed HttpOnly session."""
     if not config.web_auth_enabled:
         return JSONResponse({"authenticated": True, "username": "admin"})
-
-    token = request.cookies.get("session_token") or request.headers.get("X-Session-Token") or request.query_params.get("token")
-    if token and is_valid_session_token(token):
-        user = _active_sessions.get(token, {}).get("username", "admin")
-        return JSONResponse({"authenticated": True, "username": user})
+    token = request.cookies.get("session_token") or request.headers.get("X-Session-Token")
+    current = _current_session_client(token)
+    if current:
+        return JSONResponse({"authenticated": True, "username": current["username"]})
     return JSONResponse({"authenticated": False})
 
 
 @app.post("/api/logout")
 async def api_logout(request: Request, response: Response):
-    """Đăng xuất phiên làm việc"""
+    """Revoke both dashboard and portal credentials supplied by this request."""
     token = request.cookies.get("session_token") or request.headers.get("X-Session-Token")
     if token and token in _active_sessions:
         del _active_sessions[token]
+    _revoke_portal_jwt(_portal_jwt_from_request(request))
     resp = JSONResponse({"success": True, "message": "Đã đăng xuất thành công!"})
     resp.delete_cookie(key="session_token", path="/")
+    resp.delete_cookie(key="client_token", path="/")
     return resp
 
 
 @app.get("/api/status", dependencies=[Depends(verify_auth)])
 async def get_status():
-    """API trả về trạng thái thời gian thực toàn diện của bot"""
-    if _bot_context is None:
-        return JSONResponse({
-            "status": "OFFLINE",
-            "balance": 0.0,
-            "open_positions": [],
-            "open_positions_count": 0,
-            "total_unrealized_pnl": 0.0,
-            "is_paused": False,
-            "version": config.app_version,
-            "trading_mode": config.trading_mode
-        })
-
-    ctrl = _bot_context
-    positions = []
-    total_u_pnl = 0.0
-    prices = ctrl.get_current_prices()
-
-    for sym, pos in ctrl.order_manager.active_positions.items():
-        cur_p = prices.get(sym, pos["entry_price"])
-        side = pos["side"]
-        entry = pos["entry_price"]
-        sl = pos["stop_loss"]
-        tp = pos["take_profit"]
-
-        if side == "BUY":
-            pnl = (cur_p - entry) * pos["qty"]
-        else:
-            pnl = (entry - cur_p) * pos["qty"]
-
-        pct = (pnl / pos["margin"]) * 100.0 if pos["margin"] > 0 else 0.0
-        total_u_pnl += pnl
-
-        slider_pct = 50.0
+    """Return authoritative service projections plus explicitly local diagnostics."""
+    local_diagnostics = {
+        "label": "LOCAL_SIMULATION_DIAGNOSTIC_NOT_TRADING_AUTHORITY",
+        "controller_available": _bot_context is not None,
+        "is_paused": getattr(_bot_context, "is_paused", None),
+        "balance": None,
+        "unrealized_pnl": None,
+    }
+    if _bot_context is not None:
         try:
-            if side == "BUY":
-                total_range = tp - sl if tp > sl else 1.0
-                slider_pct = max(0.0, min(100.0, (cur_p - sl) / total_range * 100.0))
-            else:
-                total_range = sl - tp if sl > tp else 1.0
-                slider_pct = max(0.0, min(100.0, (sl - cur_p) / total_range * 100.0))
-        except Exception:
-            slider_pct = 50.0
-
-        positions.append({
-            "symbol": sym,
-            "side": side,
-            "entry_price": entry,
-            "current_price": cur_p,
-            "stop_loss": sl,
-            "take_profit": tp,
-            "qty": pos["qty"],
-            "margin": pos["margin"],
-            "leverage": pos.get("leverage", config.leverage),
-            "pnl_usdt": round(pnl, 2),
-            "pnl_percent": round(pct, 2),
-            "slider_pct": round(slider_pct, 1),
-            "partial_tp": pos.get("partial_tp_activated", False),
-            "breakeven": pos.get("breakeven_activated", False),
-            "trailing_active": pos.get("trailing_active", False)
-        })
-
-    # Dữ liệu Watchdog máy chủ
-    health_metrics = {}
-    if hasattr(ctrl, "watchdog") and ctrl.watchdog:
-        try:
-            health_metrics = ctrl.watchdog.get_health_metrics()
-        except Exception:
+            if hasattr(_bot_context, "get_current_balance"):
+                local_diagnostics["balance"] = _strict_handler_float(
+                    _bot_context.get_current_balance(), "diagnostic_balance", positive=True
+                )
+            if hasattr(_bot_context, "get_total_unrealized_pnl"):
+                local_diagnostics["unrealized_pnl"] = _strict_handler_float(
+                    _bot_context.get_total_unrealized_pnl(), "diagnostic_unrealized_pnl"
+                )
+        except (TypeError, ValueError, OverflowError, AttributeError):
             pass
 
-    # Đánh giá tiến độ đánh thật
-    eval_metrics = calculate_evaluation_metrics()
+    try:
+        client = _get_execution_client_for_surface("web")
+        service_status = client.query_status()
+        positions = client.query_positions()
+        pnl = client.query_pnl()
+    except Exception:
+        service_status = {"state": "UNKNOWN"}
+        positions = None
+        pnl = None
 
-    # Kiểm tra trạng thái News Filter
-    is_news_blackout = False
-    if hasattr(ctrl, "risk_manager") and ctrl.risk_manager:
+    state = str(service_status.get("state", "UNKNOWN")).upper() if isinstance(service_status, dict) else "UNKNOWN"
+    global_halt = service_status.get("global_halt") if isinstance(service_status, dict) else None
+    status_known = state in {"HEALTHY", "HALTED"} and isinstance(global_halt, bool)
+    if not status_known:
+        state = "UNKNOWN"
+        global_halt = None
+
+    positions_known = not (
+        positions is None
+        or (isinstance(positions, dict) and positions.get("success") is False)
+    )
+    authoritative_positions = positions if positions_known else None
+    if isinstance(authoritative_positions, dict):
+        position_count = len(authoritative_positions)
+    elif isinstance(authoritative_positions, list):
+        position_count = len(authoritative_positions)
+    else:
+        position_count = None
+
+    pnl_known = isinstance(pnl, dict) and pnl.get("success") is True
+    realized_pnl = pnl.get("total_pnl") if pnl_known else None
+    if realized_pnl is not None:
         try:
-            is_news_blackout = ctrl.risk_manager.is_economic_news_blackout()
-        except Exception:
-            pass
+            realized_pnl = _strict_handler_float(realized_pnl, "realized_pnl")
+        except (TypeError, ValueError, OverflowError):
+            realized_pnl = None
+            pnl_known = False
 
-    current_balance = round(ctrl.get_current_balance(), 2)
-    initial_balance = 1000.0
-    if hasattr(ctrl, "simulated_balance_holder") and ctrl.simulated_balance_holder:
-        initial_balance = 1000.0
-    roi_percent = round(((current_balance - initial_balance) / initial_balance) * 100.0, 2)
-
+    halt_generation = _halt_generation_from(service_status) if status_known else None
+    recovery_required = bool(service_status.get("recovery_required", False)) if status_known else False
+    resume_allowed = bool(
+        status_known
+        and global_halt
+        and halt_generation is not None
+        and halt_generation > 0
+        and not recovery_required
+        and state != "UNKNOWN"
+    )
     return JSONResponse({
-        "status": "PAUSED" if ctrl.is_paused else "RUNNING",
-        "mode": "DRY_RUN" if config.dry_run else ("BINANCE_TESTNET" if config.use_testnet else "REAL_LIVE"),
+        "status": state,
+        "environment": getattr(config, "trader_environment", "OFFLINE"),
+        "projection_source": "EXECUTION_SERVICE" if status_known else "UNKNOWN",
+        "is_paused": global_halt,
+        "halt_generation": halt_generation,
+        "halt_reason": service_status.get("halt_reason") if status_known else "Execution Service unavailable",
+        "recovery_required": recovery_required,
+        "resume_allowed": resume_allowed,
+        "balance": None,
+        "initial_balance": None,
+        "roi_percent": None,
+        "open_positions_count": position_count,
+        "positions": authoritative_positions,
+        "open_positions": authoritative_positions,
+        "total_unrealized_pnl": None,
+        "realized_pnl": realized_pnl,
+        "pnl_state": "KNOWN_VALUE" if pnl_known else "UNKNOWN",
+        "version": config.app_version,
+        "mode": "SIMULATION" if config.dry_run else "LIVE",
         "trading_mode": config.trading_mode,
-        "is_paused": ctrl.is_paused,
-        "balance": current_balance,
-        "initial_balance": initial_balance,
-        "roi_percent": roi_percent,
-        "open_positions_count": len(positions),
         "max_positions": config.max_concurrent_positions,
         "active_strategy": getattr(config, "active_strategy", "AUTO_DYNAMIC"),
         "real_trading_hard_cap": getattr(config, "real_trading_hard_cap", 100.0),
-        "total_unrealized_pnl": round(total_u_pnl, 2),
         "leverage": config.leverage,
         "margin_type": config.margin_type,
         "risk_percent": config.risk_per_trade_percent,
         "use_trailing_stop": config.use_trailing_stop,
         "trailing_activation_rr": config.trailing_activation_rr,
         "max_scan_pairs": config.max_scan_pairs,
-        "positions": positions,
-        "health": health_metrics,
-        "evaluation": eval_metrics,
-        "protection_matrix": {
-            "adx_filter": {"enabled": True, "min_adx": config.adx_min, "status": f"ADX ≥ {config.adx_min}"},
-            "btc_crash": {"enabled": config.enable_btc_crash_protection, "threshold": config.btc_crash_threshold_percent, "status": "Normal"},
-            "btc_regime": {
-                "enabled": getattr(config, "enable_btc_regime_filter", True),
-                "regime": getattr(_bot_context.scanner, "last_btc_regime", "UNKNOWN") if (_bot_context and hasattr(_bot_context, "scanner")) else "UNKNOWN",
-                "desc": getattr(_bot_context.scanner, "last_btc_regime_desc", "Đang cập nhật") if (_bot_context and hasattr(_bot_context, "scanner")) else "Đang cập nhật",
-                "direction": getattr(config, "trade_direction", "AUTO")
-            },
-            "news_filter": {"enabled": config.enable_news_filter, "is_blackout": is_news_blackout, "status": "Blackout" if is_news_blackout else "Safe"},
-            "dynamic_leverage": {"enabled": getattr(config, "enable_dynamic_leverage", True), "range": f"{getattr(config, 'min_leverage', 2)}x - {getattr(config, 'max_leverage', 10)}x"},
-            "bnb_discount": {"enabled": True, "status": "Active (0.50 BNB)", "discount": "10%"}
-        },
-        "ai_connected": bool(_bot_context.ai_copilot.is_connected) if (_bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot) else False,
-        "ai_provider": getattr(config, "ai_provider", "dual"),
-        "deepseek_connected": bool(_bot_context.ai_copilot.is_deepseek_available) if (_bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot) else False,
-        "gemini_connected": bool(_bot_context.ai_copilot.is_gemini_available) if (_bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot) else False,
-        "deepseek_model": getattr(config, "deepseek_model", "deepseek-v4.1-flash:free"),
-        "gemini_model": getattr(config, "gemini_model", "gemini-2.5-flash"),
-        "ai_api_key_masked": (config.ai_api_key[:4] + "..." + config.ai_api_key[-4:]) if (getattr(config, "ai_api_key", None) and len(config.ai_api_key) > 8) else "",
-        "fear_and_greed": CryptoSentiment.get_fear_and_greed(),
-        "version": config.app_version,
-        "last_updated": datetime.now(timezone(timedelta(hours=7))).strftime("%H:%M:%S (VN)")
-    })
-
-
+        "health": service_status.get("dimensions") if status_known else None,
+        "evaluation": calculate_evaluation_metrics(),
+        "local_diagnostics": local_diagnostics,
+    }, status_code=200 if status_known else 503)
 @app.get("/api/scanner_radar", dependencies=[Depends(verify_auth)])
 async def get_scanner_radar():
-    """API trả về danh sách các cặp coin đang được scanner theo dõi kèm chỉ báo thời gian thực"""
+    """Return scanner data or an explicit disabled state."""
     if _bot_context is None or not hasattr(_bot_context, "scanner") or not _bot_context.scanner:
-        return JSONResponse({"radar": [], "mode": config.trading_mode, "scanned_count": 0})
+        return JSONResponse({
+            "success": True,
+            "status": "DISABLED_OFFLINE",
+            "radar": [],
+            "mode": config.trader_environment,
+            "scanned_count": 0,
+            "message": "Scanner is disabled in the canonical OFFLINE deployment.",
+        })
     radar_list = getattr(_bot_context.scanner, "last_scanned_radar", [])
     return JSONResponse({
+        "success": True,
+        "status": "ACTIVE",
         "radar": radar_list,
         "mode": config.trading_mode,
         "scanned_count": len(radar_list),
-        "updated_at": datetime.now(timezone(timedelta(hours=7))).strftime("%H:%M:%S (VN)")
+        "updated_at": datetime.now(timezone(timedelta(hours=7))).strftime("%H:%M:%S (VN)"),
     })
 
 
 @app.get("/api/ai_mascot", dependencies=[Depends(verify_auth)])
 async def get_ai_mascot():
-    """Lấy câu thoại, tâm trạng và màu sắc mắt của Mascot thời gian thực"""
+    """Return AI status without claiming a disabled provider is active."""
     if _bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot:
         commentary = _bot_context.ai_copilot.get_speech_commentary(_bot_context)
         commentary["ai_connected"] = _bot_context.ai_copilot.is_connected
         return JSONResponse(commentary)
     return JSONResponse({
-        "speech": "Hệ thống Quant Bot 2.0 PRO đang trực thâu đêm bảo vệ tài khoản cho Sếp!",
-        "mood": "happy",
-        "mood_title": "ĐANG HOẠT ĐỘNG 🟢",
-        "glow_color": "#0ECB81",
-        "ai_connected": False
+        "speech": "Execution Service đang hoạt động ở chế độ OFFLINE. AI Copilot chưa được bật.",
+        "mood": "standby",
+        "mood_title": "AI DISABLED / OFFLINE",
+        "glow_color": "#F0B90B",
+        "ai_connected": False,
+        "status": "DISABLED_OFFLINE",
     })
 
 
 @app.post("/api/ai_chat", dependencies=[Depends(verify_auth)])
 async def ai_chat(request: Request):
-    """Trò chuyện trực tiếp với Trợ lý AI Quant Copilot"""
+    """Use AI only when an explicitly configured supervised context exists."""
     try:
         data = await request.json()
         user_message = (data.get("message") or data.get("query") or "").strip()
         if not user_message:
             return JSONResponse({"reply": "Sếp cần em hỗ trợ gì về thị trường hoặc danh mục lệnh ạ?", "ai_connected": False})
+        if not (_bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot):
+            return JSONResponse({"success": False, "code": "AI_DISABLED_OFFLINE", "reply": "AI Copilot is disabled in the canonical OFFLINE deployment.", "ai_connected": False}, status_code=503)
+        reply = await asyncio.to_thread(_bot_context.ai_copilot.chat, user_message, _bot_context)
+        return JSONResponse({"success": True, "reply": reply, "ai_connected": _bot_context.ai_copilot.is_connected})
+    except Exception:
+        logger.exception("AI chat request failed")
+        return JSONResponse({"success": False, "code": "AI_REQUEST_FAILED", "reply": "AI request failed.", "ai_connected": False}, status_code=503)
 
-        if _bot_context and hasattr(_bot_context, "ai_copilot") and _bot_context.ai_copilot:
-            reply = await asyncio.to_thread(_bot_context.ai_copilot.chat, user_message, _bot_context)
-            is_conn = _bot_context.ai_copilot.is_connected
-        else:
-            reply = "Trợ lý AI đang khởi động, vui lòng thử lại sau giây lát."
-            is_conn = False
 
-        return JSONResponse({"reply": reply, "ai_connected": is_conn})
-    except Exception as e:
-        return JSONResponse({"reply": f"Lỗi xử lý AI: {e}", "ai_connected": False})
+_settings_file_lock = threading.Lock()
 
 
 def _persist_setting_to_env(key: str, val: str):
-    """Ghi đè hoặc thêm biến cấu hình vào file .env để lưu vĩnh viễn qua các lần reboot"""
-    try:
-        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-        if not os.path.exists(env_file):
-            env_file = ".env"
+    """Persist one validated setting to the selected runtime env atomically."""
+    key = str(key).strip()
+    value = str(val)
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]*", key):
+        raise ValueError("Invalid runtime setting key")
+    if any(char in value for char in ("\r", "\n", "\x00")):
+        raise ValueError("Runtime setting value must be one line")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_file = os.getenv("TRADER_RUNTIME_ENV_FILE", "").strip()
+    env_file = env_file or os.path.join(root, ".runtime", "trader-stack.env")
+    if not os.path.isabs(env_file):
+        env_file = os.path.join(root, env_file)
+    os.makedirs(os.path.dirname(env_file), exist_ok=True)
+    with _settings_file_lock:
         lines = []
         if os.path.exists(env_file):
             with open(env_file, "r", encoding="utf-8") as f:
@@ -596,18 +1021,29 @@ def _persist_setting_to_env(key: str, val: str):
         found = False
         for line in lines:
             if line.strip().startswith(f"{key}=") or line.strip() == key:
-                new_lines.append(f"{key}={val}\n")
+                new_lines.append(f"{key}={value}\n")
                 found = True
             else:
                 new_lines.append(line)
         if not found:
             if new_lines and not new_lines[-1].endswith("\n"):
                 new_lines[-1] += "\n"
-            new_lines.append(f"{key}={val}\n")
-        with open(env_file, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-    except Exception:
-        pass
+            new_lines.append(f"{key}={value}\n")
+        temporary = f"{env_file}.tmp.{os.getpid()}.{secrets.token_hex(6)}"
+        try:
+            descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as f:
+                f.writelines(new_lines)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, env_file)
+            os.chmod(env_file, 0o600)
+        finally:
+            try:
+                os.unlink(temporary)
+            except FileNotFoundError:
+                pass
 
 
 @app.post("/api/update_settings", dependencies=[Depends(verify_auth)])
@@ -615,6 +1051,25 @@ async def update_settings(request: Request):
     """API điều chỉnh cấu hình thời gian thực (Live Settings) không cần restart bot"""
     try:
         data = await request.json()
+        parsed_financial = {}
+        if "leverage" in data:
+            parsed_financial["leverage"] = _strict_handler_int(data["leverage"], "leverage", positive=True)
+        if "risk_percent" in data:
+            parsed_financial["risk_percent"] = _strict_handler_float(data["risk_percent"], "risk_percent", positive=True)
+        if "adx_min" in data:
+            parsed_financial["adx_min"] = _strict_handler_float(data["adx_min"], "adx_min", positive=True)
+        if "real_trading_hard_cap" in data:
+            parsed_financial["real_trading_hard_cap"] = _strict_handler_float(
+                data["real_trading_hard_cap"], "real_trading_hard_cap", positive=True
+            )
+        if "leverage" in parsed_financial and not 1 <= parsed_financial["leverage"] <= 20:
+            raise ValueError("leverage must be between 1 and 20")
+        if "risk_percent" in parsed_financial and not 0.1 <= parsed_financial["risk_percent"] <= 5.0:
+            raise ValueError("risk_percent must be between 0.1 and 5.0")
+        if "adx_min" in parsed_financial and not 10.0 <= parsed_financial["adx_min"] <= 40.0:
+            raise ValueError("adx_min must be between 10 and 40")
+        if "real_trading_hard_cap" in parsed_financial and parsed_financial["real_trading_hard_cap"] < 10.0:
+            raise ValueError("real_trading_hard_cap must be at least 10")
         updated_fields = []
 
         if "trading_mode" in data and data["trading_mode"] in ["MARKET_ALL", "BLUECHIP_ONLY", "CUSTOM"]:
@@ -623,14 +1078,14 @@ async def update_settings(request: Request):
             updated_fields.append(f"Chế độ: {config.trading_mode}")
 
         if "leverage" in data:
-            lev = int(data["leverage"])
+            lev = parsed_financial["leverage"]
             if 1 <= lev <= 20:
                 config.leverage = lev
                 _persist_setting_to_env("LEVERAGE", str(lev))
                 updated_fields.append(f"Đòn bẩy: {lev}x")
 
         if "risk_percent" in data:
-            risk = float(data["risk_percent"])
+            risk = parsed_financial["risk_percent"]
             if 0.1 <= risk <= 5.0:
                 config.risk_per_trade_percent = risk
                 _persist_setting_to_env("RISK_PER_TRADE_PERCENT", str(risk))
@@ -643,7 +1098,7 @@ async def update_settings(request: Request):
             updated_fields.append(f"Trailing Stop: {state}")
 
         if "adx_min" in data:
-            adx = float(data["adx_min"])
+            adx = parsed_financial["adx_min"]
             if 10.0 <= adx <= 40.0:
                 config.adx_min = adx
                 _persist_setting_to_env("ADX_MIN", str(adx))
@@ -720,14 +1175,11 @@ async def update_settings(request: Request):
                 updated_fields.append(f"Chiến lược: {strat}")
 
         if "real_trading_hard_cap" in data:
-            try:
-                cap = float(data["real_trading_hard_cap"])
-                if cap >= 10.0:
-                    config.real_trading_hard_cap = cap
-                    _persist_setting_to_env("REAL_TRADING_HARD_CAP", str(cap))
-                    updated_fields.append(f"Giới hạn vốn: ${cap:,.0f}")
-            except Exception:
-                pass
+            cap = parsed_financial["real_trading_hard_cap"]
+            if cap >= 10.0:
+                config.real_trading_hard_cap = cap
+                _persist_setting_to_env("REAL_TRADING_HARD_CAP", str(cap))
+                updated_fields.append(f"Giới hạn vốn: ${cap:,.0f}")
 
         msg = "Đã cập nhật cài đặt thành công: " + ", ".join(updated_fields) if updated_fields else "Không có thay đổi nào"
         return JSONResponse({
@@ -745,7 +1197,9 @@ async def update_settings(request: Request):
             }
         })
     except Exception as e:
-        return JSONResponse({"success": False, "message": f"Lỗi cập nhật cấu hình: {e}"})
+        return JSONResponse(
+            {"success": False, "message": f"Lỗi cập nhật cấu hình: {e}"}, status_code=400
+        )
 
 
 @app.get("/api/history", dependencies=[Depends(verify_auth)])
@@ -819,65 +1273,299 @@ async def get_history():
         return JSONResponse({"error": str(e), "trades": [], "chart_data": []})
 
 
-@app.post("/api/toggle_pause", dependencies=[Depends(verify_auth)])
+@app.post("/api/toggle_pause", dependencies=[Depends(verify_operator_admin)])
 async def toggle_pause():
-    if _bot_context is None:
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
-    _bot_context.is_paused = not _bot_context.is_paused
-    state = "TẠM DỪNG" if _bot_context.is_paused else "ĐANG CHẠY"
-    return JSONResponse({"success": True, "is_paused": _bot_context.is_paused, "message": f"Bot đã chuyển sang {state}"})
+    # Standalone web control is valid when the authoritative service is reachable.
+    client = _get_execution_client_for_surface("operator")
+    status_view = client.query_status()
+    state = str(status_view.get("state", "UNKNOWN")).upper() if isinstance(status_view, dict) else "UNKNOWN"
+    if state not in {"HEALTHY", "HALTED"}:
+        return JSONResponse({"success": False, "message": "Execution Service state UNKNOWN"}, status_code=503)
+    return _set_durable_web_pause(state == "HEALTHY")
 
+def _get_execution_client_for_surface(principal: str = "web"):
+    from core.execution_service.client import ExecutionServiceClient
+    cfg = getattr(_bot_context, "config", None) or config
+    svc_host = getattr(cfg, "execution_service_host", "127.0.0.1")
+    svc_port = getattr(cfg, "execution_service_port", 50051)
+    if principal == "webhook":
+        token = getattr(cfg, "ipc_token_webhook", "")
+        canonical = "webhook-client"
+    elif principal in ("operator", "halt", "resume"):
+        token = getattr(cfg, "ipc_token_operator", "")
+        canonical = "operator-client"
+    else:
+        token = getattr(cfg, "ipc_token_web", "")
+        canonical = "web-client"
+    attr_name = f"_exec_client_{principal}"
+    if _bot_context and getattr(_bot_context, attr_name, None):
+        return getattr(_bot_context, attr_name)
+    client = ExecutionServiceClient(
+        host=svc_host, port=svc_port, auth_token=token, principal=canonical
+    )
+    if _bot_context:
+        setattr(_bot_context, attr_name, client)
+    return client
+
+def _halt_generation_from(value: Any) -> Optional[int]:
+    data = value.data if hasattr(value, "data") else value
+    if not isinstance(data, dict):
+        return None
+    generation = data.get("halt_generation", data.get("generation"))
+    if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+        return None
+    return generation
+
+
+def _set_durable_web_pause(paused: bool) -> JSONResponse:
+    """Use generation-bound HALT/RESUME and mirror only confirmed authority."""
+    global _web_halt_generation
+    try:
+        client = _get_execution_client_for_surface("operator")
+        if paused:
+            result = client.set_halt(reason="Web operator pause", source="web")
+            generation = _halt_generation_from(result) or _halt_generation_from(client.query_status())
+        else:
+            status_view = client.query_status()
+            if not isinstance(status_view, dict):
+                return JSONResponse({"success": False, "message": "Execution Service status unavailable"}, status_code=503)
+            generation = _halt_generation_from(status_view)
+            if generation is None:
+                return JSONResponse(
+                    {"success": False, "message": "HALT generation unavailable"}, status_code=409
+                )
+            result = client.resume(expected_halt_generation=generation, source="web")
+    except Exception as exc:
+        return JSONResponse({"success": False, "message": f"Execution Service error: {exc}"}, status_code=503)
+    if not result or not result.success:
+        error = result.error if result else "UNKNOWN"
+        return JSONResponse({"success": False, "message": f"Execution Service error: {error}"}, status_code=503)
+    if paused and generation is None:
+        return JSONResponse({"success": False, "message": "HALT generation unavailable"}, status_code=503)
+    _web_halt_generation = generation if paused else None
+    if _bot_context is not None:
+        _bot_context.is_paused = paused
+    return JSONResponse({
+        "success": True,
+        "is_paused": paused,
+        "halt_generation": generation,
+        "authoritative_state": "HALTED" if paused else "RESUMED",
+        "message": "Execution Service đã xác nhận trạng thái bền vững",
+    })
 
 @app.post("/api/panic_close", dependencies=[Depends(verify_auth)])
 async def panic_close():
-    if _bot_context is None:
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
-    prices = _bot_context.get_current_prices()
-    res = _bot_context.order_manager.close_all_positions(
-        reason="Đóng khẩn cấp từ Web Dashboard",
-        current_prices=prices,
-        simulated_balance_holder=_bot_context.simulated_balance_holder
-    )
-    return JSONResponse(res)
+    # No local fallback: standalone web routes directly to the authenticated service client.
+    exec_client = _get_execution_client_for_surface("web")
+    if exec_client is not None:
+        cmd_res = exec_client.emergency_close_all(reason="Đóng khẩn cấp từ Web Dashboard", source="web")
+        if not cmd_res.success:
+            return JSONResponse({"success": False, "message": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+        return JSONResponse({"success": True, "message": "Đã thực thi panic close qua Execution Service", "receipt": cmd_res.execution_receipt_id})
+    return JSONResponse({"success": False, "message": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
 
 
 @app.post("/api/close_single", dependencies=[Depends(verify_auth)])
 async def close_single(request: Request):
     """Đóng một vị thế cụ thể theo symbol"""
-    if _bot_context is None:
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
+    # Standalone close remains service-only.
     try:
         body = await request.json()
         symbol = body.get("symbol")
         if not symbol:
             return JSONResponse({"success": False, "message": "Thiếu mã symbol"})
 
-        prices = _bot_context.get_current_prices()
-        res = _bot_context.order_manager.close_single_position(
-            symbol=symbol,
-            reason="Đóng thủ công từ Web Dashboard",
-            current_prices=prices,
-            simulated_balance_holder=_bot_context.simulated_balance_holder
-        )
-        return JSONResponse(res)
+        exec_client = _get_execution_client_for_surface("web")
+        if exec_client is not None:
+            cmd_res = exec_client.close_position(symbol=symbol, reason="Đóng thủ công từ Web Dashboard", source="web")
+            if not cmd_res.success:
+                return JSONResponse({"success": False, "message": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+            return JSONResponse({"success": True, "message": f"Đã đóng {symbol} qua Execution Service", "receipt": cmd_res.execution_receipt_id})
+
+        return JSONResponse({"success": False, "message": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
     except Exception as e:
         return JSONResponse({"success": False, "message": f"Lỗi: {e}"})
 
 
-@app.post("/api/pause", dependencies=[Depends(verify_auth)])
-async def api_pause():
-    """Tạm dừng bot từ Desktop/Mobile"""
-    if _bot_context:
+@app.post("/api/pause", dependencies=[Depends(verify_operator_admin)])
+async def api_pause(request: Request):
+    """Durably halt entries from Web/Desktop/Mobile with authoritative generation confirmation."""
+    reason = "Operator manual pause"
+    source = "web"
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            raw_reason = body.get("reason")
+            if raw_reason and isinstance(raw_reason, str):
+                reason = raw_reason.strip()[:200]
+            raw_source = body.get("source")
+            if raw_source and isinstance(raw_source, str):
+                source = raw_source.strip()[:50]
+    except Exception:
+        pass
+
+    client = _get_execution_client_for_surface("operator")
+    try:
+        result = client.set_halt(reason=reason, source=source)
+        generation = _halt_generation_from(result) or _halt_generation_from(client.query_status())
+    except Exception as exc:
+        return JSONResponse({"success": False, "message": f"Execution Service error: {exc}"}, status_code=503)
+
+    if not result or not result.success:
+        error = result.error if result else "UNKNOWN"
+        return JSONResponse({"success": False, "message": f"Execution Service error: {error}"}, status_code=503)
+
+    if generation is None:
+        return JSONResponse({"success": False, "message": "HALT generation unavailable"}, status_code=503)
+
+    global _web_halt_generation
+    _web_halt_generation = generation
+    if _bot_context is not None:
         _bot_context.is_paused = True
-    return JSONResponse({"success": True, "is_paused": True, "message": "Bot đã tạm dừng"})
+
+    return JSONResponse({
+        "success": True,
+        "is_paused": True,
+        "halt_generation": generation,
+        "authoritative_state": "HALTED",
+        "message": "Execution Service đã xác nhận dừng bền vững",
+    })
 
 
-@app.post("/api/resume", dependencies=[Depends(verify_auth)])
-async def api_resume():
-    """Bật lại bot từ Desktop/Mobile"""
-    if _bot_context:
+@app.post("/api/resume", dependencies=[Depends(verify_operator_admin)])
+async def api_resume(request: Request):
+    """Durably resume entries from Web/Desktop/Mobile requiring CAS expected_halt_generation."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            {"success": False, "code": "INVALID_JSON", "message": "Yêu cầu cung cấp dữ liệu JSON"},
+            status_code=400,
+        )
+
+    if not isinstance(body, dict) or "expected_halt_generation" not in body:
+        return JSONResponse(
+            {
+                "success": False,
+                "code": "MISSING_HALT_GENERATION",
+                "message": "Yêu cầu cung cấp expected_halt_generation hợp lệ",
+            },
+            status_code=400,
+        )
+
+    expected_generation = body.get("expected_halt_generation")
+    if isinstance(expected_generation, bool) or not isinstance(expected_generation, int) or expected_generation < 1:
+        return JSONResponse(
+            {
+                "success": False,
+                "code": "INVALID_HALT_GENERATION",
+                "message": "expected_halt_generation phải là số nguyên dương",
+            },
+            status_code=400,
+        )
+
+    source = "web"
+    raw_source = body.get("source")
+    if raw_source and isinstance(raw_source, str):
+        source = raw_source.strip()[:50]
+
+    client = _get_execution_client_for_surface("operator")
+    try:
+        status_view = client.query_status()
+    except Exception as exc:
+        return JSONResponse(
+            {"success": False, "code": "SERVICE_UNAVAILABLE", "message": f"Execution Service unavailable: {exc}"},
+            status_code=503,
+        )
+
+    if not status_view or not isinstance(status_view, dict):
+        return JSONResponse(
+            {"success": False, "code": "SERVICE_UNAVAILABLE", "message": "Execution Service unavailable"},
+            status_code=503,
+        )
+
+    service_state = str(status_view.get("state", "UNKNOWN")).upper()
+    if service_state == "UNKNOWN":
+        return JSONResponse(
+            {"success": False, "code": "SERVICE_UNKNOWN", "message": "Execution Service state is UNKNOWN"},
+            status_code=503,
+        )
+
+    is_paused = bool(status_view.get("global_halt"))
+    if not is_paused:
+        return JSONResponse(
+            {"success": False, "code": "NO_ACTIVE_HALT", "message": "Hệ thống hiện không trong trạng thái HALT"},
+            status_code=409,
+        )
+
+    recovery_required = bool(status_view.get("recovery_required", False))
+    if recovery_required:
+        return JSONResponse(
+            {
+                "success": False,
+                "code": "RECOVERY_REQUIRED",
+                "message": "Không thể RESUME: Yêu cầu khắc phục trạng thái khẩn cấp (recovery_required=True)",
+            },
+            status_code=409,
+        )
+
+    current_generation = _halt_generation_from(status_view)
+    if current_generation is None or current_generation != expected_generation:
+        return JSONResponse(
+            {
+                "success": False,
+                "code": "STALE_HALT_GENERATION",
+                "current_generation": current_generation,
+                "expected_generation": expected_generation,
+                "message": f"Không thể RESUME: Thế hệ HALT đã thay đổi (hiện tại: {current_generation}, yêu cầu: {expected_generation})",
+            },
+            status_code=409,
+        )
+
+    try:
+        if hasattr(client, "resume"):
+            result = client.resume(expected_halt_generation=expected_generation, source=source)
+        elif hasattr(client, "_command"):
+            from core.execution_service.client import CommandType
+            result = client._command(
+                CommandType.RESUME,
+                {"expected_halt_generation": expected_generation},
+                source,
+                None,
+            )
+        else:
+            raise AttributeError("Execution client does not support resume")
+    except Exception as exc:
+        return JSONResponse(
+            {"success": False, "code": "SERVICE_ERROR", "message": f"Execution Service error: {exc}"},
+            status_code=503,
+        )
+
+    if not result or not result.success:
+        error = result.error if result else "UNKNOWN"
+        err_str = str(error).lower()
+        if "generation changed" in err_str or "safety" in err_str:
+            return JSONResponse(
+                {"success": False, "code": "STALE_HALT_GENERATION", "message": f"Execution Service rejected RESUME: {error}"},
+                status_code=409,
+            )
+        return JSONResponse(
+            {"success": False, "code": "RESUME_FAILED", "message": f"Execution Service error: {error}"},
+            status_code=503,
+        )
+
+    global _web_halt_generation
+    _web_halt_generation = None
+    if _bot_context is not None:
         _bot_context.is_paused = False
-    return JSONResponse({"success": True, "is_paused": False, "message": "Bot đang chạy"})
+
+    return JSONResponse({
+        "success": True,
+        "is_paused": False,
+        "halt_generation": None,
+        "authoritative_state": "RESUMED",
+        "message": "Execution Service đã xác nhận kích hoạt lại thành công",
+    })
 
 
 @app.post("/api/close_all_positions", dependencies=[Depends(verify_auth)])
@@ -889,8 +1577,7 @@ async def api_close_all_positions():
 @app.post("/api/close_position", dependencies=[Depends(verify_auth)])
 async def api_close_position(request: Request):
     """Đóng một vị thế cụ thể (hỗ trợ cả query param và JSON body)"""
-    if _bot_context is None:
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
+    # Standalone close remains service-only.
     try:
         sym = request.query_params.get("symbol")
         if not sym:
@@ -902,25 +1589,32 @@ async def api_close_position(request: Request):
         if not sym:
             return JSONResponse({"success": False, "message": "Thiếu mã symbol"})
 
-        prices = _bot_context.get_current_prices()
-        res = _bot_context.order_manager.close_single_position(
-            symbol=sym.upper(),
-            reason="Đóng từ Desktop/Mobile App",
-            current_prices=prices,
-            simulated_balance_holder=_bot_context.simulated_balance_holder
-        )
-        return JSONResponse(res)
+        sym = sym.upper()
+        exec_client = _get_execution_client_for_surface("web")
+        if exec_client is not None:
+            cmd_res = exec_client.close_position(symbol=sym, reason="Đóng từ Desktop/Mobile App", source="web")
+            if not cmd_res.success:
+                return JSONResponse({"success": False, "message": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+            return JSONResponse({"success": True, "message": f"Đã đóng {sym} qua Execution Service", "receipt": cmd_res.execution_receipt_id})
+
+        return JSONResponse({"success": False, "message": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
     except Exception as e:
         return JSONResponse({"success": False, "message": f"Lỗi: {e}"})
 
 
 @app.get("/api/radar", dependencies=[Depends(verify_auth)])
 async def api_radar():
-    """Lấy dữ liệu Radar định dạng chuẩn Desktop/Mobile"""
+    """Return scanner data with explicit OFFLINE availability state."""
     res = await get_scanner_radar()
     try:
         data = json.loads(res.body.decode())
-        return JSONResponse({"pairs": data.get("radar", [])})
+        return JSONResponse({
+            "success": True,
+            "status": data.get("status", "ACTIVE"),
+            "scanner_available": data.get("status") != "DISABLED_OFFLINE",
+            "pairs": data.get("radar", []),
+            "message": data.get("message"),
+        })
     except Exception:
         return res
 
@@ -953,36 +1647,32 @@ async def download_state():
 
 @app.get("/api/logs", dependencies=[Depends(verify_auth)])
 async def api_get_logs(lines: int = 150):
-    """Lấy nhật ký hoạt động hệ thống gần nhất cho App PC/Mobile"""
-    log_candidates = ["bot.log", "binance_bot.log", "app.log", "system.log"]
+    """Return logs from the canonical supervised OFFLINE stack."""
+    lines = max(1, min(int(lines), 500))
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    runtime_file = os.getenv("TRADER_RUNTIME_ENV_FILE", "").strip()
+    runtime = os.path.dirname(runtime_file) if runtime_file else os.path.join(root, ".runtime")
+    candidates = [
+        os.path.join(runtime, "logs", "web.log"),
+        os.path.join(runtime, "logs", "execution-service.log"),
+        os.path.join(runtime, "logs", "telegram.log"),
+    ]
     result_lines = []
-    found_file = ""
-    for lf in log_candidates:
-        if os.path.exists(lf):
-            found_file = lf
-            try:
-                with open(lf, "r", encoding="utf-8", errors="ignore") as f:
-                    all_lines = f.readlines()
-                    result_lines = all_lines[-lines:]
-                break
-            except Exception:
-                pass
-
-    if not result_lines:
+    found = []
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
         try:
-            import subprocess
-            cmd = ["journalctl", "-u", "binance-bot.service", "-n", str(lines), "--no-pager"]
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
-            if proc.returncode == 0 and proc.stdout:
-                result_lines = proc.stdout.splitlines()
-                found_file = "journalctl"
-        except Exception:
-            pass
-
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                result_lines.extend(f.readlines()[-lines:])
+            found.append(os.path.basename(path))
+        except OSError:
+            continue
+    result_lines = sorted(result_lines)[-lines:] if result_lines else []
     return JSONResponse({
         "success": True,
-        "source": found_file or "none",
-        "lines": [l.rstrip() for l in result_lines] if result_lines else ["Hệ thống đang hoạt động bình thường, chưa có bản ghi log mới."]
+        "source": found or ["none"],
+        "lines": [line.rstrip() for line in result_lines] or ["No recent supervised stack logs."],
     })
 
 
@@ -1050,7 +1740,12 @@ self.addEventListener('fetch', (e) => {
 async def get_klines(symbol: str = "BTCUSDT", interval: str = "15m", limit: int = 100):
     """Lấy dữ liệu nến klines phục vụ biểu đồ TradingView Lightweight Charts"""
     try:
-        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit={min(200, max(30, limit))}"
+        market_base = (
+            "https://testnet.binancefuture.com/fapi/v1"
+            if str(getattr(config, "market_data_environment", "PRODUCTION")).upper() == "TESTNET"
+            else "https://fapi.binance.com/fapi/v1"
+        )
+        url = f"{market_base}/klines?symbol={symbol}&interval={interval}&limit={min(200, max(30, limit))}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
@@ -1086,42 +1781,87 @@ async def get_klines(symbol: str = "BTCUSDT", interval: str = "15m", limit: int 
 
 @app.post("/api/manual_order", dependencies=[Depends(verify_auth)])
 async def manual_order(request: Request):
-    """Vào lệnh bán tự động 1-Click trực tiếp từ Web Dashboard"""
+    """Submit a manual entry only from a separately supervised strategy context."""
     if _bot_context is None or not hasattr(_bot_context, "order_manager"):
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
+        return JSONResponse({"success": False, "code": "STRATEGY_CONTEXT_DISABLED_OFFLINE", "message": "Manual entry is unavailable in OFFLINE monitoring mode."}, status_code=503)
 
     try:
         data = await request.json()
         symbol = str(data.get("symbol", "")).strip().upper()
         side = str(data.get("side", "")).strip().upper()
+        stop_loss = data.get("stop_loss")
+        qty = data.get("qty")
+        try:
+            stop_loss = _strict_handler_float(stop_loss, "stop_loss", positive=True)
+            qty = _strict_handler_float(qty, "qty", positive=True)
+        except (TypeError, ValueError, OverflowError):
+            return JSONResponse(
+                {"success": False, "code": "PROTECTION_OR_SIZE_REQUIRED",
+                 "message": "Explicit valid stop_loss and qty are required."},
+                status_code=400,
+            )
         if not symbol or side not in ["BUY", "SELL", "LONG", "SHORT"]:
             return JSONResponse({"success": False, "message": "Dữ liệu symbol hoặc side không hợp lệ"})
+        if stop_loss <= 0 or qty <= 0:
+            return JSONResponse(
+                {"success": False, "code": "PROTECTION_OR_SIZE_REQUIRED",
+                 "message": "Explicit positive stop_loss and qty are required."}, status_code=400
+            )
 
         norm_side = "BUY" if side in ["BUY", "LONG"] else "SELL"
-        lev = int(data.get("leverage", config.leverage))
-        risk_pct = float(data.get("risk_percent", config.risk_per_trade_percent))
-        bal = _bot_context.get_current_balance()
-
-        res = _bot_context.order_manager.execute_manual_order(
-            symbol=symbol,
-            side=norm_side,
-            balance=bal,
-            leverage=lev,
-            risk_percent=risk_pct,
-            simulated_balance_holder=_bot_context.simulated_balance_holder
+        lev = _strict_handler_int(data.get("leverage", config.leverage), "leverage", positive=True)
+        if not 1 <= lev <= 20:
+            return JSONResponse({"success": False, "message": "leverage must be between 1 and 20"}, status_code=400)
+        bal = _strict_handler_float(_bot_context.get_current_balance(), "capital", positive=True)
+        entry_price = (
+            _strict_handler_float(data["entry_price"], "entry_price", positive=True)
+            if "entry_price" in data else 0.0
         )
-        return JSONResponse(res)
+        take_profit = (
+            _strict_handler_float(data["take_profit"], "take_profit", positive=True)
+            if "take_profit" in data else None
+        )
+        exec_client = _get_execution_client_for_surface("web")
+        if exec_client is not None:
+            cmd_res = exec_client.open_position(
+                symbol=symbol,
+                side=norm_side,
+                qty=qty,
+                entry_price=entry_price,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                leverage=lev,
+                total_capital=bal,
+                source="web",
+            )
+            if not cmd_res.success:
+                return JSONResponse({"success": False, "message": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+            return JSONResponse({"success": True, "symbol": symbol, "side": norm_side, "receipt": cmd_res.execution_receipt_id})
+
+        return JSONResponse({"success": False, "message": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
     except Exception as e:
-        return JSONResponse({"success": False, "message": f"Lỗi thực thi lệnh: {e}"})
+        return JSONResponse({"success": False, "message": f"Lỗi thực thi lệnh: {e}"}, status_code=400)
 
 
 @app.get("/api/analytics", dependencies=[Depends(verify_auth)])
 async def get_analytics():
-    """Lấy dữ liệu thống kê hiệu suất theo từng cặp coin"""
-    if _bot_context is None or not hasattr(_bot_context, "order_manager"):
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
-    data = _bot_context.order_manager.get_symbol_performance_breakdown()
-    return JSONResponse({"success": True, "analytics": data})
+    """Return symbol analytics from the authoritative Execution Service ledger."""
+    try:
+        pnl = _get_execution_client_for_surface("web").query_pnl()
+        ledger = pnl.get("pnl_ledger") if isinstance(pnl, dict) else None
+        if not isinstance(ledger, list):
+            return JSONResponse({"success": False, "code": "PNL_LEDGER_UNKNOWN"}, status_code=503)
+        grouped = {}
+        for row in ledger:
+            symbol = str(row.get("symbol") or "UNKNOWN")
+            item = grouped.setdefault(symbol, {"symbol": symbol, "trades": 0, "net_pnl": 0.0, "fees": 0.0})
+            item["trades"] += 1
+            item["net_pnl"] += float(row.get("realized_pnl") or 0.0)
+            item["fees"] += float(row.get("fee") or 0.0)
+        return JSONResponse({"success": True, "source": "EXECUTION_SERVICE_PNL_LEDGER", "analytics": list(grouped.values())})
+    except Exception:
+        logger.exception("Analytics projection failed")
+        return JSONResponse({"success": False, "code": "PNL_LEDGER_UNKNOWN"}, status_code=503)
 
 
 @app.get("/api/export_history_csv", dependencies=[Depends(verify_auth)])
@@ -1178,9 +1918,9 @@ async def reset_history():
 
 @app.post("/api/backtest", dependencies=[Depends(verify_auth)])
 async def run_backtest_endpoint(request: Request):
-    """API giả lập kiểm thử chiến lược định lượng trên dữ liệu nến Binance Futures"""
+    """Run backtests only when the supervised strategy data context is enabled."""
     if _bot_context is None or not hasattr(_bot_context, "client"):
-        return JSONResponse({"success": False, "message": "Bot chưa khởi động"})
+        return JSONResponse({"success": False, "code": "STRATEGY_CONTEXT_DISABLED_OFFLINE", "message": "Backtest requires a separately supervised strategy context."}, status_code=503)
     try:
         data = await request.json()
         symbol = str(data.get("symbol", "BTCUSDT")).strip().upper()
@@ -1227,7 +1967,12 @@ async def get_liquidation_radar(symbol: str = "BTCUSDT"):
         cur_p = prices.get(symbol, 0.0)
     if cur_p <= 0:
         try:
-            url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
+            market_base = (
+                "https://testnet.binancefuture.com/fapi/v1"
+                if str(getattr(config, "market_data_environment", "PRODUCTION")).upper() == "TESTNET"
+                else "https://fapi.binance.com/fapi/v1"
+            )
+            url = f"{market_base}/ticker/price?symbol={symbol}"
             r = requests.get(url, timeout=3)
             if r.status_code == 200:
                 cur_p = float(r.json().get("price", 0.0))
@@ -1297,16 +2042,19 @@ async def get_rl_regime():
 
 @app.post("/api/voice_command", dependencies=[Depends(verify_auth)])
 async def post_voice_command(request: Request):
-    """Tiếp nhận và thực thi câu lệnh giọng nói/văn bản tự nhiên"""
+    """Execute voice strategy commands only with a supervised strategy context."""
+    if _bot_context is None:
+        return JSONResponse({"success": False, "code": "STRATEGY_CONTEXT_DISABLED_OFFLINE", "reply": "Voice strategy commands are disabled in OFFLINE monitoring mode."}, status_code=503)
     try:
         body = await request.json()
         cmd_text = str(body.get("command", "")).strip()
         if not cmd_text:
-            return JSONResponse({"success": False, "reply": "Em chưa nghe rõ câu lệnh của Sếp ạ."})
+            return JSONResponse({"success": False, "reply": "Em chưa nghe rõ câu lệnh của Sếp ạ."}, status_code=400)
         res = QuantumVoiceCommander.process_command(cmd_text, _bot_context)
         return JSONResponse({"success": True, **res})
-    except Exception as e:
-        return JSONResponse({"success": False, "reply": f"Lỗi thực thi lệnh giọng nói: {e}"})
+    except Exception:
+        logger.exception("Voice command failed")
+        return JSONResponse({"success": False, "code": "VOICE_COMMAND_FAILED"}, status_code=503)
 
 
 @app.get("/api/lead_lag", dependencies=[Depends(verify_auth)])
@@ -1411,14 +2159,17 @@ async def get_edge_latency():
 
 @app.post("/api/multi_turn_chat", dependencies=[Depends(verify_auth)])
 async def post_multi_turn_chat(request: Request):
-    """Đàm thoại tư vấn danh mục chuyên sâu bằng tiếng Việt đa vòng (Bản 12.0)"""
+    """Use the portfolio advisor only when AI/strategy context is enabled."""
+    if _bot_context is None:
+        return JSONResponse({"success": False, "code": "AI_DISABLED_OFFLINE", "error": "Portfolio advisor is disabled in OFFLINE monitoring mode."}, status_code=503)
     try:
         body = await request.json()
         query = body.get("query", "")
         res = MultiTurnPortfolioAdvisor.answer_query(query, _bot_context)
         return JSONResponse({"success": True, "response": res})
-    except Exception as e:
-        return JSONResponse({"success": False, "error": str(e)})
+    except Exception:
+        logger.exception("Portfolio advisor failed")
+        return JSONResponse({"success": False, "code": "PORTFOLIO_ADVISOR_FAILED"}, status_code=503)
 
 
 @app.get("/api/ai_training", dependencies=[Depends(verify_auth)])
@@ -1466,16 +2217,36 @@ async def webhook_tradingview(request: Request):
         raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
     passphrase = data.get("passphrase")
-    expected = getattr(config, "webhook_passphrase", "quant_pro_secret_2026")
+    expected = getattr(config, "webhook_passphrase", None)
+    DEFAULT_WEBHOOK_SECRETS = {
+        "quant_pro_default_insecure_passphrase",
+        "quant_pro_secret_passphrase",
+        "quant_pro_secret_2026",
+        "quant_pro_production_long_secret_passphrase_2026",
+        "default",
+        "",
+        "None",
+        None
+    }
+    if not expected or str(expected).strip() in DEFAULT_WEBHOOK_SECRETS or len(str(expected).strip()) <= 20:
+        logger.error("🚨 [WEBHOOK DENIED] Webhook bị từ chối: Đang sử dụng mật khẩu mặc định hoặc chưa cấu hình an toàn (>20 ký tự).")
+        return JSONResponse({"success": False, "error": "Webhook passphrase is using insecure public default, unconfigured, or too short (must be > 20 chars). Explicit custom passphrase required."}, status_code=403)
+
     if not passphrase or not secrets.compare_digest(str(passphrase), str(expected)):
-        raise HTTPException(status_code=401, detail="Unauthorized webhook passphrase")
+        return JSONResponse({"success": False, "error": "Unauthorized webhook passphrase"}, status_code=401)
 
     if not _bot_context:
         return JSONResponse({"success": False, "error": "Bot context not initialized"}, status_code=503)
 
     symbol = str(data.get("symbol", "")).upper()
     action = str(data.get("action", "")).upper()
-    price = float(data.get("price", 0.0))
+    try:
+        price = (
+            _strict_handler_float(data["price"], "price", positive=True)
+            if "price" in data else 0.0
+        )
+    except (TypeError, ValueError, OverflowError) as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
 
     if not symbol or action not in ["BUY", "SELL", "CLOSE", "SHORT", "LONG"]:
         return JSONResponse({"success": False, "error": "Invalid symbol or action"}, status_code=400)
@@ -1488,10 +2259,13 @@ async def webhook_tradingview(request: Request):
     logger.info("📡 [TradingView Webhook] Nhận tín hiệu %s cho %s tại $%s", action, symbol, f"{price:,.4f}" if price > 0 else "Market")
 
     if action == "CLOSE":
-        if symbol in _bot_context.order_manager.active_positions:
-            ok = _bot_context.order_manager.close_position(symbol, exit_price=price if price > 0 else None, reason="TradingView Webhook Close")
-            return JSONResponse({"success": ok, "message": f"Closed {symbol}"})
-        return JSONResponse({"success": False, "message": f"No active position for {symbol}"})
+        exec_client = _get_execution_client_for_surface("webhook")
+        if exec_client is not None:
+            cmd_res = exec_client.close_position(symbol=symbol, reason="TradingView Webhook Close", source="webhook")
+            if not cmd_res.success:
+                return JSONResponse({"success": False, "error": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+            return JSONResponse({"success": True, "message": f"Closed {symbol} via Execution Service"})
+        return JSONResponse({"success": False, "error": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
 
     bal = _bot_context.get_current_balance()
     risk_ok, risk_reason = _bot_context.risk_manager.can_open_new_position(
@@ -1503,15 +2277,38 @@ async def webhook_tradingview(request: Request):
 
     filter_info = _bot_context.client.get_symbol_filter_info(symbol)
     if price <= 0:
-        price = _bot_context.client.get_symbol_price(symbol)
-        if not price or price <= 0:
+        if hasattr(_bot_context.client, "get_symbol_price"):
+            try:
+                p = _bot_context.client.get_symbol_price(symbol)
+                if isinstance(p, (int, float)) and p > 0:
+                    price = float(p)
+            except Exception:
+                pass
+        if price <= 0 and hasattr(_bot_context.client, "get_klines_df"):
+            try:
+                df = _bot_context.client.get_klines_df(symbol, interval="1m", limit=1)
+                if df is not None and not df.empty and "close" in df.columns:
+                    price = float(df["close"].iloc[-1])
+            except Exception:
+                pass
+        if not price or (isinstance(price, (int, float)) and price <= 0):
             return JSONResponse({"success": False, "error": f"Cannot get market price for {symbol}"}, status_code=400)
 
-    sl = float(data.get("stop_loss", 0.0))
-    tp = float(data.get("take_profit", 0.0))
+    try:
+        sl = _strict_handler_float(data.get("stop_loss", 0.0), "stop_loss", positive=True)
+        tp = (
+            _strict_handler_float(data["take_profit"], "take_profit", positive=True)
+            if "take_profit" in data else 0.0
+        )
+        bal = _strict_handler_float(bal, "capital", positive=True)
+    except (TypeError, ValueError, OverflowError) as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
     if sl <= 0:
-        atr_dist = price * 0.015
-        sl = price - atr_dist if action == "BUY" else price + atr_dist
+        return JSONResponse(
+            {"success": False, "code": "PROTECTIVE_STOP_REQUIRED",
+             "error": "Explicit positive stop_loss is required for OPEN"},
+            status_code=400,
+        )
     if tp <= 0:
         dist = abs(price - sl)
         tp = price + 1.5 * dist if action == "BUY" else price - 1.5 * dist
@@ -1527,28 +2324,1027 @@ async def webhook_tradingview(request: Request):
     if not sizing.get("valid"):
         return JSONResponse({"success": False, "error": sizing.get("reason")}, status_code=400)
 
-    success = _bot_context.order_manager.execute_entry(
-        symbol=symbol,
-        side=action,
-        entry_price=price,
-        qty=sizing["qty"],
-        stop_loss=sl,
-        take_profit=tp,
-        margin=sizing["margin"],
-        risk_amount=sizing["risk_amount"],
-        leverage=sizing.get("leverage")
+    exec_client = _get_execution_client_for_surface("webhook")
+    if exec_client is not None:
+        cmd_res = exec_client.open_position(
+            symbol=symbol,
+            side=action,
+            qty=sizing["qty"],
+            entry_price=price,
+            stop_loss=sl,
+            take_profit=tp,
+            leverage=sizing.get("leverage", 1),
+            total_capital=bal,
+            source="webhook",
+        )
+        if not cmd_res.success:
+            return JSONResponse({"success": False, "error": f"Execution Service error: {cmd_res.error}"}, status_code=503)
+        return JSONResponse({
+            "success": True,
+            "symbol": symbol,
+            "action": action,
+            "price": price,
+            "qty": sizing["qty"],
+            "receipt": cmd_res.execution_receipt_id,
+        })
+
+    return JSONResponse({"success": False, "error": "Execution Service unavailable (Hard Cutover)"}, status_code=503)
+
+
+# ==================== NON-CUSTODIAL MULTI-CLIENT COPY-TRADING & PUBLIC PORTAL ====================
+
+def get_current_client_from_request(request: Request) -> Optional[Dict[str, Any]]:
+    """Xác thực client chỉ từ JWT ký số hoặc phiên Admin hợp lệ."""
+    token = _portal_jwt_from_request(request)
+
+    if token:
+        payload = decode_jwt_token(token)
+        if payload and payload.get("client_id"):
+            with get_db_session() as db:
+                if _jwt_is_revoked(payload, db):
+                    return None
+        if payload and payload.get("client_id"):
+            with get_db_session() as db:
+                c = db.query(Client).filter(Client.id == int(payload["client_id"])).first()
+                if (
+                    c and c.is_active and c.username == payload.get("sub")
+                    and payload.get("session_version") == _client_session_version(c)
+                ):
+                    return {
+                        "client_id": c.id,
+                        "username": c.username,
+                        "full_name": getattr(c, "full_name", None) or c.username,
+                        "role": c.role,
+                        "email": c.email or ""
+                    }
+
+    adm_token = request.cookies.get("session_token") or request.headers.get("X-Session-Token")
+    current_admin = _current_session_client(adm_token, required_role="admin")
+    if current_admin:
+        with get_db_session() as db:
+            adm = db.query(Client).filter(Client.id == current_admin["client_id"]).first()
+            if adm:
+                return {
+                    "client_id": adm.id,
+                    "username": adm.username,
+                    "full_name": getattr(adm, "full_name", None) or "Quản Trị Viên",
+                    "role": adm.role,
+                    "email": adm.email or ""
+                }
+    return None
+
+
+def is_admin_request(request: Request) -> bool:
+    """Require current database admin status; token claims alone grant no authority."""
+    jwt_token = _portal_jwt_from_request(request)
+    if jwt_token:
+        payload = decode_jwt_token(jwt_token)
+        if payload and payload.get("client_id"):
+            with get_db_session() as db:
+                if _jwt_is_revoked(payload, db):
+                    return False
+                row = db.query(Client).filter(Client.id == int(payload["client_id"])).first()
+                return bool(
+                    row
+                    and row.is_active
+                    and row.role == "admin"
+                    and row.username == payload.get("sub")
+                    and payload.get("session_version") == _client_session_version(row)
+                )
+
+    session_token = request.cookies.get("session_token") or request.headers.get("X-Session-Token")
+    return _current_session_client(session_token, required_role="admin") is not None
+
+
+# --- Phân hệ 1: Public Track Record ---
+@app.get("/track-record", response_class=HTMLResponse)
+async def track_record_page():
+    """Trang Track Record được tính lại từ CSV/database hiện tại ở mỗi request."""
+    metrics = calculate_track_record_metrics()
+    t_path = os.path.join(os.path.dirname(__file__), "templates", "track_record.html")
+    if not os.path.exists(t_path):
+        return HTMLResponse(render_track_record_html(metrics))
+
+    with open(t_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    pnl = float(metrics.get("net_pnl_usdt", 0.0))
+    roi = float(metrics.get("total_return_pct", 0.0))
+    prefix = "+" if pnl > 0 else ""
+    pnl_class = "text-profitGreen" if pnl >= 0 else "text-lossRed"
+    rows = []
+    for trade in metrics.get("recent_trades", [])[:50]:
+        side = escape(str(trade.get("side", "")))
+        side_class = "text-cyberCyan bg-cyan-950/40 border-cyan-800/50" if side in ("BUY", "LONG") else "text-binanceGold bg-yellow-950/40 border-yellow-800/50"
+        trade_pnl = float(trade.get("pnl_usdt", 0.0))
+        trade_pct = float(trade.get("pnl_percent", 0.0))
+        trade_prefix = "+" if trade_pnl > 0 else ""
+        trade_class = "text-profitGreen" if trade_pnl >= 0 else "text-lossRed"
+        rows.append(f'''<tr class="hover:bg-darkCardHover transition border-b border-darkBorder font-mono text-xs">
+            <td class="py-3 px-4 text-gray-400 whitespace-nowrap">{escape(str(trade.get("timestamp", "")))}</td>
+            <td class="py-3 px-4 font-bold text-white">{escape(str(trade.get("symbol", "")))}</td>
+            <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[11px] font-bold border {side_class}">{side}</span></td>
+            <td class="py-3 px-4 text-gray-300 text-right">${float(trade.get("entry_price", 0.0)):,.4f}</td>
+            <td class="py-3 px-4 text-gray-300 text-right">${float(trade.get("exit_price", 0.0)):,.4f}</td>
+            <td class="py-3 px-4 text-gray-400 text-right">${float(trade.get("margin", 0.0)):,.2f}</td>
+            <td class="py-3 px-4 text-right {trade_class} font-bold">{trade_prefix}${trade_pnl:.2f} ({trade_prefix}{trade_pct:.2f}%)</td>
+            <td class="py-3 px-4 text-gray-300">{escape(str(trade.get("exit_reason", "")))}</td>
+        </tr>''')
+
+    replacements = {
+        "__TR_TOTAL__": str(int(metrics.get("total_trades", 0))),
+        "__TR_WIN_RATE__": f'{float(metrics.get("win_rate", 0.0)):.1f}',
+        "__TR_WINS__": str(int(metrics.get("wins", 0))),
+        "__TR_LOSSES__": str(int(metrics.get("losses", 0))),
+        "__TR_NET_PNL__": f'{prefix}{pnl:.2f}',
+        "__TR_ROI__": f'{prefix}{roi:.2f}',
+        "__TR_PNL_CLASS__": pnl_class,
+        "__TR_PF__": f'{float(metrics.get("profit_factor", 0.0)):.2f}',
+        "__TR_SHARPE__": f'{float(metrics.get("sharpe_ratio", 0.0)):.2f}',
+        "__TR_DD__": f'{float(metrics.get("max_drawdown_pct", 0.0)):.2f}',
+        "__TR_ROWS__": "".join(rows),
+        "__TR_EQUITY_JSON__": json.dumps(metrics.get("equity_curve", []), ensure_ascii=False),
+    }
+    for key, value in replacements.items():
+        html = html.replace(key, value)
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/public/track-record-data")
+async def api_public_track_record():
+    """API dữ liệu Track Record cho biểu đồ và đối tác"""
+    return JSONResponse(calculate_track_record_metrics())
+
+
+# --- Phân hệ 2: Client Portal Web Pages ---
+@app.get("/portal/login", response_class=HTMLResponse)
+async def portal_login_view(request: Request):
+    """Trang đăng nhập Client Portal"""
+    client_ctx = get_current_client_from_request(request)
+    if client_ctx:
+        return RedirectResponse(url="/portal/dashboard", status_code=302)
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/login.html")
+    t_path = os.path.join(os.path.dirname(__file__), "templates", "login.html")
+    if os.path.exists(t_path):
+        with open(t_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(render_portal_login_html())
+
+
+@app.get("/portal/login-v2", response_class=HTMLResponse)
+async def portal_login_v2_view(request: Request):
+    """V2 Login page (always available for V2 testing)."""
+    client_ctx = get_current_client_from_request(request)
+    if client_ctx:
+        return RedirectResponse(url="/portal/dashboard-v2", status_code=302)
+    return render_ui_v2_template("ui_v2/login.html")
+
+
+@app.post("/portal/login")
+async def portal_login_action(request: Request, response: Response):
+    """Xử lý đăng nhập Client Portal bằng tài khoản đã lưu trong database."""
+    content_type = request.headers.get("content-type", "")
+    is_form = "application/json" not in content_type
+
+    if is_form:
+        form_data = await request.form()
+        username = str(form_data.get("username", "")).strip()
+        password = str(form_data.get("password", "")).strip()
+    else:
+        body = await request.json()
+        username = str(body.get("username", "")).strip()
+        password = str(body.get("password", "")).strip()
+
+    if not username or not password:
+        if is_form:
+            return RedirectResponse(url="/portal/login?error=missing", status_code=303)
+        return JSONResponse({"success": False, "message": "Vui lòng nhập tên đăng nhập và mật khẩu."}, status_code=400)
+
+    if _login_is_limited(request, username):
+        if is_form:
+            return RedirectResponse(url="/portal/login?error=rate_limited", status_code=303)
+        return JSONResponse({"success": False, "code": "LOGIN_RATE_LIMITED", "message": "Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau."}, status_code=429)
+
+    client_data = None
+    with get_db_session() as db:
+        c = db.query(Client).filter((Client.username == username) | (Client.email == username)).first()
+        if c and c.is_active and verify_password(password, c.password_hash):
+            client_data = {
+                "client_id": int(c.id),
+                "username": c.username,
+                "full_name": getattr(c, "full_name", None) or c.username,
+                "role": c.role,
+                "email": c.email or "",
+                "session_version": _client_session_version(c),
+            }
+
+    is_authenticated = client_data is not None
+    if is_authenticated:
+        _clear_login_failures(request, username)
+    else:
+        _record_login_failure(request, username)
+    if is_authenticated and client_data:
+        jwt_token = create_jwt_token({
+            "sub": client_data["username"],
+            "client_id": client_data["client_id"],
+            "role": client_data["role"],
+            "full_name": client_data["full_name"],
+            "email": client_data["email"],
+            "session_version": client_data["session_version"],
+        })
+        is_admin_user = client_data.get("role") == "admin"
+        target_url = "/admin" if is_admin_user else "/portal/dashboard"
+
+        if is_form:
+            resp = RedirectResponse(url=target_url, status_code=303)
+        else:
+            resp = JSONResponse({
+                "success": True,
+                "username": client_data["username"],
+                "full_name": client_data["full_name"],
+                "role": client_data["role"],
+                "redirect": target_url,
+                "message": "Đăng nhập thành công!"
+            })
+
+        if is_admin_user:
+            adm_token = create_session_token(client_data["username"], "admin")
+            resp.set_cookie(key="session_token", value=adm_token, max_age=30*86400, path="/", httponly=True, samesite="strict", secure=True)
+
+        resp.set_cookie(key="client_session_user", value=client_data["username"], max_age=30*86400, path="/", httponly=True, samesite="lax", secure=True)
+        resp.set_cookie(key="client_token", value=jwt_token, max_age=30*86400, path="/", httponly=True, samesite="lax", secure=True)
+        return resp
+    # Thất bại
+    if is_form:
+        t_path = os.path.join(os.path.dirname(__file__), "templates", "login.html")
+        if os.path.exists(t_path):
+            with open(t_path, "r", encoding="utf-8") as f:
+                html = f.read()
+            err_box = '<div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; color: #ef4444; padding: 12px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; margin-bottom: 16px;">⚠️ Tên đăng nhập hoặc mật khẩu không chính xác!</div>'
+            html = html.replace('<form method="POST"', err_box + '<form method="POST"')
+            return HTMLResponse(content=html, status_code=401)
+        return RedirectResponse(url="/portal/login?error=invalid", status_code=303)
+    else:
+        return JSONResponse({"success": False, "message": "Sai tên đăng nhập hoặc mật khẩu."}, status_code=401)
+
+
+@app.get("/portal/register", response_class=HTMLResponse)
+async def portal_register_view(request: Request):
+    """Trang đăng ký tài khoản khách hàng mới"""
+    client_ctx = get_current_client_from_request(request)
+    if client_ctx:
+        return RedirectResponse(url="/portal/dashboard", status_code=302)
+    t_path = os.path.join(os.path.dirname(__file__), "templates", "register.html")
+    if os.path.exists(t_path):
+        with open(t_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(render_portal_register_html())
+
+
+@app.post("/portal/register")
+async def portal_register_action(request: Request, response: Response):
+    """Xử lý đăng ký tài khoản mới (hỗ trợ cả Form Onboarding và JSON API)"""
+    content_type = request.headers.get("content-type", "")
+    is_form = "application/json" not in content_type
+
+    if is_form:
+        form_data = await request.form()
+        username = str(form_data.get("username", "")).strip()
+        email = str(form_data.get("email", "")).strip().lower()
+        password = str(form_data.get("password", "")).strip()
+        full_name = str(form_data.get("full_name", "")).strip() or username
+
+        if len(username) < 3 or len(password) < 6:
+            return RedirectResponse(url="/portal/register?error=invalid", status_code=303)
+
+        with get_db_session() as db:
+            exist_u = db.query(Client).filter((Client.username == username) | (Client.email == email if email else False)).first()
+            if exist_u:
+                return RedirectResponse(url="/portal/register?error=exists", status_code=303)
+
+            new_client = Client(
+                username=username,
+                email=email if email else None,
+                full_name=full_name,
+                password_hash=hash_password(password),
+                role="client",
+                is_active=True
+            )
+            db.add(new_client)
+            db.commit()
+            db.refresh(new_client)
+
+            token_payload = {
+                "sub": new_client.username,
+                "client_id": int(new_client.id),
+                "role": new_client.role,
+                "email": new_client.email or "",
+                "full_name": new_client.full_name or username,
+                "session_version": _client_session_version(new_client),
+            }
+            jwt_token = create_jwt_token(token_payload)
+
+        target_url = "/portal/dashboard"
+        resp = RedirectResponse(url=target_url, status_code=303)
+        resp.set_cookie(key="client_session_user", value=username, max_age=30*86400, path="/", httponly=True, samesite="lax", secure=True)
+        resp.set_cookie(key="client_token", value=jwt_token, max_age=30*86400, path="/", httponly=True, samesite="lax", secure=True)
+        return resp
+
+    return await api_portal_register(request, response)
+
+@app.get("/portal/logout")
+async def portal_logout_view(request: Request):
+    """Revoke the current portal JWT before deleting browser cookies."""
+    _revoke_portal_jwt(_portal_jwt_from_request(request))
+    resp = RedirectResponse(url="/portal/login", status_code=302)
+    resp.delete_cookie(key="client_session_user", path="/")
+    resp.delete_cookie(key="client_token", path="/")
+    return resp
+
+
+def _client_account_feature_disabled() -> JSONResponse:
+    return JSONResponse(
+        {
+            "success": False,
+            "ok": False,
+            "state": "DISABLED",
+            "code": "FEATURE_DISABLED",
+            "feature": "client_account_trading",
+            "message": "Client-account trading is not supported in the current architecture.",
+        },
+        status_code=503,
     )
 
+
+@app.get("/portal/api-settings", response_class=HTMLResponse)
+async def portal_api_settings_view(request: Request):
+    """Retired product surface; never accept or display trading credentials."""
+    if not get_current_client_from_request(request):
+        return RedirectResponse(url="/portal/login", status_code=302)
+    return HTMLResponse(
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width'>"
+        "<title>Feature disabled</title></head><body><main>"
+        "<h1>Feature disabled</h1>"
+        "<p>Client-account trading is not supported in the current architecture.</p>"
+        "<p>No Binance credentials are required or accepted by this application.</p>"
+        "<a href='/portal/dashboard'>Return to monitoring dashboard</a>"
+        "</main></body></html>",
+        status_code=200,
+    )
+
+
+@app.post("/portal/api-settings")
+async def portal_api_settings_post_action(request: Request):
+    """Fail closed without reading the body or touching credential storage."""
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+
+@app.get("/portal/dashboard-v2", response_class=HTMLResponse)
+async def portal_dashboard_v2_view(request: Request):
+    """V2 Operator Terminal (Always accessible when authenticated)."""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx:
+        return RedirectResponse(url="/portal/login?next=/portal/dashboard-v2", status_code=302)
+    return render_ui_v2_template("ui_v2/dashboard.html", user=client_ctx)
+
+
+@app.get("/portal/ui_v2_preview", response_class=HTMLResponse)
+async def portal_ui_v2_preview(request: Request):
+    """Developer preview showcase. Requires authentication unless UI_V2_DEV_PREVIEW_ENABLED is explicitly enabled."""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx and not is_ui_v2_preview_enabled():
+        return RedirectResponse(url="/portal/login?next=/portal/ui_v2_preview", status_code=302)
+    p = os.path.join(os.path.dirname(__file__), "templates", "ui_v2_preview.html")
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>UI V2 Preview Not Found</h1>", status_code=404)
+
+
+@app.get("/portal/dashboard", response_class=HTMLResponse)
+async def portal_dashboard_view(request: Request):
+    """Bảng điều khiển khách hàng cá nhân hóa dựa trên 100% dữ liệu thật của tài khoản"""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx:
+        return RedirectResponse(url="/portal/login", status_code=302)
+
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/dashboard.html", user=client_ctx)
+
+    client_id = client_ctx["client_id"]
+    mux = get_order_multiplexer(use_testnet=getattr(config, "use_testnet", False))
+    dashboard_data = mux.get_client_dashboard_info(client_id)
+
+    # Consume only the non-secret directory projection returned by the multiplexer.
+    with get_db_session() as db:
+        c = db.query(Client).filter(Client.id == client_id).first()
+        client_dict = c.to_dict() if c else client_ctx
+        cred_dict = dict(dashboard_data)
+        user_orders_orm = db.query(ClientOrderLog).filter(ClientOrderLog.client_id == client_id).order_by(ClientOrderLog.created_at.desc()).limit(50).all()
+        user_orders = [o.to_dict() for o in user_orders_orm]
+
+    t_path = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
+    if os.path.exists(t_path):
+        with open(t_path, "r", encoding="utf-8") as f:
+            html = f.read()
+
+        full_name = escape(str(client_ctx.get("full_name") or client_dict.get("full_name") or "Khách hàng"))
+        username = escape(str(client_ctx.get("username") or "client"))
+        email = escape(str(client_ctx.get("email") or ""))
+
+        html = html.replace("Nguyễn Nhật Huy", full_name)
+        html = html.replace("huy@noza.site", email)
+
+        # 1. Tính toán các chỉ số KPI THẬT từ user_orders và Binance / simulated balance
+        equity_val = float(dashboard_data.get('equity', 1000.0) or 1000.0)
+        balance_val = float(dashboard_data.get('balance', 1000.0) or 1000.0)
+        net_pnl_val = float(dashboard_data.get('net_pnl', 0.0) or 0.0)
+        roi_val = (net_pnl_val / balance_val * 100.0) if balance_val > 0 else 0.0
+
+        # Tính win rate và profit factor thật từ user_orders
+        closed_orders = [o for o in user_orders if o.get("action") in ("CLOSE", "PARTIAL_TP", "EMERGENCY_CLOSE")]
+        gross_profit = 0.0
+        gross_loss = 0.0
+        wins = 0
+        losses = 0
+        for o in closed_orders:
+            pnl_val = 0.0
+            err_msg = o.get("error_message") or ""
+            if "pnl=" in err_msg:
+                try:
+                    pnl_val = float(err_msg.split("pnl=")[1].split()[0])
+                except Exception:
+                    pass
+            if pnl_val > 0:
+                gross_profit += pnl_val
+                wins += 1
+            elif pnl_val < 0:
+                gross_loss += abs(pnl_val)
+                losses += 1
+        win_rate_val = (wins / len(closed_orders) * 100.0) if closed_orders else 0.0
+        total_trades_val = int(dashboard_data.get("total_trades", len(user_orders)) or 0)
+        profit_factor_val = (gross_profit / gross_loss) if gross_loss > 0 else (99.0 if gross_profit > 0 else 0.0)
+        sharpe_val = float(dashboard_data.get('sharpe', 0.0) or 0.0)
+        max_dd_val = float(dashboard_data.get('max_drawdown', 0.0) or 0.0)
+
+        # Thay thế KPI Stats theo ID
+        html = html.replace('id="stat-equity">$0.00</div>', f'id="stat-equity">${equity_val:,.2f}</div>')
+        html = html.replace('id="stat-balance">Ví Futures: $0.00</div>', f'id="stat-balance">Ví Futures: ${balance_val:,.2f}</div>')
+        pnl_prefix = "+" if net_pnl_val > 0 else ""
+        html = html.replace('id="stat-net-pnl">$0.00</div>', f'id="stat-net-pnl">{pnl_prefix}${net_pnl_val:,.2f}</div>')
+        html = html.replace('id="stat-roi">0.00% ROI</div>', f'id="stat-roi">{pnl_prefix}{roi_val:.2f}% ROI</div>')
+        html = html.replace('id="stat-win-rate">0.0%</div>', f'id="stat-win-rate">{win_rate_val:.1f}%</div>')
+        html = html.replace('id="stat-trades-count">0 lệnh đã đối soát</div>', f'id="stat-trades-count">{total_trades_val} lệnh đã đối soát</div>')
+        html = html.replace('id="stat-profit-factor">0.00</div>', f'id="stat-profit-factor">{profit_factor_val:.2f}</div>')
+        html = html.replace('id="stat-sharpe">0.00</div>', f'id="stat-sharpe">{sharpe_val:.2f}</div>')
+        html = html.replace('id="stat-max-dd">0.00%</div>', f'id="stat-max-dd">{max_dd_val:.2f}%</div>')
+
+        # 2. Cấu hình API và mốc High-Water Mark THẬT
+        hwm_base = float(dashboard_data.get("hwm_benchmark", 1000.0) or 1000.0)
+        profit_ratio = float(dashboard_data.get("profit_share_percent", 10.0) or 10.0)
+        fee_due = float(dashboard_data.get("fee_due_usdt", 0.0) or 0.0)
+        credit_bal = float(dashboard_data.get("credit_balance_usdt", 0.0) or 0.0)
+
+        html = html.replace('id="hwm_benchmark_disp">$1,000.00', f'id="hwm_benchmark_disp">${hwm_base:,.2f}')
+        html = html.replace('id="profit_share_pct_disp">10.0%', f'id="profit_share_pct_disp">{profit_ratio:.1f}%')
+        html = html.replace('id="fee_due_disp">$28.55', f'id="fee_due_disp">${fee_due:,.2f}')
+        html = html.replace('id="credit_balance_disp">$0.00', f'id="credit_balance_disp">${credit_bal:,.2f}')
+        html = html.replace('id="chart-start-equity" class="text-white">$0.00', f'id="chart-start-equity" class="text-white">${hwm_base:,.2f}')
+        html = html.replace('id="chart-peak-equity" class="text-profitGreen">$0.00', f'id="chart-peak-equity" class="text-profitGreen">${max(hwm_base, equity_val):,.2f}')
+
+        # Client credential and copy-trade controls are intentionally absent.
+        html = html.replace("__IS_COPY_ACTIVE__", "false")
+
+        # 3. Vị thế thực tế của user
+        raw_user_positions = dashboard_data.get("positions", [])
+        if isinstance(raw_user_positions, dict):
+            user_positions = [dict(position, symbol=position.get("symbol") or symbol)
+                              for symbol, position in raw_user_positions.items()
+                              if isinstance(position, dict)]
+        else:
+            user_positions = raw_user_positions if isinstance(raw_user_positions, list) else []
+        open_margin_total = sum(float(p.get("margin", 0.0) or 0.0) for p in user_positions)
+        html = html.replace('id="donut-open-margin" class="text-lg font-mono font-black text-binanceGold">$0.00', f'id="donut-open-margin" class="text-lg font-mono font-black text-binanceGold">${open_margin_total:,.2f}')
+        if user_positions:
+            pos_rows = ""
+            for p in user_positions:
+                side_color = "text-cyberCyan bg-cyan-950/40 border-cyan-800/50" if p["side"] in ("BUY", "LONG") else "text-binanceGold bg-yellow-950/40 border-yellow-800/50"
+                pnl_color = "text-profitGreen" if p["pnl_usdt"] >= 0 else "text-lossRed"
+                prefix = "+" if p["pnl_usdt"] > 0 else ""
+                pos_rows += f'''
+                <tr class="hover:bg-darkCardHover transition">
+                    <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-profitGreen"></span>
+                        {p["symbol"]}
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 rounded text-xs font-mono font-bold border {side_color}">{p["side"]}</span>
+                    </td>
+                    <td class="py-3 px-4 text-xs font-mono text-gray-300 text-right">{p["size"]}</td>
+                    <td class="py-3 px-4 text-xs font-mono text-gray-300 text-right">${p["entry_price"]:,.4f}</td>
+                    <td class="py-3 px-4 text-xs font-mono text-white text-right">${p["mark_price"]:,.4f}</td>
+                    <td class="py-3 px-4 text-xs font-mono text-gray-400 text-right">${p["margin"]:,.2f}</td>
+                    <td class="py-3 px-4 text-right font-mono font-bold {pnl_color}">
+                        {prefix}${p["pnl_usdt"]:,.2f} ({prefix}{p["pnl_percent"]:.2f}%)
+                    </td>
+                    <td class="py-3 px-4 text-center text-xs">
+                        <span class="px-2 py-0.5 rounded bg-profitGreen/10 text-profitGreen font-mono text-[11px] border border-profitGreen/30">
+                            🛡️ Đang Bảo Vệ SL
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center text-xs text-gray-500 font-mono">
+                        READ ONLY
+                    </td>
+                </tr>
+                '''
+            tbody_match = re.search(r'<tbody class="divide-y divide-slate-800/50 font-medium">.*?</tbody>', html, re.DOTALL)
+            if tbody_match:
+                html = html[:tbody_match.start()] + f'<tbody class="divide-y divide-darkBorder font-medium">{pos_rows}</tbody>' + html[tbody_match.end():]
+        else:
+            idle_row = '''
+            <tbody class="divide-y divide-darkBorder font-medium">
+                <tr>
+                    <td colspan="9" class="py-8 text-center text-xs text-gray-400 font-mono">
+                        <i class="fa-solid fa-circle-check text-profitGreen mr-1.5"></i>
+                        OFFLINE monitoring is active. No open positions are reported.<br>
+                        <span class="text-gray-500 text-[11px]">Scanner, strategy, and client-account trading are disabled.</span>
+                    </td>
+                </tr>
+            </tbody>
+            '''
+            tbody_match = re.search(r'<tbody class="divide-y divide-slate-800/50 font-medium">.*?</tbody>', html, re.DOTALL)
+            if tbody_match:
+                html = html[:tbody_match.start()] + idle_row + html[tbody_match.end():]
+
+        # 4. Nhật ký lệnh THẬT cho Tab 4 (Audit Logs)
+        if user_orders:
+            hist_rows = ""
+            for o in user_orders:
+                side_b = "text-cyberCyan bg-cyan-950/40 border-cyan-800/50" if o.get("side") in ("BUY", "LONG") else "text-binanceGold bg-yellow-950/40 border-yellow-800/50"
+                st_b = "text-profitGreen bg-emerald-950/40 border-emerald-800/50" if o.get("status") in ("FILLED", "SIMULATED") else "text-lossRed bg-rose-950/40 border-rose-800/50"
+                date_str = str(o.get("created_at") or "")[:19].replace("T", " ")
+                hist_rows += f'''
+                <tr class="hover:bg-darkCardHover transition border-b border-darkBorder font-mono text-xs">
+                    <td class="py-3 px-4 text-gray-400 whitespace-nowrap">{date_str}</td>
+                    <td class="py-3 px-4 font-bold text-white">{o.get("symbol")}</td>
+                    <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[11px] font-bold border {side_b}">{o.get("side")}</span></td>
+                    <td class="py-3 px-4 text-gray-300 text-right">${float(o.get("price") or 0.0):,.4f}</td>
+                    <td class="py-3 px-4 text-gray-400 text-right">{float(o.get("qty") or 0.0):.4f}</td>
+                    <td class="py-3 px-4 text-center"><span class="px-2 py-0.5 rounded text-[11px] font-bold border {st_b}">{o.get("status")}</span></td>
+                    <td class="py-3 px-4 text-white font-bold">{o.get("action")}</td>
+                    <td class="py-3 px-4 text-gray-400 text-[11px] font-mono">{o.get("order_id") or "-"}</td>
+                </tr>
+                '''
+            html = html.replace('id="user-history-tbody"><tr><td colspan="8" class="py-8 text-center text-xs text-gray-500 font-mono">Chưa có giao dịch sao chép nào được ghi nhận cho tài khoản của bạn.</td></tr></tbody>',
+                                f'id="user-history-tbody">{hist_rows}</tbody>')
+
+        # 5. Dữ liệu Donut Chart THẬT
+        if user_positions:
+            donut_slices = []
+            colors = ["#3B82F6", "#00F0FF", "#F0B90B", "#A855F7", "#EC4899"]
+            legend_html = ""
+            cur_eq = max(1.0, equity_val)
+            for i, p in enumerate(user_positions):
+                col = colors[i % len(colors)]
+                pct = round((p["margin"] / cur_eq) * 100.0, 1)
+                donut_slices.append({"val": pct, "color": col, "name": p["symbol"]})
+                legend_html += f'''
+                <div class="flex items-center justify-between">
+                    <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:{col};"></span> {p["symbol"]} ({pct}%)</span>
+                    <span class="text-gray-300 font-bold">${p["margin"]:,.2f}</span>
+                </div>
+                '''
+            rem_pct = max(0.0, round(100.0 - sum(s["val"] for s in donut_slices), 1))
+            donut_slices.append({"val": rem_pct, "color": "#0ECB81", "name": "USDT Khả Dụng"})
+            legend_html += f'''
+            <div class="flex items-center justify-between">
+                <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-profitGreen"></span> USDT Khả Dụng ({rem_pct}%)</span>
+                <span class="text-gray-300 font-bold">${balance_val:,.2f}</span>
+            </div>
+            '''
+            html = html.replace("__USER_DONUT_SLICES_JSON__", json.dumps(donut_slices))
+            html = html.replace('<div class="space-y-2 text-xs font-mono" id="user-donut-legend">.*?',
+                                f'<div class="space-y-2 text-xs font-mono" id="user-donut-legend">{legend_html}')
+        else:
+            donut_slices = [{"val": 100, "color": "#0ECB81", "name": "USDT Khả Dụng"}]
+            html = html.replace("__USER_DONUT_SLICES_JSON__", json.dumps(donut_slices))
+            html = html.replace('id="donut-usdt-balance">$0.00', f'id="donut-usdt-balance">${balance_val:,.2f}')
+
+        # 6. Dữ liệu Equity Curve THẬT
+        user_series = [{"t": "Bắt đầu", "v": balance_val}]
+        if user_orders and len(user_orders) > 1:
+            cum = balance_val
+            for o in list(reversed(user_orders))[:20]:
+                c_at = str(o.get("created_at") or "")
+                t_lbl = c_at[5:10].replace("-", "/") if len(c_at) >= 10 else ""
+                user_series.append({"t": t_lbl, "v": round(cum, 2)})
+            user_series.append({"t": "Hiện tại", "v": equity_val})
+        else:
+            user_series.append({"t": "Hiện tại", "v": equity_val})
+        html = html.replace("__USER_EQUITY_SERIES_JSON__", json.dumps(user_series))
+
+        # Notice script if redirected from admin
+        if request.query_params.get("notice") == "admin_forbidden":
+            notice_script = '''
+            <script>
+                window.addEventListener("DOMContentLoaded", () => {
+                    setTimeout(() => {
+                        if (typeof showToast === "function") {
+                            showToast("🚫 Quyền truy cập bị từ chối: Trang Admin Cockpit chỉ dành riêng cho Quản trị viên hệ thống. Bạn đã được chuyển hướng về Cổng Khách Hàng cá nhân.", "error");
+                        }
+                    }, 400);
+                });
+            </script>
+            </body>
+            '''
+            html = html.replace("</body>", notice_script)
+
+        return HTMLResponse(content=html)
+
+    mux = get_order_multiplexer(use_testnet=getattr(config, "use_testnet", False))
+    dashboard_data = mux.get_client_dashboard_info(client_id)
+    with get_db_session() as db:
+        c = db.query(Client).filter(Client.id == client_id).first()
+        client_dict = c.to_dict() if c else client_ctx
+    return HTMLResponse(render_portal_dashboard_html(client_dict, dashboard_data))
+
+
+@app.post("/api/portal/login")
+async def api_portal_login(request: Request, response: Response):
+    """API xác thực đăng nhập cấp JWT Token"""
+    return await portal_login_action(request, response)
+
+
+@app.post("/api/portal/register")
+async def api_portal_register(request: Request, response: Response):
+    """Đăng ký tài khoản khách hàng mới"""
+    try:
+        body = await request.json()
+        username = str(body.get("username", "")).strip()
+        email = str(body.get("email", "")).strip().lower()
+        password = str(body.get("password", "")).strip()
+
+        if len(username) < 3:
+            return JSONResponse({"success": False, "message": "Tên đăng nhập phải có ít nhất 3 ký tự."}, status_code=400)
+        if len(password) < 6:
+            return JSONResponse({"success": False, "message": "Mật khẩu phải có ít nhất 6 ký tự."}, status_code=400)
+
+        with get_db_session() as db:
+            exist_user = db.query(Client).filter(Client.username == username).first()
+            if exist_user:
+                return JSONResponse({"success": False, "message": "Tên đăng nhập này đã được sử dụng."}, status_code=400)
+            if email:
+                exist_email = db.query(Client).filter(Client.email == email).first()
+                if exist_email:
+                    return JSONResponse({"success": False, "message": "Email này đã được đăng ký."}, status_code=400)
+
+            new_client = Client(
+                username=username,
+                email=email if email else None,
+                full_name=username,
+                password_hash=hash_password(password),
+                role="client",
+                is_active=True
+            )
+            db.add(new_client)
+            db.commit()
+            db.refresh(new_client)
+
+            token_payload = {
+                "sub": new_client.username,
+                "client_id": new_client.id,
+                "role": new_client.role,
+                "email": new_client.email,
+                "full_name": new_client.full_name,
+                "session_version": _client_session_version(new_client),
+            }
+            jwt_token = create_jwt_token(token_payload)
+
+        resp = JSONResponse({
+            "success": True,
+            "username": username,
+            "redirect": "/portal/dashboard",
+            "message": "Đăng ký tài khoản thành công!"
+        })
+        resp.set_cookie(key="client_session_user", value=username, max_age=30 * 86400, path="/", httponly=True, samesite="lax", secure=True)
+        resp.set_cookie(key="client_token", value=jwt_token, max_age=30 * 86400, path="/", httponly=True, samesite="lax", secure=True)
+        return resp
+    except Exception as e:
+        logger.error("Lỗi đăng ký portal: %s", e)
+        return JSONResponse({"success": False, "message": f"Lỗi hệ thống: {e}"}, status_code=500)
+
+
+@app.post("/api/portal/logout")
+async def api_portal_logout(request: Request):
+    """Durably revoke the current portal JWT before deleting cookies."""
+    _revoke_portal_jwt(_portal_jwt_from_request(request))
+    resp = JSONResponse({"success": True, "message": "Đã đăng xuất"})
+    resp.delete_cookie(key="client_session_user", path="/")
+    resp.delete_cookie(key="client_token", path="/")
+    return resp
+
+
+@app.get("/api/portal/me")
+async def api_portal_me(request: Request):
+    """Lấy thông tin tài khoản hiện tại"""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx:
+        return JSONResponse({"authenticated": False}, status_code=401)
+    return JSONResponse({"authenticated": True, "client": client_ctx})
+
+
+@app.get("/api/portal/api-settings")
+async def api_portal_get_api_settings(request: Request):
+    """Retired credential surface remains deterministic and fail-closed."""
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+
+@app.post("/api/portal/api-settings")
+async def api_portal_save_api_settings(request: Request):
+    return await portal_api_settings_post_action(request)
+
+
+@app.get("/api/portal/dashboard-data")
+async def api_portal_dashboard_data(request: Request):
+    """Return portal state while copy execution remains explicitly disabled."""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx:
+        return JSONResponse({"success": False, "message": "Chưa xác thực."}, status_code=401)
     return JSONResponse({
-        "success": success,
-        "symbol": symbol,
-        "action": action,
-        "price": price,
-        "qty": sizing["qty"]
+        "success": True,
+        "copy_trading_available": False,
+        "copy_trading_status": "UNAVAILABLE_DISABLED",
+        "data": {"positions": [], "orders": [], "is_copy_enabled": False},
     })
 
 
+@app.post("/api/portal/toggle-copy")
+async def api_portal_toggle_copy(request: Request):
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+
+@app.post("/api/portal/close-position")
+async def api_portal_close_position(request: Request):
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+
+@app.post("/api/portal/emergency-close-all")
+async def api_portal_emergency_close_all(request: Request):
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+@app.get("/api/portal/settlements")
+async def api_portal_get_settlements(request: Request):
+    """Lấy lịch sử các đợt quyết toán lợi nhuận High-Water Mark của khách hàng"""
+    client_ctx = get_current_client_from_request(request)
+    if not client_ctx:
+        return JSONResponse({"success": False, "message": "Chưa xác thực."}, status_code=401)
+    try:
+        client_id = client_ctx["client_id"]
+        with get_db_session() as db:
+            settlements = db.query(ProfitShareSettlement).filter(ProfitShareSettlement.client_id == client_id).order_by(ProfitShareSettlement.created_at.desc()).limit(20).all()
+            return JSONResponse({"success": True, "settlements": [s.to_dict() for s in settlements]})
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+@app.post("/api/portal/update-copy-settings")
+async def api_portal_update_copy_settings(request: Request):
+    if not get_current_client_from_request(request):
+        return JSONResponse({"success": False, "code": "UNAUTHENTICATED"}, status_code=401)
+    return _client_account_feature_disabled()
+
+
+@app.get("/api/affiliate/programs")
+async def api_get_affiliate_programs():
+    """Danh mục các chương trình Affiliate tối ưu lợi nhuận có thể kích hoạt với Binance"""
+    return JSONResponse({
+        "success": True,
+        "active_programs": [
+            {
+                "name": "Binance Refer-to-Earn USDC",
+                "type": "Pool & Welcome Voucher",
+                "referral_id": "GRO_28502_SKWHI",
+                "claim_url": "https://www.binance.com/referral/earn-together/refer2earn-usdc/claim?hl=vi&ref=GRO_28502_SKWHI&utm_source=referral_entrance",
+                "benefit_referee": "Lên đến 100 USDC Voucher & quà chào mừng",
+                "benefit_referrer": "Chia sẻ Pool thưởng USDC cùng bạn bè",
+                "status": "ACTIVE"
+            },
+            {
+                "name": "Binance Futures Broker Rebate",
+                "type": "Cashback Hoàn Phí",
+                "referral_id": "GRO_28502_SKWHI",
+                "claim_url": "https://trader.noza.site/",
+                "benefit_referee": "Hoàn 20% phí giao dịch phái sinh Futures trọn đời",
+                "benefit_referrer": "Tích lũy hoa hồng trọn đời từ volume giao dịch",
+                "status": "ACTIVE"
+            },
+            {
+                "name": "Binance Lead Trader Profit Sharing",
+                "type": "Copy Trading (Unavailable)",
+                "profit_share_rate": None,
+                "settlement_cycle": None,
+                "benefit_lead_trader": "Unavailable in this deployment",
+                "benefit_copier": "Copy-trade execution is disabled pending separate certification",
+                "status": "UNAVAILABLE_DISABLED"
+            }
+        ]
+    })
+
+
+# --- Phân hệ 4: Pháp Lý & Cảnh Báo Rủi Ro ---
+@app.get("/risk-warning", response_class=HTMLResponse)
+async def risk_warning_view():
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/risk_warning.html")
+    p = os.path.join(os.path.dirname(__file__), "templates", "risk_warning.html")
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Cảnh báo rủi ro đầu tư phái sinh</h1>")
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_view():
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/terms.html")
+    p = os.path.join(os.path.dirname(__file__), "templates", "terms.html")
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Điều khoản sử dụng dịch vụ</h1>")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_view():
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/privacy.html")
+    p = os.path.join(os.path.dirname(__file__), "templates", "privacy.html")
+    if os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>Chính sách bảo mật dữ liệu phi lưu ký</h1>")
+
+
+# --- Phân hệ 5: Phân Quyền Admin Cockpit & Quản Lý Đa Khách Hàng (RBAC) ---
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_cockpit_page(request: Request):
+    """
+    Bảng điều khiển kỹ thuật cao dành RIÊNG cho Quản trị viên (Admin Cockpit).
+    Khách hàng (Client role) bị CHẶN TUYỆT ĐỐI và tự động điều hướng về Portal cá nhân.
+    """
+    # 1. Kiểm tra nếu đang đăng nhập tài khoản Khách hàng thường (như huy123456)
+    client_ctx = get_current_client_from_request(request)
+    if client_ctx and client_ctx.get("role") != "admin":
+        logger.warning("🚫 [SECURITY] Khách hàng %s (role=%s) cố gắng truy cập Admin Cockpit! Chặn và điều hướng.",
+                       client_ctx.get("username"), client_ctx.get("role"))
+        return RedirectResponse(url="/portal/dashboard?notice=admin_forbidden", status_code=303)
+
+    # 2. Kiểm tra quyền Quản trị viên
+    if not is_admin_request(request):
+        return RedirectResponse(url="/portal/login?next=/admin", status_code=303)
+
+    return await dashboard_page()
+
+
+@app.get("/api/admin/clients")
+async def api_admin_get_clients(request: Request):
+    """Return the Portal account directory without credential/copy metadata."""
+    if not is_admin_request(request):
+        return JSONResponse({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}, status_code=403)
+
+    with get_db_session() as db:
+        clients = db.query(Client).all()
+        result = []
+        for client in clients:
+            orders_count = db.query(ClientOrderLog).filter(
+                ClientOrderLog.client_id == client.id
+            ).count()
+            result.append({
+                "id": client.id,
+                "username": client.username,
+                "full_name": getattr(client, "full_name", None) or client.username,
+                "email": client.email,
+                "role": client.role,
+                "is_active": client.is_active,
+                "created_at": client.created_at.isoformat() if client.created_at else None,
+                "client_trading": {
+                    "available": False,
+                    "state": "FEATURE_DISABLED",
+                },
+                "total_orders": orders_count,
+            })
+        return JSONResponse({
+            "success": True,
+            "total_clients": len(result),
+            "active_copy_traders": 0,
+            "total_allocated_margin": 0.0,
+            "clients": result,
+        })
+
+
+@app.post("/api/admin/clients/{target_client_id}/toggle-copy")
+async def api_admin_toggle_client_copy(target_client_id: int, request: Request):
+    del target_client_id
+    if not is_admin_request(request):
+        return JSONResponse({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}, status_code=403)
+    return _client_account_feature_disabled()
+@app.post("/api/admin/clients/{target_client_id}/settle")
+async def api_admin_settle_client_profit(target_client_id: int, request: Request):
+    """API dành riêng cho Admin: Thực hiện quyết toán High-Water Mark (HWM) chu kỳ hàng tuần cho khách hàng"""
+    if not is_admin_request(request):
+        return JSONResponse({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}, status_code=403)
+    try:
+        body = await request.json() if "application/json" in request.headers.get("content-type", "") else {}
+        note = body.get("note", "Quyết toán định kỳ Admin")
+        mux = get_order_multiplexer(use_testnet=getattr(config, "use_testnet", False))
+        res = mux.settle_profit_share(target_client_id, note=note)
+        return JSONResponse(res)
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+@app.get("/api/admin/settlements")
+async def api_admin_get_all_settlements(request: Request):
+    """API dành riêng cho Admin: Xem toàn bộ lịch sử quyết toán chia sẻ lợi nhuận HWM"""
+    if not is_admin_request(request):
+        return JSONResponse({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}, status_code=403)
+    with get_db_session() as db:
+        settlements = (
+            db.query(ProfitShareSettlement)
+            .order_by(ProfitShareSettlement.created_at.desc())
+            .limit(100)
+            .all()
+        )
+        res = []
+        for s in settlements:
+            c = db.query(Client).filter(Client.id == s.client_id).first()
+            d = s.to_dict()
+            d["username"] = c.username if c else f"Client #{s.client_id}"
+            d["full_name"] = getattr(c, "full_name", None) or d["username"]
+            res.append(d)
+        return JSONResponse({"success": True, "settlements": res})
+
+
+@app.post("/api/admin/clients/{target_client_id}/update-ratio")
+async def api_admin_update_profit_ratio(target_client_id: int, request: Request):
+    """API dành riêng cho Admin: Cập nhật tỷ lệ chia sẻ lợi nhuận cho khách hàng (chuẩn 10% - 20%)"""
+    if not is_admin_request(request):
+        return JSONResponse({"success": False, "message": "Yêu cầu quyền Quản trị viên (Admin)."}, status_code=403)
+    try:
+        body = await request.json()
+        raw_ratio = body.get("profit_share_ratio")
+        if isinstance(raw_ratio, bool) or not isinstance(raw_ratio, (int, float)):
+            return JSONResponse({"success": False, "message": "Tỷ lệ chia sẻ lợi nhuận phải là số hữu hạn."}, status_code=400)
+        ratio = _strict_handler_float(raw_ratio, "profit_share_ratio", positive=True)
+        if ratio > 0.20 or ratio < 0.10:
+            return JSONResponse({"success": False, "message": "Tỷ lệ chia sẻ lợi nhuận phải nằm trong khoảng 10% đến 20%."}, status_code=400)
+        with get_db_session() as db:
+            c = db.query(Client).filter(Client.id == target_client_id).first()
+            if not c:
+                return JSONResponse({"success": False, "message": "Không tìm thấy khách hàng."}, status_code=404)
+            c.profit_share_ratio = ratio
+            # Profit-sharing is client accounting metadata, not credential configuration.
+            db.commit()
+        return JSONResponse({"success": True, "message": f"Đã cập nhật tỷ lệ chia sẻ lợi nhuận thành {ratio * 100:.1f}%", "profit_share_ratio": ratio})
+    except (TypeError, ValueError, OverflowError) as exc:
+        return JSONResponse({"success": False, "message": str(exc)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+
 @app.get("/", response_class=HTMLResponse)
+async def root_dispatch_page(request: Request):
+    """Trang chủ Astra Quant Labs (giống 100% trader.noza.site)"""
+    admin_token = request.cookies.get("session_token")
+    if admin_token and is_valid_session_token(admin_token):
+        if is_ui_v2_enabled():
+            return RedirectResponse(url="/portal/dashboard", status_code=302)
+        return await dashboard_page()
+
+    if is_ui_v2_enabled():
+        return render_ui_v2_template("ui_v2/landing.html")
+
+    t_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
+    if os.path.exists(t_path):
+        with open(t_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return await dashboard_page()
+
+
+
 async def dashboard_page():
     """Giao diện Web Dashboard Siêu Hiện Đại (Institutional Grade) - Dark Glassmorphism"""
     html_content = f"""<!DOCTYPE html>
@@ -1702,6 +3498,71 @@ async def dashboard_page():
         .mascot-pupil {{ transition: transform 0.08s cubic-bezier(0.2, 0.8, 0.4, 1); }}
         .mascot-head-tilt {{ transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.4, 1); transform-style: preserve-3d; }}
         .mascot-eyelid {{ transition: transform 0.09s ease-in-out; }}
+        /* Unified dark responsive shell: desktop + mobile */
+        *, *::before, *::after {{ box-sizing: border-box; }}
+        img, svg, canvas {{ max-width: 100%; }}
+        button, a, input, select {{ -webkit-tap-highlight-color: transparent; }}
+        button, a {{ touch-action: manipulation; }}
+        #workspace {{ width: 100%; min-width: 0; }}
+        .glass-card, .glass-panel {{ min-width: 0; }}
+        .no-scrollbar {{ scrollbar-width: none; }}
+        .no-scrollbar::-webkit-scrollbar {{ display: none; }}
+
+        @media (max-width: 767px) {{
+            #admin-header-inner {{
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                gap: 0.5rem !important;
+                min-width: 0;
+            }}
+            #admin-brand-text p {{ display: none !important; }}
+            #admin-brand-text .admin-brand-name {{ font-size: 0.75rem !important; }}
+            #admin-header-actions {{
+                margin-left: auto;
+                max-width: calc(100vw - 150px);
+                overflow: hidden;
+                gap: 0.35rem !important;
+            }}
+            #admin-header-actions > button {{
+                width: 2.25rem !important;
+                height: 2.25rem !important;
+                min-width: 2.25rem !important;
+            }}
+            #workspace {{
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                padding-top: 0.875rem !important;
+                padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important;
+            }}
+            #workspace .glass-card {{ border-radius: 1rem !important; }}
+            #workspace .grid.grid-cols-2 {{ gap: 0.65rem !important; }}
+            #workspace .text-3xl {{ font-size: 1.4rem !important; line-height: 1.75rem !important; }}
+            .mobile-bottom-btn {{ min-height: 3.25rem; border-radius: 0.75rem; }}
+            .mobile-bottom-btn:active {{ background: rgba(240,185,11,.10); transform: scale(.97); }}
+            nav.fixed.bottom-0 {{ padding-bottom: calc(0.375rem + env(safe-area-inset-bottom)); }}
+            #settings-modal > div,
+            #ai-chat-modal > div,
+            #tv-chart-modal > div,
+            #analytics-modal > div,
+            #backtest-modal > div {{
+                max-width: 100% !important;
+                max-height: calc(100dvh - 1rem) !important;
+                border-radius: 1rem !important;
+            }}
+            .mascot-floating, .drone-orbit, .antenna-dot, .laser-sweep-line {{ animation-duration: 6s !important; }}
+        }}
+
+        @media (max-width: 380px) {{
+            #admin-brand-text {{ display: none !important; }}
+            #admin-header-actions {{ max-width: calc(100vw - 64px); }}
+            #workspace .grid.grid-cols-2 {{ grid-template-columns: minmax(0, 1fr) !important; }}
+            #workspace .glass-card {{ padding: 0.875rem !important; }}
+            .mobile-bottom-btn span {{ font-size: 0.5rem !important; }}
+        }}
+
+        @media (prefers-reduced-motion: reduce) {{
+            *, *::before, *::after {{ scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }}
+        }}
     </style>
 </head>
 <body class="bg-darkBase text-gray-200 font-sans min-h-screen antialiased selection:bg-binanceGold selection:text-black">
@@ -2324,20 +4185,29 @@ async def dashboard_page():
     <!-- Top Navigation Bar -->
     <!-- Top Navigation Bar (Clean, single-row, responsive on Mobile, Mini App and Desktop) -->
     <header class="border-b border-darkBorder bg-darkCard/95 sticky top-0 z-50 backdrop-blur-md w-full max-w-full">
-        <div class="max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-2">
+        <div id="admin-header-inner" class="max-w-[1600px] mx-auto px-2 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-1 sm:gap-2">
             <!-- Left Branding -->
             <div class="flex items-center space-x-1.5 sm:space-x-3 min-w-0 flex-shrink">
                 <img src="/logo.png" alt="Quant Bot Logo" class="w-7 h-7 sm:w-10 sm:h-10 rounded-xl object-cover border border-binanceGold/40 shadow-lg shadow-yellow-900/20 flex-shrink-0">
-                <div class="min-w-0">
+                <div id="admin-brand-text" class="min-w-0">
                     <div class="flex items-center gap-1.5 sm:gap-2">
-                        <span class="font-extrabold text-xs sm:text-base lg:text-lg text-white tracking-wider truncate">QUANT PRO</span>
+                        <span class="admin-brand-name font-extrabold text-xs sm:text-base lg:text-lg text-white tracking-wider truncate">QUANT PRO</span>
                     </div>
                     <p class="hidden sm:block text-[10px] sm:text-[11px] text-gray-400 font-medium truncate">Institutional Strategy • Cloud VPS Terminal</p>
                 </div>
-            </div>
+                </div>
 
             <!-- Center/Right Badges & Controls (No-wrap, clean responsive layout) -->
-            <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+            <div id="admin-header-actions" class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                <!-- Navigation Shortcuts: Track Record & Client Portal -->
+                <a href="/track-record" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-darkBase hover:bg-yellow-950/40 border border-yellow-700/50 text-xs text-binanceGold font-bold transition-all" title="Xem Public Track Record công khai">
+                    <i class="fa-solid fa-chart-line text-[11px]"></i>
+                    <span class="hidden xl:inline">Track Record</span>
+                </a>
+                <a href="/portal/dashboard" class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-darkBase hover:bg-cyan-950/40 border border-cyan-700/50 text-xs text-cyberCyan font-bold transition-all" title="Chuyển sang Client Portal">
+                    <i class="fa-solid fa-user-gear text-[11px]"></i>
+                    <span class="hidden xl:inline">Client Portal</span>
+                </a>
                 <!-- Ping Latency (Desktop Only) -->
                 <div class="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-darkBase border border-darkBorder text-xs text-gray-300 font-mono">
                     <span id="ping-indicator" class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span>
@@ -4835,46 +6705,39 @@ async def dashboard_page():
                 const eyeL = document.getElementById('robot-eye-left');
                 const eyeR = document.getElementById('robot-eye-right');
 
-                if (data.is_paused) {{
+                if (data.is_paused === true) {{
                     if (statusBadge) {{
                         statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-900/30 text-binanceGold border border-yellow-700/50 flex items-center gap-1.5";
                         statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-binanceGold"></span> TẠM DỪNG';
                     }}
                     if (btnPauseText) btnPauseText.innerText = "Tiếp Tục Quét";
                     if (btnPauseIcon) btnPauseIcon.className = "fa-solid fa-play";
-                    if (eyeL) eyeL.setAttribute('fill', '#F0B90B');
-                    if (eyeR) eyeR.setAttribute('fill', '#F0B90B');
-                }} else {{
-                    if (statusBadge) {{
-                        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-bold bg-green-900/30 text-profitGreen border border-green-700/50 flex items-center gap-1.5";
-                        statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span> ĐANG CHẠY';
-                    }}
+                }} else if (data.is_paused === false) {{
+                    if (statusBadge) statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-profitGreen animate-pulse"></span> EXECUTION SERVICE HEALTHY';
                     if (btnPauseText) btnPauseText.innerText = "Tạm Dừng Bot";
                     if (btnPauseIcon) btnPauseIcon.className = "fa-solid fa-pause";
-                    if (eyeL) eyeL.setAttribute('fill', data.total_unrealized_pnl >= 0 ? '#0ECB81' : '#F6465D');
-                    if (eyeR) eyeR.setAttribute('fill', data.total_unrealized_pnl >= 0 ? '#0ECB81' : '#F6465D');
+                }} else {{
+                    if (statusBadge) statusBadge.innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-400"></span> UNKNOWN';
+                    if (btnPauseText) btnPauseText.innerText = "Trạng thái không xác định";
+                    if (btnPauseIcon) btnPauseIcon.className = "fa-solid fa-triangle-exclamation";
                 }}
+                if (eyeL) eyeL.setAttribute('fill', '#6b7280');
+                if (eyeR) eyeR.setAttribute('fill', '#6b7280');
 
-                // Metrics
-                safeSetHTML('metric-balance', `$${{data.balance.toLocaleString('en-US', {{minimumFractionDigits: 2}})}} <span class="text-xs font-normal text-gray-400">USDT</span>`);
+                // Authoritative account balance/unrealized PnL are UNKNOWN until service exposes typed queries.
+                safeSetHTML('metric-balance', data.balance === null ? 'UNKNOWN <span class="text-xs font-normal text-gray-400">(service)</span>' : `$${{data.balance.toLocaleString('en-US', {{minimumFractionDigits: 2}})}}`);
                 const roiElem = document.getElementById('metric-roi');
-                const roiSign = data.roi_percent >= 0 ? '+' : '';
-                if (roiElem) {{
-                    roiElem.innerText = `${{roiSign}}${{data.roi_percent.toFixed(2)}}%`;
-                    roiElem.className = `font-bold font-mono ${{data.roi_percent >= 0 ? 'text-profitGreen' : 'text-lossRed'}}`;
-                }}
+                if (roiElem) roiElem.innerText = data.roi_percent === null ? 'UNKNOWN' : `${{data.roi_percent.toFixed(2)}}%`;
                 safeSetText('metric-leverage', `${{data.leverage}}x (${{data.margin_type}})`);
-
-                // PnL
                 const uPnlElem = document.getElementById('metric-unrealized-pnl');
-                const uSign = data.total_unrealized_pnl >= 0 ? '+' : '';
                 if (uPnlElem) {{
-                    uPnlElem.innerText = `${{uSign}}$${{data.total_unrealized_pnl.toFixed(2)}}`;
-                    uPnlElem.className = `text-2xl lg:text-3xl font-extrabold font-mono ${{data.total_unrealized_pnl >= 0 ? 'text-profitGreen' : 'text-lossRed'}}`;
+                    uPnlElem.innerText = data.total_unrealized_pnl === null ? 'UNKNOWN' : `$${{data.total_unrealized_pnl.toFixed(2)}}`;
+                    uPnlElem.className = 'text-2xl lg:text-3xl font-extrabold font-mono text-gray-400';
                 }}
-                safeSetText('metric-open-count', `${{data.open_positions_count}} / ${{data.max_positions}} vị thế`);
-                safeSetText('badge-open-slots', `${{data.open_positions_count}} / ${{data.max_positions}} vị thế`);
-                safeSetText('tab-badge-positions', `${{data.open_positions_count !== undefined ? data.open_positions_count : (data.positions ? data.positions.length : 0)}}`);
+                const knownPositionCount = data.open_positions_count === null ? 0 : data.open_positions_count;
+                safeSetText('metric-open-count', data.open_positions_count === null ? 'UNKNOWN' : `${{knownPositionCount}} / ${{data.max_positions}} vị thế`);
+                safeSetText('badge-open-slots', data.open_positions_count === null ? 'UNKNOWN' : `${{knownPositionCount}} / ${{data.max_positions}} vị thế`);
+                safeSetText('tab-badge-positions', data.open_positions_count === null ? '?' : `${{knownPositionCount}}`);
                 const slotBar = document.getElementById('metric-slot-bar');
                 if (slotBar) {{
                     const slotPercent = (data.open_positions_count / data.max_positions) * 100.0;
@@ -4918,17 +6781,42 @@ async def dashboard_page():
             const tbody = document.getElementById('positions-table-body');
             const mobileContainer = document.getElementById('positions-mobile-container');
             const navBadge = document.getElementById('nav-badge-positions');
+            const normalizePosition = (position, fallbackSymbol = '') => {{
+                const raw = position && typeof position === 'object' ? position : {{}};
+                const finite = (value, fallback = 0) => {{
+                    const parsed = Number(value);
+                    return Number.isFinite(parsed) ? parsed : fallback;
+                }};
+                const entry = finite(raw.entry_price);
+                return {{
+                    ...raw,
+                    symbol: raw.symbol || fallbackSymbol,
+                    entry_price: entry,
+                    current_price: finite(raw.current_price, entry),
+                    stop_loss: finite(raw.stop_loss),
+                    take_profit: finite(raw.take_profit),
+                    margin: finite(raw.margin),
+                    pnl_usdt: finite(raw.pnl_usdt),
+                    pnl_percent: finite(raw.pnl_percent),
+                    slider_pct: finite(raw.slider_pct, 50),
+                }};
+            }};
+            const positionList = Array.isArray(positions)
+                ? positions.map(position => normalizePosition(position))
+                : (positions && typeof positions === 'object'
+                    ? Object.entries(positions).map(([symbol, position]) => normalizePosition(position, symbol))
+                    : []);
 
             if (navBadge) {{
-                if (positions && positions.length > 0) {{
+                if (positionList.length > 0) {{
                     navBadge.classList.remove('hidden');
                 }} else {{
                     navBadge.classList.add('hidden');
                 }}
             }}
-            safeSetText('tab-badge-positions', positions ? positions.length : 0);
+            safeSetText('tab-badge-positions', positionList.length);
 
-            if (!positions || positions.length === 0) {{
+            if (positionList.length === 0) {{
                 if (tbody) {{
                     tbody.innerHTML = '<tr><td colspan="11" class="px-6 py-10 text-center text-gray-400 font-sans"><i class="fa-solid fa-magnifying-glass text-binanceGold mr-2"></i> Không có vị thế nào đang mở. Bot đang liên tục quét cơ hội...</td></tr>';
                 }}
@@ -4948,7 +6836,7 @@ async def dashboard_page():
 
             // Render Desktop Table Rows
             if (tbody) {{
-                tbody.innerHTML = positions.map(p => {{
+                tbody.innerHTML = positionList.map(p => {{
                     const isLong = p.side === 'BUY';
                     const sideBadge = isLong 
                         ? '<span class="px-2.5 py-1 rounded text-xs font-bold bg-green-950/60 text-profitGreen border border-green-700/50">LONG</span>' 
@@ -5007,7 +6895,7 @@ async def dashboard_page():
 
             // Render Mobile Cards View
             if (mobileContainer) {{
-                mobileContainer.innerHTML = positions.map(p => {{
+                mobileContainer.innerHTML = positionList.map(p => {{
                     const isLong = p.side === 'BUY';
                     const sideBadge = isLong 
                         ? '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-green-950/80 text-profitGreen border border-green-600/60 flex items-center gap-1"><i class="fa-solid fa-arrow-trend-up"></i> LONG</span>' 
@@ -5801,14 +7689,35 @@ async def dashboard_page():
         // 1-Click Semi-Auto Order Execution
         async function executeManualOrder(symbol, side) {{
             const sideText = side === 'BUY' ? 'LONG 📈' : 'SHORT 📉';
-            if (!confirm(`Xác nhận vào lệnh ${{sideText}} cho cặp ${{symbol}} ngay lập tức?`)) return;
+            const entryRaw = prompt(`Giá vào dự kiến cho ${{symbol}}:`);
+            if (entryRaw === null) return;
+            const stopRaw = prompt(`Stop Loss bắt buộc cho ${{symbol}} ${{sideText}}:`);
+            if (stopRaw === null) return;
+            const qtyRaw = prompt(`Khối lượng (qty) cho ${{symbol}}:`);
+            if (qtyRaw === null) return;
+            const entryPrice = Number(entryRaw);
+            const stopLoss = Number(stopRaw);
+            const qty = Number(qtyRaw);
+            const valid = Number.isFinite(entryPrice) && entryPrice > 0
+                && Number.isFinite(stopLoss) && stopLoss > 0
+                && Number.isFinite(qty) && qty > 0
+                && ((side === 'BUY' && stopLoss < entryPrice)
+                    || (side === 'SELL' && stopLoss > entryPrice));
+            if (!valid) {{
+                showToast('Entry, Stop Loss hoặc qty không hợp lệ/an toàn.', 'error');
+                return;
+            }}
+            if (!confirm(`Xác nhận ${{sideText}} ${{symbol}} qty=${{qty}}, entry=${{entryPrice}}, SL=${{stopLoss}}?`)) return;
 
             try {{
                 showToast(`Đang gửi lệnh ${{sideText}} ${{symbol}}...`, "warning");
                 const res = await fetch('/api/manual_order', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ symbol: symbol, side: side }})
+                    body: JSON.stringify({{
+                        symbol: symbol, side: side, qty: qty,
+                        entry_price: entryPrice, stop_loss: stopLoss,
+                    }})
                 }});
                 const data = await res.json();
                 if (data.success) {{
@@ -6646,38 +8555,15 @@ async def dashboard_page():
         // ==========================================
         // Authentication & Session Management
         // ==========================================
-        let currentAuthToken = localStorage.getItem('session_token') || null;
         let dashboardPollingActive = false;
         let dashboardIntervalIds = [];
 
-        // Intercept all native fetch calls to seamlessly inject X-Session-Token
+        // Browser authentication is cookie-only; JavaScript never receives the bearer value.
         const originalFetch = window.fetch;
         window.fetch = async function(resource, init = {{}}) {{
             init = init || {{}};
-            init.headers = init.headers || {{}};
-
-            // Normalize headers object
-            if (init.headers instanceof Headers) {{
-                if (currentAuthToken && !init.headers.has('X-Session-Token')) {{
-                    init.headers.set('X-Session-Token', currentAuthToken);
-                }}
-            }} else if (Array.isArray(init.headers)) {{
-                if (currentAuthToken) {{
-                    init.headers.push(['X-Session-Token', currentAuthToken]);
-                }}
-            }} else {{
-                if (currentAuthToken && !init.headers['X-Session-Token']) {{
-                    init.headers['X-Session-Token'] = currentAuthToken;
-                }}
-            }}
-
-            if (!init.credentials) {{
-                init.credentials = 'same-origin';
-            }}
-
+            if (!init.credentials) init.credentials = 'same-origin';
             const response = await originalFetch(resource, init);
-
-            // If 401 Unauthorized occurs on any protected API, show login modal
             if (response.status === 401) {{
                 const urlStr = typeof resource === 'string' ? resource : (resource.url || '');
                 if (!urlStr.includes('/api/login') && !urlStr.includes('/api/telegram_webapp_auth') && !urlStr.includes('/api/check_auth')) {{
@@ -6685,9 +8571,9 @@ async def dashboard_page():
                     showLoginModal();
                 }}
             }}
-
             return response;
         }};
+
 
         function showLoginModal() {{
             const modal = document.getElementById('login-modal');
@@ -6721,12 +8607,7 @@ async def dashboard_page():
                 }});
 
                 const data = await res.json();
-                if (res.ok && data.success && data.token) {{
-                    currentAuthToken = data.token;
-                    try {{
-                        localStorage.setItem('session_token', data.token);
-                        document.cookie = 'session_token=' + data.token + '; path=/; max-age=' + (30 * 86400) + '; SameSite=Lax';
-                    }} catch(err) {{}}
+                if (res.ok && data.success) {{
 
                     hideLoginModal();
                     updateUserUI(data.username || uInput.value.trim());
@@ -6773,12 +8654,7 @@ async def dashboard_page():
                 }});
 
                 const data = await res.json();
-                if (res.ok && data.success && data.token) {{
-                    currentAuthToken = data.token;
-                    try {{
-                        localStorage.setItem('session_token', data.token);
-                        document.cookie = 'session_token=' + data.token + '; path=/; max-age=' + (30 * 86400) + '; SameSite=Lax';
-                    }} catch(err) {{}}
+                if (res.ok && data.success) {{
 
                     hideLoginModal();
                     updateUserUI(data.username || 'Telegram Admin');
@@ -6806,11 +8682,7 @@ async def dashboard_page():
                 await originalFetch('/api/logout', {{ method: 'POST' }});
             }} catch(e) {{}}
 
-            currentAuthToken = null;
-            try {{
-                localStorage.removeItem('session_token');
-                document.cookie = 'session_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-            }} catch(e) {{}}
+
 
             const profileWidget = document.getElementById('user-profile-widget');
             if (profileWidget) {{
@@ -6834,18 +8706,6 @@ async def dashboard_page():
         }}
 
         async function checkInitialAuth() {{
-            // 1. Kiểm tra query param ?token=
-            try {{
-                const urlParams = new URLSearchParams(window.location.search);
-                const queryToken = urlParams.get('token');
-                if (queryToken) {{
-                    currentAuthToken = queryToken;
-                    localStorage.setItem('session_token', queryToken);
-                    document.cookie = 'session_token=' + queryToken + '; path=/; max-age=' + (30 * 86400) + '; SameSite=Lax';
-                    // Xóa param ?token trên thanh địa chỉ URL mà không reload trang
-                    window.history.replaceState({{}}, document.title, window.location.pathname);
-                }}
-            }} catch(e) {{}}
 
             // 2. Kiểm tra nếu đang chạy trong Telegram WebApp
             const tg = window.Telegram?.WebApp;
@@ -6869,19 +8729,14 @@ async def dashboard_page():
                         if (tgGreeting) tgGreeting.textContent = 'Chào ' + (u.first_name || u.username || 'Admin') + ' (ID: ' + u.id + ')';
                     }}
 
-                    // Tự động đăng nhập ngầm 1-chạm nếu chưa có session token
-                    if (!currentAuthToken) {{
-                        const autoOk = await loginWithTelegramWebApp(true);
-                        if (autoOk) return;
-                    }}
+                    const autoOk = await loginWithTelegramWebApp(true);
+                    if (autoOk) return;
                 }}
             }}
 
-            // 3. Kiểm tra tính hợp lệ với server qua /api/check_auth
             try {{
-                const res = await originalFetch('/api/check_auth', {{
-                    headers: currentAuthToken ? {{ 'X-Session-Token': currentAuthToken }} : {{}}
-                }});
+            // 3. Kiểm tra tính hợp lệ với server qua /api/check_auth
+                const res = await originalFetch('/api/check_auth', {{ credentials: 'same-origin' }});
                 const data = await res.json();
                 if (res.ok && data.authenticated) {{
                     hideLoginModal();

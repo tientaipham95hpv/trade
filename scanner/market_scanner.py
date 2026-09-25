@@ -25,10 +25,11 @@ class MarketScanner:
     - Tìm kiếm coin có setup giao dịch thỏa mãn chiến lược.
     """
 
-    def __init__(self, config: BotConfig, client: BinanceFuturesClient, strategy: BaseStrategy):
+    def __init__(self, config: BotConfig, client: BinanceFuturesClient, strategy: BaseStrategy, order_manager: Optional[Any] = None):
         self.config = config
         self.client = client
         self.strategy = strategy
+        self.order_manager = order_manager
         self.pullback_strategy = strategy if isinstance(strategy, TrendPullbackStrategy) else TrendPullbackStrategy(rr_ratio=config.risk_reward_ratio, adx_min=config.adx_min)
         self.breakout_strategy = BreakoutVolumeStrategy(rr_ratio=config.risk_reward_ratio)
         self.mean_reversion_strategy = MeanReversionStrategy()
@@ -194,11 +195,13 @@ class MarketScanner:
             logger.warning(f"🛡️ [QUỸ BẢO VỆ VỐN] {crash_msg} -> Tạm thời LOẠI BỎ toàn bộ tín hiệu BUY Altcoin!")
 
         if self.config.trading_mode == "BLUECHIP_ONLY":
-            symbols_to_scan = [s.strip() for s in self.config.bluechip_symbols.split(",") if s.strip()]
+            symbols_to_scan = list(dict.fromkeys([s.strip().upper() for s in self.config.bluechip_symbols.split(",") if s.strip()]))
+        elif self.config.trading_mode == "CUSTOM":
+            symbols_to_scan = list(dict.fromkeys([s.strip().upper() for s in self.config.target_symbols.split(",") if s.strip()]))
         elif self.config.enable_scanner:
             symbols_to_scan = self.get_liquid_symbols(max_pairs=self.config.max_scan_pairs)
         else:
-            symbols_to_scan = self.config.symbol_list
+            symbols_to_scan = list(dict.fromkeys(self.config.symbol_list))
 
         opportunities = []
         radar_items = []
@@ -309,12 +312,27 @@ class MarketScanner:
                         continue
 
                     # 4. Kiểm tra Khiên Quản Trị Rủi Ro Tương Quan (Portfolio Correlation Shield - Bản 5.0)
-                    active_positions = getattr(self.config, "active_positions", {})
+                    active_positions = {}
+                    if getattr(self, "order_manager", None) is not None and hasattr(self.order_manager, "active_positions"):
+                        active_positions = self.order_manager.active_positions
+                    elif hasattr(self.config, "active_positions") and isinstance(self.config.active_positions, dict):
+                        active_positions = self.config.active_positions
+
+                    combined_positions = dict(active_positions)
+                    for opp in opportunities:
+                        opp_sym = opp.get("symbol")
+                        if opp_sym and opp_sym not in combined_positions:
+                            opp_sig = opp.get("signal")
+                            combined_positions[opp_sym] = {
+                                "symbol": opp_sym,
+                                "side": opp_sig.value if hasattr(opp_sig, "value") else str(opp_sig)
+                            }
+
                     corr_check = self.correlation_shield.check_correlation_risk(
                         candidate_symbol=symbol,
                         candidate_side=sig.value if hasattr(sig, "value") else str(sig),
                         candidate_closes=ltf_df['close'].tolist(),
-                        active_positions=active_positions
+                        active_positions=combined_positions
                     )
                     if not corr_check.get("is_safe", True):
                         logger.warning(corr_check.get("warning_message"))

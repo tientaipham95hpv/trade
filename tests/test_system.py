@@ -1,6 +1,8 @@
 import unittest
 import os
 import sys
+import shutil
+import tempfile
 
 # Thêm thư mục gốc vào PYTHONPATH
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -26,19 +28,23 @@ class TestTradingBotCore(unittest.TestCase):
         self.risk_manager = RiskManager(self.config)
 
     def test_risk_manager_circuit_breaker(self):
-        # Thiết lập vốn đầu ngày 1,000 USDT
-        from datetime import datetime, timezone, timedelta
-        self.risk_manager.last_reset_day = datetime.now(timezone(timedelta(hours=7))).date()
-        self.risk_manager.daily_start_balance = 1000.0
+        # Application has no local breaker authority: missing service projection fails closed.
+        safe, msg = self.risk_manager.check_circuit_breaker(1000.0)
+        self.assertFalse(safe)
+        self.assertIn("CIRCUIT_BREAKER_UNKNOWN", msg)
 
-        # Lỗ nhẹ (980 USDT -> lỗ 2%), chưa chạm 5%
-        safe, msg = self.risk_manager.check_circuit_breaker(980.0)
+        state = {"state": "HEALTHY", "is_active": False, "daily_baseline_balance": 1000.0, "cooldown_until": 0.0}
+        self.risk_manager.execution_service_client = type(
+            "BreakerClient", (),
+            {"query_circuit_breaker": lambda _self: {"success": True, "circuit_breaker": dict(state)}}
+        )()
+        safe, _ = self.risk_manager.check_circuit_breaker(980.0)
         self.assertTrue(safe)
 
-        # Lỗ nặng (940 USDT -> lỗ 6%), vượt 5%
+        state.update({"state": "TRIPPED", "is_active": True, "cooldown_until": 4102444800.0})
         safe, msg = self.risk_manager.check_circuit_breaker(940.0)
         self.assertFalse(safe)
-        self.assertIn("NGẮT MẠCH KHẨN CẤP", msg)
+        self.assertIn("CIRCUIT_BREAKER_TRIPPED", msg)
 
     def test_risk_manager_position_sizing(self):
         balance = 1000.0
@@ -109,13 +115,11 @@ class TestTradingBotCore(unittest.TestCase):
         from notifier.telegram_bot import TelegramNotifier
         from core.order_manager import OrderManager
 
-        # Dùng file test tạm thời
-        test_state = "test_bot_state.json"
-        test_csv = "test_trade_history.csv"
-        if os.path.exists(test_state):
-            os.remove(test_state)
-        if os.path.exists(test_csv):
-            os.remove(test_csv)
+        # Isolate every persistence sidecar and register cleanup before construction.
+        temp_dir = tempfile.mkdtemp(prefix="bot-system-test-")
+        self.addCleanup(shutil.rmtree, temp_dir, True)
+        test_state = os.path.join(temp_dir, "state.json")
+        test_csv = os.path.join(temp_dir, "trade_history.csv")
         cfg = BotConfig(
             dry_run=True,
             telegram_enabled=False,
@@ -167,11 +171,6 @@ class TestTradingBotCore(unittest.TestCase):
         # Lãi thêm 0.01 * 1500 = $15 -> Tổng balance = 1025.0
         self.assertAlmostEqual(sim_balance["balance"], 1025.0, places=2)
 
-        # Dọn dẹp file test
-        if os.path.exists(test_state):
-            os.remove(test_state)
-        if os.path.exists(test_csv):
-            os.remove(test_csv)
 
     def test_institutional_adx_filter(self):
         """Kiểm tra bộ lọc ADX loại bỏ tín hiệu khi thị trường sideway yếu"""

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <link rel="icon" type="image/png" href="/logo.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        darkBase: '#080a0f',
+                        darkCard: '#10141e',
+                        darkCardHover: '#141a27',
+                        darkBorder: '#1c2436',
+                        binanceGold: '#F0B90B',
+                        profitGreen: '#0ECB81',
+                        lossRed: '#F6465D',
+                        cyberCyan: '#00F0FF',
+                        cyberPurple: '#00c8d7'
+                    }
+                }
+            }
+        };
+    </script>
+    <style>
+        /* Design contract: dense institutional terminal, clear hierarchy, no decorative chrome. */
+        :root { color-scheme: dark; --base:#080a0f; --card:#10141e; --raised:#141a27; --line:#1c2436; --gold:#F0B90B; --green:#0ECB81; --red:#F6465D; --cyan:#00c8d7; --text:#e7ebf3; --muted:#8b96a9; }
+        * { box-sizing:border-box; }
+        html, body { width:100%; max-width:100%; min-height:100%; margin:0; background:var(--base); color:var(--text); }
+        body { overflow-x:hidden; background-image:radial-gradient(circle at 75% -10%, rgba(240,185,11,.11), transparent 32rem), linear-gradient(rgba(28,36,54,.2) 1px, transparent 1px), linear-gradient(90deg, rgba(28,36,54,.16) 1px, transparent 1px); background-size:auto, 48px 48px, 48px 48px; }
+        ::selection { background:rgba(240,185,11,.28); color:#fff; }
+        ::-webkit-scrollbar { width:7px; height:7px; }
+        ::-webkit-scrollbar-track { background:var(--base); }
+        ::-webkit-scrollbar-thumb { background:#29344b; border-radius:8px; }
+        ::-webkit-scrollbar-thumb:hover { background:var(--gold); }
+        header, footer { background:rgba(8,10,15,.9) !important; border-color:var(--line) !important; }
+        .glass-panel, .glass-card { background:linear-gradient(145deg, rgba(18,23,34,.97), rgba(12,15,23,.97)); border:1px solid var(--line); box-shadow:0 18px 48px rgba(0,0,0,.22); }
+        .glass-panel { backdrop-filter:blur(16px); }
+        .glass-card { backdrop-filter:blur(10px); transition:border-color 140ms ease, transform 140ms ease, box-shadow 180ms ease; }
+        .glass-card:hover { border-color:#354158; box-shadow:0 22px 56px rgba(0,0,0,.28); }
+        a, button, input, select { -webkit-tap-highlight-color:transparent; }
+        a, button { transition:color 120ms ease, background-color 120ms ease, border-color 120ms ease, transform 100ms ease, opacity 120ms ease; }
+        a:active, button:active { transform:translateY(1px); }
+        :focus-visible { outline:2px solid var(--gold) !important; outline-offset:3px; }
+        input, select { min-height:44px; }
+        .glow-gold { box-shadow:0 0 28px rgba(240,185,11,.16); }
+        .glow-green { box-shadow:0 0 24px rgba(14,203,129,.14); }
+        .glow-cyan { box-shadow:0 0 20px rgba(0,200,215,.12); }
+        .tab-btn.active { background:rgba(240,185,11,.12); color:var(--gold); border-color:rgba(240,185,11,.4); font-weight:700; }
+        main > * { animation:terminal-in 440ms cubic-bezier(.2,.75,.25,1) both; }
+        main > *:nth-child(2) { animation-delay:50ms; } main > *:nth-child(3) { animation-delay:90ms; } main > *:nth-child(4) { animation-delay:130ms; }
+        @keyframes terminal-in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+        canvas, img { max-width:100%; }
+        table { min-width:720px; }
+        .overflow-x-auto { overscroll-behavior-inline:contain; scrollbar-gutter:stable; }
+        #portal-header-inner, header { min-width:0; }
+        @media (max-width:767px) {
+            header > div { min-height:56px; height:auto !important; padding-top:8px; padding-bottom:8px; }
+            header { gap:8px; } header > a, header > div > a { min-width:0; }
+            header p { display:none; }
+            #portal-brand-text { display:none !important; }
+            #portal-user-name { max-width:74px !important; }
+            main { padding-left:12px !important; padding-right:12px !important; }
+            .glass-card, .glass-panel { border-radius:16px !important; }
+            footer .flex { flex-wrap:wrap; row-gap:8px; }
+            button, a[class*="px-"] { min-height:40px; }
+        }
+        @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0ms !important; scroll-behavior:auto !important; transition-duration:.01ms !important; } }
+    </style>
+
+    <title>Đăng Nhập Cổng Khách Hàng — Binance Quant Pro</title>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200">
+    <!-- Header -->
+    <header class="max-w-6xl w-full mx-auto flex items-center justify-between py-2">
+        <a href="/" class="flex items-center space-x-3">
+            <img src="/logo.png" alt="Quant Bot Logo" class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl object-cover border border-binanceGold/40 shadow-lg shadow-yellow-900/20 flex-shrink-0">
+            <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                    <span class="font-extrabold text-sm sm:text-base text-white tracking-wider truncate">QUANT PRO</span>
+                    <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-yellow-950/50 text-binanceGold border border-yellow-700/50">PORTAL</span>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-gray-400 font-medium truncate">Institutional Strategy • Cloud VPS Terminal</p>
+            </div>
+        </a>
+        <div class="flex items-center space-x-2">
+            <a href="/track-record" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-300 hover:text-white hover:bg-darkCard transition border border-darkBorder">
+                <i class="fa-solid fa-chart-line mr-1 text-binanceGold"></i> Track Record
+            </a>
+        </div>
+    </header>
+
+    <!-- Login Form Card -->
+    <main class="flex-1 flex items-center justify-center py-8">
+        <div class="max-w-md w-full glass-card rounded-3xl p-8 space-y-6 shadow-2xl border border-darkBorder">
+            <div class="text-center space-y-3">
+                <img src="/logo.png" alt="Quant Bot Logo" class="w-16 h-16 rounded-2xl mx-auto object-cover border border-binanceGold/50 shadow-xl shadow-yellow-900/30">
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight">Cổng Giám Sát OFFLINE</h1>
+                    <p class="text-xs text-gray-400 font-mono mt-1">Execution Service monitoring • client trading disabled</p>
+                </div>
+            </div>
+
+
+            <form method="POST" action="/portal/login" class="space-y-4">
+                <div class="space-y-1">
+                    <label class="text-xs font-semibold text-gray-300">Tên Đăng Nhập hoặc Email</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3.5 top-3.5 text-gray-500 text-sm"></i>
+                        <input type="text" id="username" name="username" autocomplete="username" required placeholder="Tên đăng nhập hoặc email" class="w-full bg-darkBase border border-darkBorder focus:border-binanceGold rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="space-y-1">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-semibold text-gray-300">Mật Khẩu</label>
+                        <a href="https://t.me/AstraQuantSupport" target="_blank" class="text-[11px] text-binanceGold hover:underline font-medium">Quên mật khẩu?</a>
+                    </div>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3.5 top-3.5 text-gray-500 text-sm"></i>
+                        <input type="password" id="password" name="password" autocomplete="current-password" required placeholder="Mật khẩu" class="w-full bg-darkBase border border-darkBorder focus:border-binanceGold rounded-xl py-2.5 pl-10 pr-3 text-sm text-white placeholder-gray-500 focus:outline-none transition">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-gray-400">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" name="remember" checked class="rounded border-darkBorder text-binanceGold focus:ring-0">
+                        <span>Ghi nhớ đăng nhập</span>
+                    </label>
+                    <span class="text-[11px] font-mono text-profitGreen">🔒 AES-256 Non-Custodial</span>
+                </div>
+
+                <button type="submit" class="w-full py-3 rounded-xl bg-binanceGold hover:bg-binanceGold-hover text-darkBase font-black text-sm shadow-lg shadow-yellow-900/30 transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Đăng Nhập Dashboard →</span>
+                </button>
+            </form>
+
+            <div class="text-center pt-2 space-y-3 border-t border-darkBorder">
+                <p class="text-xs text-gray-400">
+                    Chưa có tài khoản?
+                    <a href="/portal/register" class="text-binanceGold hover:underline font-bold ml-1">Đăng ký thành viên mới</a>
+                </p>
+                <div class="flex items-center justify-center space-x-4 text-[11px] text-gray-500 font-mono">
+                    <a href="/" class="hover:text-gray-300">Trang chủ</a>
+                    <span>•</span>
+                    <a href="/risk-warning" class="hover:text-gray-300">Cảnh báo rủi ro</a>
+                    <span>•</span>
+                    <a href="/terms" class="hover:text-gray-300">Điều khoản</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center text-xs text-gray-500 py-3 font-mono">
+        © 2026 Binance Quant Pro — Nền tảng Giao dịch Định lượng Phi Lưu Ký. Bảo toàn 100% vốn trên ví Binance.
+    </footer>
+
+
+</body>
+</html>

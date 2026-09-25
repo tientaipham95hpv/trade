@@ -53,14 +53,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
               ),
             ),
             const SizedBox(height: 14),
-            const Text('Mật khẩu quản trị / Auth Token:', style: TextStyle(color: Colors.grey, fontSize: 11)),
+            const Text('Token phiên quản trị (chỉ giữ trong bộ nhớ):', style: TextStyle(color: Colors.grey, fontSize: 11)),
             const SizedBox(height: 6),
             TextField(
               controller: _tokenCtrl,
               obscureText: true,
               style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
               decoration: InputDecoration(
-                hintText: 'Nhập mật khẩu Web Dashboard...',
+                hintText: 'Nhập token phiên; không lưu trên thiết bị',
                 hintStyle: const TextStyle(color: Colors.grey, fontSize: 11),
                 filled: true,
                 fillColor: const Color(0xFF080A0F),

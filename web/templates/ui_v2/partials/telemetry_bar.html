@@ -1,0 +1,53 @@
+<header class="top-telemetry-bar">
+    <div class="top-telemetry-bar__left">
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">ENV</span>
+            <span id="telemetry-env" class="env-badge env-unknown env-badge--unknown">UNKNOWN</span>
+        </div>
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">EXEC</span>
+            <span id="telemetry-exec" class="status-badge status-badge--healthy">
+                <span class="status-badge__dot"></span>
+                HEALTHY
+            </span>
+        </div>
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">WEB</span>
+            <span id="telemetry-web" class="status-badge status-badge--healthy">
+                <span class="status-badge__dot"></span>
+                READY
+            </span>
+        </div>
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">TELEGRAM</span>
+            <span id="telemetry-tg" class="status-badge status-badge--healthy">
+                <span class="status-badge__dot"></span>
+                READY
+            </span>
+        </div>
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">HALT</span>
+            <span id="telemetry-halt" class="status-badge status-badge--healthy">
+                <span class="status-badge__dot"></span>
+                INACTIVE
+            </span>
+        </div>
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">RECOVERY</span>
+            <span id="telemetry-recovery" class="status-badge status-badge--healthy">
+                <span class="status-badge__dot"></span>
+                CLEAR
+            </span>
+        </div>
+    </div>
+
+    <div class="top-telemetry-bar__right">
+        <div class="telemetry-unit">
+            <span class="telemetry-unit__key">IPC RTT</span>
+            <span id="telemetry-latency" class="telemetry-unit__val font-mono text-cyan">— ms</span>
+        </div>
+        <div class="telemetry-unit">
+            <span id="telemetry-clock" class="telemetry-unit__val font-mono text-secondary">--:--:-- UTC</span>
+        </div>
+    </div>
+</header>

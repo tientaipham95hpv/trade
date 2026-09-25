@@ -1,43 +1,130 @@
+import time
 import logging
-import socket
-import requests
 from typing import Dict, Any, List, Optional
 import pandas as pd
 import utils.network_fix
 
-from binance.client import Client
-from binance.exceptions import BinanceAPIException
 from config.settings import BotConfig
 
+
+class BinanceAPIException(Exception):
+    """Compatibility exception without importing the mutation-capable Binance SDK."""
+
+
+class _PublicBinanceTransport:
+    """Credential-free public Futures transport exposed through the read-only facade."""
+
+    def __init__(self, testnet: bool = False):
+        self.base = "https://testnet.binancefuture.com/fapi/v1" if testnet else "https://fapi.binance.com/fapi/v1"
+
+    def _get(self, path: str, **params):
+        response = utils.network_fix.http_session.get(f"{self.base}/{path}", params=params, timeout=8)
+        response.raise_for_status()
+        return response.json()
+
+    def futures_ping(self):
+        return self._get("ping")
+
+    def futures_symbol_ticker(self, **params):
+        return self._get("ticker/price", **params)
+
+    def futures_exchange_info(self):
+        return self._get("exchangeInfo")
+
+    def futures_klines(self, **params):
+        return self._get("klines", **params)
+
+    def futures_historical_klines(self, **params):
+        return self.futures_klines(**params)
+
+    def get_exchange_info(self):
+        return self.futures_exchange_info()
+
+    def futures_account(self):
+        raise RuntimeError("Application has no account credential authority")
+
+    def futures_position_information(self):
+        raise RuntimeError("Application has no account credential authority")
+
+    def futures_get_order(self, **params):
+        raise RuntimeError("Application has no authenticated order-read authority")
+
+    def futures_get_open_orders(self, **params):
+        raise RuntimeError("Application has no authenticated order-read authority")
+
+    def futures_get_open_algo_orders(self, **params):
+        raise RuntimeError("Application has no authenticated order-read authority")
 logger = logging.getLogger("BinanceClient")
 
 
+READ_ONLY_SDK_METHODS = {
+    "futures_ping",
+    "futures_account",
+    "futures_position_information",
+    "futures_symbol_ticker",
+    "futures_get_order",
+    "futures_get_open_orders",
+    "futures_get_open_algo_orders",
+    "futures_exchange_info",
+    "futures_klines",
+    "futures_historical_klines",
+    "get_exchange_info",
+}
+
+
+def _build_read_only_facade_type():
+    # The wrapped SDK lives only in a closure; facade instances have no raw-client field or dict.
+    import weakref
+
+    wrapped_sdks = weakref.WeakKeyDictionary()
+
+    class _ReadOnlyBinanceSDKFacade:
+        __slots__ = ("__weakref__",)
+
+        def __init__(self, raw_sdk: Any):
+            wrapped_sdks[self] = raw_sdk
+
+        def __getattr__(self, name: str):
+            if name in READ_ONLY_SDK_METHODS:
+                return getattr(wrapped_sdks[self], name)
+            raise AttributeError(
+                f"Operation '{name}' is unavailable on ReadOnlyBinanceSDKFacade: "
+                "Application client mutation surface is 0."
+            )
+
+        def __dir__(self):
+            return sorted(READ_ONLY_SDK_METHODS)
+
+    _ReadOnlyBinanceSDKFacade.__name__ = "ReadOnlyBinanceSDKFacade"
+    _ReadOnlyBinanceSDKFacade.__qualname__ = "ReadOnlyBinanceSDKFacade"
+    return _ReadOnlyBinanceSDKFacade
+
+
+ReadOnlyBinanceSDKFacade = _build_read_only_facade_type()
+
+
 class BinanceFuturesClient:
-    """Wrapper kết nối Binance Futures API (REST)"""
+    """Wrapper kết nối Binance Futures API (REST) - Pure Read-Only for Application processes"""
 
     def __init__(self, config: BotConfig):
         self.config = config
         self.is_testnet = config.use_testnet
         self.is_dry_run = config.dry_run
+        market_data_environment = str(
+            getattr(config, "market_data_environment", "PRODUCTION") or "PRODUCTION"
+        ).upper()
+        self.market_data_environment = market_data_environment
+        market_data_testnet = market_data_environment == "TESTNET"
 
-        api_key = config.api_key if config.api_key else None
-        api_secret = config.api_secret if config.api_secret else None
-
-        # Khởi tạo Client python-binance (ping=False để không bị block ở spot testnet)
-        try:
-            self.client = Client(
-                api_key=api_key,
-                api_secret=api_secret,
-                testnet=self.is_testnet,
-                ping=False
-            )
-        except Exception as e:
-            logger.warning(f"Khởi tạo client testnet thất bại ({e}), chuyển sang client thông thường: {e}")
-            self.client = Client(api_key=api_key, api_secret=api_secret, ping=False)
-
-        # Base URL cho Futures
-        self.fapi_base = "https://testnet.binancefuture.com/fapi/v1" if self.is_testnet else "https://fapi.binance.com/fapi/v1"
-        self.public_fapi_base = "https://fapi.binance.com/fapi/v1"
+        # The application owns only a credential-free public transport.
+        self.client = ReadOnlyBinanceSDKFacade(_PublicBinanceTransport(market_data_testnet))
+        self.public_fapi_base = (
+            "https://testnet.binancefuture.com/fapi/v1"
+            if market_data_testnet
+            else "https://fapi.binance.com/fapi/v1"
+        )
+        # Compatibility alias; application code has no authenticated mutation transport.
+        self.fapi_base = self.public_fapi_base
 
         # Bộ nhớ đệm thông tin symbol (step_size, tick_size, v.v.)
         self._exchange_info_cache: Dict[str, Any] = {}
@@ -54,7 +141,7 @@ class BinanceFuturesClient:
 
     def get_available_balance(self) -> float:
         """Lấy số dư USDT khả dụng trong ví Futures"""
-        if self.is_dry_run and not (self.config.api_key and self.config.api_secret):
+        if self.is_dry_run:
             # Nếu chạy Dry-Run không có API key, gán vốn giả lập 1,000 USDT
             return 1000.0
 
@@ -70,7 +157,7 @@ class BinanceFuturesClient:
 
     def get_bnb_balance(self) -> float:
         """Lấy số dư BNB trong ví Futures để kiểm tra điều kiện giảm 10% phí sàn"""
-        if self.is_dry_run and not (self.config.api_key and self.config.api_secret):
+        if self.is_dry_run:
             return 0.5  # Giả lập có BNB khi dry-run không API key
 
         try:
@@ -95,23 +182,36 @@ class BinanceFuturesClient:
             logger.warning(f"💡 [TỐI ƯU PHÍ GIAO DỊCH] {msg}")
         return {"bnb_balance": bnb, "has_discount": has_discount, "message": msg}
 
-    def get_open_positions(self) -> List[Dict[str, Any]]:
+    def get_open_positions(self, symbol: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
         """Lấy danh sách các vị thế đang mở (positionAmt != 0)"""
-        if self.is_dry_run and not (self.config.api_key and self.config.api_secret):
+        if self.is_dry_run:
             return []
 
         try:
             positions = self.client.futures_position_information()
+            if not isinstance(positions, list):
+                return None
             open_pos = []
             for pos in positions:
-                amt = float(pos.get("positionAmt", 0.0))
+                if not isinstance(pos, dict):
+                    return None
+                if "symbol" in pos and "positionAmt" not in pos and "amount" not in pos:
+                    # Malformed record without quantity
+                    return None
+                try:
+                    amt = float(pos.get("positionAmt", pos.get("amount", 0.0)))
+                except (ValueError, TypeError):
+                    return None
                 if amt != 0:
+                    if symbol and pos.get("symbol") != symbol:
+                        continue
                     open_pos.append({
                         "symbol": pos["symbol"],
                         "amount": amt,
+                        "positionAmt": amt,
                         "side": "LONG" if amt > 0 else "SHORT",
-                        "entry_price": float(pos.get("entryPrice", 0.0)),
-                        "mark_price": float(pos.get("markPrice", 0.0)),
+                        "entry_price": float(pos.get("entryPrice", pos.get("entry_price", 0.0))),
+                        "mark_price": float(pos.get("markPrice", pos.get("mark_price", 0.0))),
                         "unRealizedProfit": float(pos.get("unRealizedProfit", 0.0)),
                         "leverage": int(pos.get("leverage", 1)),
                         "liquidationPrice": float(pos.get("liquidationPrice", 0.0))
@@ -119,33 +219,18 @@ class BinanceFuturesClient:
             return open_pos
         except BinanceAPIException as e:
             logger.error(f"Lỗi lấy danh sách vị thế: {e}")
-            return []
-
-    def set_leverage_and_margin(self, symbol: str, leverage: int, margin_type: str = "ISOLATED"):
-        """Thiết lập đòn bẩy và chế độ ký quỹ (ISOLATED)"""
-        if self.is_dry_run and not (self.config.api_key and self.config.api_secret):
-            logger.info(f"[Dry Run] Đã cấu hình {symbol} sang {margin_type} và Đòn bẩy {leverage}x")
-            return
-
-        try:
-            # 1. Đặt Margin Type (ISOLATED / CROSSED)
-            try:
-                self.client.futures_change_margin_type(symbol=symbol, marginType=margin_type)
-            except BinanceAPIException as e:
-                # Bỏ qua nếu đã là ISOLATED từ trước (code -4046)
-                if e.code != -4046:
-                    logger.debug(f"Margin type setting: {e.message}")
-
-            # 2. Đặt Leverage
-            self.client.futures_change_leverage(symbol=symbol, leverage=leverage)
-            logger.info(f"Đã đặt {symbol}: Đòn bẩy {leverage}x, Margin {margin_type}")
-        except BinanceAPIException as e:
-            logger.warning(f"Không thể chỉnh đòn bẩy cho {symbol}: {e.message}")
-
+            return None
+        except Exception as e:
+            logger.error(f"Lỗi không xác định lấy danh sách vị thế: {e}")
     def get_symbol_filter_info(self, symbol: str) -> Dict[str, float]:
         """Lấy step_size, min_qty, min_notional, tick_size của symbol"""
-        if symbol in self._exchange_info_cache:
-            return self._exchange_info_cache[symbol]
+        cache = getattr(self, "_exchange_info_cache", None)
+        if cache is None:
+            self._exchange_info_cache = {}
+            cache = self._exchange_info_cache
+
+        if symbol in cache:
+            return cache[symbol]
 
         default_info = {
             "step_size": 0.001,
@@ -156,7 +241,8 @@ class BinanceFuturesClient:
 
         try:
             # Lấy thông tin từ public production API để đảm bảo tốc độ và độ chính xác
-            url = f"{self.public_fapi_base}/exchangeInfo"
+            base_url = getattr(self, "public_fapi_base", "https://fapi.binance.com/fapi/v1")
+            url = f"{base_url}/exchangeInfo"
             r = utils.network_fix.http_session.get(url, timeout=8)
             exchange_info = r.json()
             for s in exchange_info.get("symbols", []):
@@ -236,69 +322,95 @@ class BinanceFuturesClient:
             logger.debug(f"Lỗi lấy funding rate {symbol}: {e}")
             return 0.0
 
-    def place_market_order(self, symbol: str, side: str, quantity: float) -> Optional[Dict[str, Any]]:
-        """Gửi lệnh Market vào sàn"""
-        if self.is_dry_run:
-            logger.info(f"[DRY RUN ORDER] Market {side} {quantity} {symbol}")
-            return {"status": "FILLED", "symbol": symbol, "side": side, "origQty": str(quantity)}
-
+    def get_symbol_price(self, symbol: str) -> float:
+        """Lấy giá thị trường hiện tại của symbol từ ticker hoặc klines"""
         try:
-            order = self.client.futures_create_order(
-                symbol=symbol,
-                side=side,
-                type="MARKET",
-                quantity=quantity
-            )
-            logger.info(f"Lệnh Market thành công: {order.get('orderId')}")
-            return order
-        except BinanceAPIException as e:
-            logger.error(f"Lỗi đặt lệnh Market {symbol}: {e.message}")
+            if hasattr(self, "client") and self.client:
+                if hasattr(self.client, "price"):
+                    try:
+                        return float(self.client.price)
+                    except Exception:
+                        pass
+                try:
+                    res = self.client.futures_symbol_ticker(symbol=symbol)
+                    if res and "price" in res:
+                        return float(res["price"])
+                except Exception:
+                    pass
+            df = self.get_klines_df(symbol, interval="1m", limit=1)
+            if df is not None and not df.empty and "close" in df.columns:
+                return float(df["close"].iloc[-1])
+            return 0.0
+        except Exception as e:
+            logger.debug(f"Lỗi lấy giá {symbol}: {e}")
+            return 0.0
+
+    def get_order(self, symbol: str, client_order_id: Optional[str] = None, order_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+        """Truy vấn trạng thái lệnh theo client_order_id hoặc order_id"""
+        try:
+            params: Dict[str, Any] = {"symbol": symbol}
+            if client_order_id:
+                params["origClientOrderId"] = client_order_id
+            if order_id:
+                params["orderId"] = order_id
+            return self.client.futures_get_order(**params)
+        except Exception as e:
+            logger.debug(f"Lỗi truy vấn lệnh {symbol} ({client_order_id or order_id}): {e}")
             return None
 
-    def place_stop_loss_order(self, symbol: str, side: str, stop_price: float) -> Optional[Dict[str, Any]]:
-        """Đặt lệnh Hard Stop Loss (STOP_MARKET) trên sàn"""
-        if self.is_dry_run:
-            logger.info(f"[DRY RUN ORDER] Stop Loss {side} @ ${stop_price}")
-            return {"status": "NEW", "type": "STOP_MARKET", "stopPrice": str(stop_price)}
-
+    def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lấy danh sách lệnh thường đang chờ khớp trên sàn (R5-014)"""
         try:
-            order = self.client.futures_create_order(
-                symbol=symbol,
-                side=side,
-                type="STOP_MARKET",
-                stopPrice=stop_price,
-                closePosition=True
-            )
-            return order
-        except BinanceAPIException as e:
-            logger.error(f"Lỗi đặt lệnh Stop Loss {symbol}: {e.message}")
-            return None
+            params = {"symbol": symbol} if symbol else {}
+            if hasattr(self.client, "futures_get_open_orders"):
+                return self.client.futures_get_open_orders(**params)
+            return []
+        except Exception as e:
+            logger.error(f"Lỗi truy vấn futures_get_open_orders: {e}")
+            raise
 
-    def place_take_profit_order(self, symbol: str, side: str, tp_price: float) -> Optional[Dict[str, Any]]:
-        """Đặt lệnh Chốt lời (TAKE_PROFIT_MARKET) trên sàn"""
-        if self.is_dry_run:
-            logger.info(f"[DRY RUN ORDER] Take Profit {side} @ ${tp_price}")
-            return {"status": "NEW", "type": "TAKE_PROFIT_MARKET", "stopPrice": str(tp_price)}
-
+    def get_open_algo_orders(self, symbol: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lấy danh sách lệnh algo/conditional đang chờ khớp trên sàn (R5-014)"""
         try:
-            order = self.client.futures_create_order(
-                symbol=symbol,
-                side=side,
-                type="TAKE_PROFIT_MARKET",
-                stopPrice=tp_price,
-                closePosition=True
-            )
-            return order
-        except BinanceAPIException as e:
-            logger.error(f"Lỗi đặt lệnh Take Profit {symbol}: {e.message}")
-            return None
+            params = {"symbol": symbol} if symbol else {}
+            if hasattr(self.client, "futures_get_open_algo_orders"):
+                return self.client.futures_get_open_algo_orders(**params)
+            return []
+        except Exception as e:
+            logger.error(f"Lỗi truy vấn futures_get_open_algo_orders: {e}")
+            raise
 
-    def cancel_all_symbol_orders(self, symbol: str):
-        """Hủy toàn bộ lệnh chờ của symbol (khi đóng vị thế)"""
-        if self.is_dry_run:
-            return
 
-        try:
-            self.client.futures_cancel_all_open_orders(symbol=symbol)
-        except BinanceAPIException as e:
-            logger.debug(f"Lỗi hủy lệnh chờ {symbol}: {e.message}")
+class MarketDataClient:
+    """
+    Read-Only Market Data Client for Application Surfaces (Strategy, Scanner, Web).
+    Contains ZERO mutating methods and requires NO Binance trading credentials.
+    """
+
+    def __init__(self, config: Optional[BotConfig] = None):
+        self.config = config or BotConfig()
+        self._inner = BinanceFuturesClient(self.config)
+
+    def get_klines_df(self, symbol: str, interval: str = "15m", limit: int = 100) -> pd.DataFrame:
+        return self._inner.get_klines_df(symbol, interval, limit)
+
+    def get_symbol_price(self, symbol: str) -> Optional[float]:
+        return self._inner.get_symbol_price(symbol)
+
+    def get_symbol_filter_info(self, symbol: str) -> Dict[str, Any]:
+        return self._inner.get_symbol_filter_info(symbol)
+
+    def get_funding_rate(self, symbol: str) -> float:
+        return self._inner.get_funding_rate(symbol)
+
+    def get_top_volume_symbols(self, limit: int = 50) -> List[str]:
+        return self._inner.get_top_volume_symbols(limit)
+
+    def test_connection(self) -> bool:
+        return self._inner.test_connection()
+
+    def get_available_balance(self) -> float:
+        return self._inner.get_available_balance()
+
+
+PublicMarketDataClient = BinanceFuturesClient

@@ -88,7 +88,7 @@ class BotStatus {
     var cb = json['circuit_breaker'] as Map<String, dynamic>? ?? {};
 
     return BotStatus(
-      balance: safeParseDouble(json['balance'], 1000.0),
+      balance: safeParseDouble(json['balance'], 0.0),
       unrealizedPnl: safeParseDouble(json['unrealized_pnl'], safeParseDouble(json['total_unrealized_pnl'], 0.0)),
       btcRegime: json['btc_regime'] ?? 'BULL',
       btcRegimeReason: json['btc_regime_reason'] ?? 'BTC Trend Shield',

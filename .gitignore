@@ -11,6 +11,23 @@ trade_history*.csv
 .env
 scratch/
 
+.runtime/
+# Runtime credentials and durable state
+.execution_service_token
+*.key
+*.fernet
+*copytrade*.db
+*copytrade*.db-wal
+*copytrade*.db-shm
+*app_security.db
+*app_security.db-wal
+*app_security.db-shm
+*state*.db
+*state*.db-wal
+*state*.db-shm
+*.cb.json
+*.cb.json.tmp.*
+
 # PC Desktop App (Node / Electron)
 pc-app/node_modules/
 pc-app/dist/
@@ -31,3 +48,10 @@ ios-app/ios/Flutter/Flutter.podspec
 .DS_Store
 Thumbs.db
 *.lnk
+*.meta
+round*.txt
+*.pem
+*.p12
+*.mobileprovision
+*.sqlite
+logs/

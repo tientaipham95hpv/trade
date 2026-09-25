@@ -1,0 +1,110 @@
+{% extends "ui_v2/base.html" %}
+
+{% block title %}Đăng Nhập Cổng Giám Sát — Binance Quant Pro (Obsidian Quants){% endblock %}
+
+{% block body %}
+<div class="terminal-shell min-h-screen flex flex-col justify-between">
+    <!-- Header -->
+    <header class="top-telemetry-bar">
+        <div class="top-telemetry-left">
+            <a href="/" class="top-telemetry-brand">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0B90B" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <span class="text-gold font-bold">BINANCE QUANT PRO</span>
+            </a>
+            <span class="env-badge env-badge--offline">OFFLINE</span>
+        </div>
+        <div class="top-telemetry-right">
+            <a href="/" class="btn btn--outline btn--sm font-mono text-xs">VỀ TRANG CHỦ</a>
+        </div>
+    </header>
+
+    <!-- Center Card -->
+    <main class="flex-1 flex items-center justify-center p-4">
+        <div class="terminal-panel" style="max-width: 420px; width: 100%;">
+            <div class="panel-header">
+                <span class="panel-title">OPERATOR AUTHENTICATION</span>
+                <span class="badge-subtle font-mono text-cyan">PORTAL V2</span>
+            </div>
+            <div class="panel-body">
+                <div class="text-center mb-6">
+                    <div class="font-bold text-lg text-primary">Cổng Giám Sát Vận Hành</div>
+                    <div class="text-xs text-muted font-mono mt-1">Execution Service monitoring • client trading disabled</div>
+                </div>
+
+                <div id="login-error-alert" class="hidden mb-4">
+                    <div class="risk-alert risk-alert--critical">
+                        <div class="risk-alert__content">
+                            <div id="login-error-text" class="risk-alert__title text-xs">Thông tin đăng nhập không chính xác.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="/portal/login" class="flex flex-col gap-4">
+                    <div class="form-group flex flex-col gap-1">
+                        <label for="username" class="text-xs font-mono text-secondary">TÊN ĐĂNG NHẬP / EMAIL</label>
+                        <input type="text" id="username" name="username" autocomplete="username" required
+                               placeholder="Nhập username hoặc email"
+                               class="bg-base border border-border focus:border-cyan text-primary text-sm font-mono rounded px-3 py-2 outline-none">
+                    </div>
+
+                    <div class="form-group flex flex-col gap-1">
+                        <div class="flex justify-between items-center">
+                            <label for="password" class="text-xs font-mono text-secondary">MẬT KHẨU</label>
+                        </div>
+                        <input type="password" id="password" name="password" autocomplete="current-password" required
+                               placeholder="Nhập mật khẩu"
+                               class="bg-base border border-border focus:border-cyan text-primary text-sm font-mono rounded px-3 py-2 outline-none">
+                    </div>
+
+                    <button type="submit" class="btn btn--primary font-mono font-bold mt-2" style="background-color: var(--gold); color: #000; border-color: var(--gold);">
+                        XÁC THỰC VÀO TERMINAL
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-4 border-t border-border text-center">
+                    <div class="text-xs text-muted font-mono">
+                        Xác thực HTTP-Only Cookie • Phiên làm việc được mã hóa
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-3 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
+        <div>&copy; 2026 Binance Quant Pro. All rights reserved.</div>
+        <div class="flex gap-4">
+            <a href="/risk-warning" class="hover:text-primary">Cảnh báo rủi ro</a>
+            <a href="/privacy" class="hover:text-primary">Chính sách</a>
+            <a href="/terms" class="hover:text-primary">Điều khoản</a>
+        </div>
+    </footer>
+</div>
+
+<script>
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const err = params.get('error');
+        const expired = params.get('expired');
+        const alertBox = document.getElementById('login-error-alert');
+        const alertText = document.getElementById('login-error-text');
+
+        if (err || expired) {
+            alertBox.classList.remove('hidden');
+            if (err === 'invalid') {
+                alertText.textContent = 'Tên đăng nhập hoặc mật khẩu không chính xác.';
+            } else if (err === 'missing') {
+                alertText.textContent = 'Vui lòng điền đầy đủ tên đăng nhập và mật khẩu.';
+            } else if (err === 'rate_limited') {
+                alertText.textContent = 'Đã vượt quá số lần thử đăng nhập. Vui lòng thử lại sau.';
+            } else if (expired) {
+                alertText.textContent = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
+            }
+        }
+    })();
+</script>
+{% endblock %}

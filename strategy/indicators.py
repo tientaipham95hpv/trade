@@ -15,18 +15,61 @@ class TechnicalIndicators:
 
     @staticmethod
     def calculate_rsi(series: pd.Series, period: int = 14) -> pd.Series:
-        """Tính Relative Strength Index (RSI) chuẩn Wilder"""
-        delta = series.diff()
-        gain = (delta.where(delta > 0, 0.0)).copy()
-        loss = (-delta.where(delta < 0, 0.0)).copy()
+        """Tính Relative Strength Index (RSI) chuẩn Wilder với SMA seed"""
+        vals = series.to_numpy(dtype=float)
+        n = len(vals)
+        rsi = np.full(n, 50.0, dtype=float)
+        if n < period + 1:
+            for idx in range(n):
+                if np.isnan(vals[idx]):
+                    rsi[idx] = np.nan
+            return pd.Series(rsi, index=series.index)
 
-        # Wilder's Smoothing
-        avg_gain = gain.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
+        delta = np.diff(vals)
+        seed_delta = delta[:period]
+        if np.any(np.isnan(seed_delta)):
+            gain = np.nan
+            loss = np.nan
+            rsi[period] = np.nan
+        else:
+            gain = sum(max(x, 0.0) for x in seed_delta) / period
+            loss = sum(max(-x, 0.0) for x in seed_delta) / period
+            if loss == 0 and gain > 0:
+                rsi[period] = 100.0
+            elif loss == 0 and gain == 0:
+                rsi[period] = 50.0
+            else:
+                rsi[period] = 100.0 - (100.0 / (1.0 + gain / loss))
 
-        rs = avg_gain / avg_loss.replace(0, np.nan)
-        rsi = 100.0 - (100.0 / (1.0 + rs))
-        return rsi.fillna(50.0)
+        for i in range(period, len(delta)):
+            candle_idx = i + 1
+            cur_val = vals[candle_idx]
+            if np.isnan(cur_val):
+                rsi[candle_idx] = np.nan
+            else:
+                prev_val = vals[candle_idx - 1]
+                if np.isnan(prev_val):
+                    d = 0.0
+                else:
+                    d = cur_val - prev_val
+                if np.isnan(gain) or np.isnan(loss):
+                    gain = max(d, 0.0)
+                    loss = max(-d, 0.0)
+                else:
+                    gain = (gain * (period - 1) + max(d, 0.0)) / period
+                    loss = (loss * (period - 1) + max(-d, 0.0)) / period
+                if loss == 0 and gain > 0:
+                    rsi[candle_idx] = 100.0
+                elif loss == 0 and gain == 0:
+                    rsi[candle_idx] = 50.0
+                else:
+                    rsi[candle_idx] = 100.0 - (100.0 / (1.0 + gain / loss))
+
+        for idx in range(n):
+            if np.isnan(vals[idx]):
+                rsi[idx] = np.nan
+
+        return pd.Series(rsi, index=series.index)
 
     @staticmethod
     def calculate_atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
@@ -98,7 +141,17 @@ class TechnicalIndicators:
         if df.empty or len(df) < 50:
             return df
 
+        orig_index = df.index
         df = df.copy()
+        is_sorted = False
+        had_duplicates = False
+        if "open_time" in df.columns:
+            if df["open_time"].duplicated().any():
+                had_duplicates = True
+                df = df.drop_duplicates(subset=["open_time"], keep="first")
+            df = df.sort_values("open_time")
+            is_sorted = True
+
         # Đảm bảo các cột có kiểu float
         for col in ['open', 'high', 'low', 'close', 'volume']:
             if col in df.columns:
@@ -106,7 +159,12 @@ class TechnicalIndicators:
 
         # EMA Trend
         df['ema_50'] = cls.calculate_ema(df['close'], 50)
-        df['ema_200'] = cls.calculate_ema(df['close'], 200) if len(df) >= 200 else cls.calculate_ema(df['close'], len(df) // 2)
+        df['ema_200'] = cls.calculate_ema(df['close'], 200)
+
+        # Missing input contract
+        missing_close = df['close'].isna()
+        if missing_close.any():
+            df.loc[missing_close, ['ema_50', 'ema_200']] = np.nan
 
         # RSI
         df['rsi'] = cls.calculate_rsi(df['close'], 14)
@@ -122,6 +180,12 @@ class TechnicalIndicators:
 
         # MACD
         df['macd'], df['macd_signal'], df['macd_hist'] = cls.calculate_macd(df['close'], 12, 26, 9)
+
+        if is_sorted:
+            if not had_duplicates and orig_index.isin(df.index).all():
+                df = df.reindex(orig_index)
+            else:
+                df = df.reset_index(drop=True)
 
         return df
 

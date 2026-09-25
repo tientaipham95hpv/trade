@@ -1,25 +1,72 @@
 import os
+import secrets
 from dataclasses import dataclass
 from typing import List
+
 from dotenv import load_dotenv
 
 # Tải biến môi trường từ file .env
 load_dotenv()
+
+def _explicit_ipc_token(*env_names: str) -> str:
+    """Load one principal credential without consulting service authority secrets."""
+    configured = {
+        os.getenv(name, "").strip()
+        for name in env_names
+        if os.getenv(name, "").strip()
+    }
+    if len(configured) > 1:
+        raise ValueError(f"Conflicting IPC token aliases: {', '.join(env_names)}")
+    return next(iter(configured), "")
+
+
+_WEB_USERNAME = os.getenv("WEB_USERNAME", "").strip()
+_WEB_PASSWORD = os.getenv("WEB_PASSWORD", "").strip()
+_WEB_ADMIN_CONFIGURED = bool(_WEB_USERNAME and _WEB_PASSWORD)
 
 
 BOT_VERSION = ""
 
 
 @dataclass
-class BotConfig:
+class ApplicationConfig:
     # Versioning
     app_version: str = ""
 
-    # Binance API
-    api_key: str = os.getenv("BINANCE_API_KEY", "")
-    api_secret: str = os.getenv("BINANCE_API_SECRET", "")
+    # Mode flags (Zero Binance API keys in ApplicationConfig)
     use_testnet: bool = os.getenv("USE_TESTNET", "True").lower() == "true"
     dry_run: bool = os.getenv("DRY_RUN", "True").lower() == "true"
+    # Canonical deployment mode. Legacy callers may derive it unless strict startup is requested.
+    trader_environment: str = os.getenv("TRADER_ENVIRONMENT", "").strip().upper()
+    require_explicit_environment: bool = os.getenv(
+        "REQUIRE_EXPLICIT_TRADER_ENVIRONMENT", "False"
+    ).lower() == "true"
+    market_data_environment: str = os.getenv(
+        "MARKET_DATA_ENVIRONMENT", "PRODUCTION"
+    ).strip().upper()
+
+    # Execution Service IPC Settings
+    execution_service_host: str = os.getenv("EXECUTION_SERVICE_HOST", "127.0.0.1")
+    execution_service_port: int = int(os.getenv("EXECUTION_SERVICE_PORT", "50051"))
+    execution_service_timeout: float = float(os.getenv("EXECUTION_SERVICE_TIMEOUT", "10.0"))
+
+    # Dedicated IPC Principal Credentials (Canonical Shared Specification)
+    ipc_token_strategy: str = _explicit_ipc_token(
+        "IPC_TOKEN_STRATEGY", "IPC_TOKEN_STRATEGY_CLIENT"
+    )
+    ipc_token_web: str = _explicit_ipc_token("IPC_TOKEN_WEB", "IPC_TOKEN_WEB_CLIENT")
+    ipc_token_telegram: str = _explicit_ipc_token(
+        "IPC_TOKEN_TELEGRAM", "IPC_TOKEN_TELEGRAM_CLIENT"
+    )
+    ipc_token_webhook: str = _explicit_ipc_token(
+        "IPC_TOKEN_WEBHOOK", "IPC_TOKEN_WEBHOOK_CLIENT"
+    )
+    ipc_token_operator: str = _explicit_ipc_token(
+        "IPC_TOKEN_OPERATOR", "IPC_TOKEN_OPERATOR_CLIENT"
+    )
+    ipc_token_copytrade: str = _explicit_ipc_token(
+        "IPC_TOKEN_COPYTRADE", "IPC_TOKEN_COPYTRADE_CLIENT"
+    )
 
     # Capital & Risk Management
     sizing_mode: str = os.getenv("SIZING_MODE", "risk_percent").lower()
@@ -44,12 +91,25 @@ class BotConfig:
     log_file: str = os.getenv("LOG_FILE", "bot.log")
 
     # Web Dashboard & Security
-    enable_web: bool = os.getenv("ENABLE_WEB", "True").lower() == "true"
+    enable_web: bool = os.getenv("ENABLE_WEB", "False").lower() == "true"
     web_port: int = int(os.getenv("WEB_PORT", "8088"))
     web_auth_enabled: bool = os.getenv("WEB_AUTH_ENABLED", "True").lower() == "true"
-    web_username: str = os.getenv("WEB_USERNAME", "admin")
-    web_password: str = os.getenv("WEB_PASSWORD", "admin123456")
+    web_admin_configured: bool = _WEB_ADMIN_CONFIGURED
+    web_username: str = _WEB_USERNAME or f"unconfigured-{secrets.token_urlsafe(24)}"
+    web_password: str = _WEB_PASSWORD or f"unconfigured-{secrets.token_urlsafe(32)}"
+    web_allowed_origins: str = os.getenv(
+        "WEB_ALLOWED_ORIGINS", "https://trader.noza.site"
+    )
+    web_expose_api_docs: bool = os.getenv("WEB_EXPOSE_API_DOCS", "False").lower() == "true"
+    web_login_rate_limit: int = int(os.getenv("WEB_LOGIN_RATE_LIMIT", "20"))
+    web_login_rate_window_seconds: int = int(os.getenv("WEB_LOGIN_RATE_WINDOW_SECONDS", "300"))
 
+    # Copy-trading security material is explicit. Consumers fail closed while blank.
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "").strip()
+    copytrade_encryption_key: str = os.getenv("COPYTRADE_ENCRYPTION_KEY", "").strip()
+    profit_share_percent: float = float(os.getenv("PROFIT_SHARE_PERCENT", "25.0"))
+    binance_partner_url: str = os.getenv("BINANCE_PARTNER_URL", "https://trader.noza.site/")
+    copytrade_enabled: bool = os.getenv("COPYTRADE_ENABLED", "False").lower() == "true"
     # Server Watchdog & Daily Backup
     watchdog_interval_seconds: int = int(os.getenv("WATCHDOG_INTERVAL_SECONDS", "60"))
     enable_daily_backup: bool = os.getenv("ENABLE_DAILY_BACKUP", "True").lower() == "true"
@@ -95,6 +155,7 @@ class BotConfig:
     telegram_enabled: bool = os.getenv("TELEGRAM_ENABLED", "False").lower() == "true"
     telegram_bot_token: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     telegram_chat_id: str = os.getenv("TELEGRAM_CHAT_ID", "")
+    telegram_authorized_pairs: str = os.getenv("TELEGRAM_AUTHORIZED_PAIRS", "")
 
     # AI Copilot & Trade Auditor (Dual Engine: DeepSeek V4.1 Flash via TokenHarbor & Google Gemini 2.5 Flash)
     ai_enabled: bool = os.getenv("AI_ENABLED", "True").lower() == "true"
@@ -121,7 +182,56 @@ class BotConfig:
     enable_circuit_breaker: bool = os.getenv("ENABLE_CIRCUIT_BREAKER", "True").lower() == "true"
     circuit_breaker_max_daily_loss: float = float(os.getenv("CIRCUIT_BREAKER_MAX_DAILY_LOSS", "30.0"))  # USDT ($30 or 3%)
     circuit_breaker_cooldown_hours: int = int(os.getenv("CIRCUIT_BREAKER_COOLDOWN_HOURS", "12"))
-    webhook_passphrase: str = os.getenv("WEBHOOK_PASSPHRASE", "quant_pro_secret_2026")
+    webhook_passphrase: str = os.getenv("WEBHOOK_PASSPHRASE", "").strip()
+
+    def validate_security_configuration(self) -> None:
+        """Validate secrets only at startup boundaries so tooling imports remain side-effect free."""
+        selected_environment = self.trader_environment
+        if not selected_environment:
+            if self.require_explicit_environment:
+                raise RuntimeError("TRADER_ENVIRONMENT must be explicitly configured")
+            selected_environment = (
+                "OFFLINE" if self.dry_run else ("TESTNET" if self.use_testnet else "LIVE")
+            )
+            self.trader_environment = selected_environment
+        if selected_environment not in {"OFFLINE", "TESTNET", "LIVE"}:
+            raise RuntimeError("TRADER_ENVIRONMENT must be OFFLINE, TESTNET, or LIVE")
+        if selected_environment == "OFFLINE" and not self.dry_run:
+            raise RuntimeError("OFFLINE mode requires DRY_RUN=True")
+        if selected_environment == "TESTNET" and (self.dry_run or not self.use_testnet):
+            raise RuntimeError("TESTNET mode requires DRY_RUN=False and USE_TESTNET=True")
+        if selected_environment == "LIVE" and (self.dry_run or self.use_testnet):
+            raise RuntimeError("LIVE mode requires DRY_RUN=False and USE_TESTNET=False")
+        if self.market_data_environment not in {"PRODUCTION", "TESTNET"}:
+            raise RuntimeError("MARKET_DATA_ENVIRONMENT must be PRODUCTION or TESTNET")
+        if self.enable_web:
+            if not self.web_admin_configured:
+                raise RuntimeError(
+                    "Enabled web administration requires explicit WEB_USERNAME and WEB_PASSWORD"
+                )
+            if len(self.jwt_secret_key) < 32:
+                raise RuntimeError("Enabled web administration requires an explicit 32-character JWT_SECRET_KEY")
+            if len(self.copytrade_encryption_key) < 32:
+                raise RuntimeError(
+                    "Enabled web administration requires an explicit external COPYTRADE_ENCRYPTION_KEY"
+                )
+            try:
+                from cryptography.fernet import Fernet
+
+                Fernet(self.copytrade_encryption_key.encode("ascii"))
+            except (TypeError, ValueError):
+                raise RuntimeError(
+                    "COPYTRADE_ENCRYPTION_KEY must be an explicit valid Fernet key"
+                ) from None
+        if self.webhook_passphrase and len(self.webhook_passphrase) < 21:
+            raise RuntimeError("WEBHOOK_PASSPHRASE must contain at least 21 characters")
+        if self.jwt_secret_key and len(self.jwt_secret_key) < 32:
+            raise RuntimeError("JWT_SECRET_KEY must contain at least 32 characters")
+
+    def __post_init__(self):
+        # Any application configuration instantiation disarms inherited service authority.
+        os.environ.pop("EXECUTION_SERVICE_PROCESS", None)
+        self.validate_security_configuration()
 
     @property
     def symbol_list(self) -> List[str]:
@@ -130,4 +240,36 @@ class BotConfig:
         return [s.strip().upper() for s in self.target_symbols.split(",") if s.strip()]
 
 
-config = BotConfig()
+@dataclass
+class BotConfig(ApplicationConfig):
+    """Compatibility alias for ApplicationConfig.
+    Structurally contains ZERO trading secrets (no api_key, no api_secret).
+    """
+    def __post_init__(self):
+        # Application processes must never inherit execution-store authority.
+        os.environ.pop("EXECUTION_SERVICE_PROCESS", None)
+        self.validate_security_configuration()
+
+
+@dataclass
+class ExecutionServiceConfig(ApplicationConfig):
+    """Configuration for Execution Service Process.
+    Sole component permitted to load Binance trading credentials.
+    """
+    api_key: str = ""
+    api_secret: str = ""
+    execution_db_path: str = os.getenv("EXECUTION_DB_PATH", "bot_state.json.db")
+    ipc_token_internal: str = _explicit_ipc_token(
+        "IPC_TOKEN_INTERNAL", "IPC_TOKEN_INTERNAL_SERVICE"
+    )
+    def __post_init__(self):
+        if not self.api_key:
+            self.api_key = os.getenv("BINANCE_API_KEY", "").strip()
+        if not self.api_secret:
+            self.api_secret = os.getenv("BINANCE_API_SECRET", "").strip()
+        if not self.dry_run and (not self.api_key or not self.api_secret):
+            raise RuntimeError("Live Execution Service requires explicit Binance credentials")
+        self.validate_security_configuration()
+
+
+config = None if os.environ.get("EXECUTION_SERVICE_PROCESS") == "1" else BotConfig()

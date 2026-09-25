@@ -1,0 +1,385 @@
+{
+  "release_candidate_id": "UI_V2_RC1",
+  "total_files": 63,
+  "manifest_digest": "042817ef5b0840366464d1f6618f12360ec2b171e87ca3801e8e0f773fa1ccc8",
+  "files": [
+    {
+      "path": "config/settings.py",
+      "sha256": "ea8ba482d7bfe8af4402531cb3701dfc1f61e2f94d3a3706f11fe7ce8852dea2",
+      "category": "configuration",
+      "size_bytes": 15341
+    },
+    {
+      "path": "ios-app/lib/ui_v2/models/activity_view.dart",
+      "sha256": "8b6ffad9dd7feda7ab5cbe2ed31d0561a1629ce7ee475091e9a0391025dc0a46",
+      "category": "flutter_source",
+      "size_bytes": 2836
+    },
+    {
+      "path": "ios-app/lib/ui_v2/models/position_view.dart",
+      "sha256": "412b62da4d9aa16ebefc9bf7370a90d47c417eabc1a77805f19ad096a2467b39",
+      "category": "flutter_source",
+      "size_bytes": 3839
+    },
+    {
+      "path": "ios-app/lib/ui_v2/models/risk_view.dart",
+      "sha256": "6b6d818947c5b9af4049153412e7f798e874a9c3278ff7d0c5436af524404be7",
+      "category": "flutter_source",
+      "size_bytes": 1822
+    },
+    {
+      "path": "ios-app/lib/ui_v2/models/system_status.dart",
+      "sha256": "99d872871252ed6becb4c8af02c24d1c42b7c1876bf09222a5906c6365285b4a",
+      "category": "flutter_source",
+      "size_bytes": 4174
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/home_screen.dart",
+      "sha256": "e74a3db09d15a511372277ac7a903687d3c1424e9e9dfdb6f69319312faf9109",
+      "category": "flutter_source",
+      "size_bytes": 9698
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/login_screen.dart",
+      "sha256": "cf69862784cedb1e4856aa9c61219a8768c7499a161f7cec93c9361138a0ac7b",
+      "category": "flutter_source",
+      "size_bytes": 12639
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/overview_tab.dart",
+      "sha256": "50fcb4d33c6890c0c90676a4da7059fff09c4c77683882e519a7dfc717efb0bf",
+      "category": "flutter_source",
+      "size_bytes": 13636
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/position_detail_sheet.dart",
+      "sha256": "2f9e2e01a171cc1fe5c83af8a29a3d470764d5a0514c13ac2a5a9469c863d211",
+      "category": "flutter_source",
+      "size_bytes": 7959
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/positions_tab.dart",
+      "sha256": "4aa8954f68b299acc77b097618d1536d460477418cf7e855f699c22643909f3d",
+      "category": "flutter_source",
+      "size_bytes": 9500
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/risk_tab.dart",
+      "sha256": "c428df101422b9f4ea9ff17d7a77c30b88001c5c55bbf0c0c10558827648e0ff",
+      "category": "flutter_source",
+      "size_bytes": 14662
+    },
+    {
+      "path": "ios-app/lib/ui_v2/screens/system_tab.dart",
+      "sha256": "9a3d443e6b0c2c4a78a1960becc20184eea82c16402eb6c1c7cacc656e9096d0",
+      "category": "flutter_source",
+      "size_bytes": 10008
+    },
+    {
+      "path": "ios-app/lib/ui_v2/services/auth_store.dart",
+      "sha256": "beab1055777c3aa5d9c48d452fe4f72befdbc104c025768f30c0508c0463afb1",
+      "category": "flutter_source",
+      "size_bytes": 3751
+    },
+    {
+      "path": "ios-app/lib/ui_v2/services/polling_controller.dart",
+      "sha256": "b088790b2b4c0b1ccce976a2374f40e5dcccd52bd4666126d9059f3b518ecad8",
+      "category": "flutter_source",
+      "size_bytes": 4769
+    },
+    {
+      "path": "ios-app/lib/ui_v2/services/quant_api_client.dart",
+      "sha256": "2e9486f87fce627ea837e0084d5cf9c94f19094eeee5365fec9a9288d74854b3",
+      "category": "flutter_source",
+      "size_bytes": 12405
+    },
+    {
+      "path": "ios-app/lib/ui_v2/theme/quant_colors.dart",
+      "sha256": "150d02d6341485cbd9eb153fb7a013959a473e381835d79a5974f6c9975c9239",
+      "category": "flutter_source",
+      "size_bytes": 2116
+    },
+    {
+      "path": "ios-app/lib/ui_v2/theme/quant_spacing.dart",
+      "sha256": "e0f1a6ba9cae0b0475eac6cfc372979e9d69ed961fb80641d51748efa2cdeacc",
+      "category": "flutter_source",
+      "size_bytes": 1381
+    },
+    {
+      "path": "ios-app/lib/ui_v2/theme/quant_theme.dart",
+      "sha256": "45fb2645d6098386319ec675df78a8715f881dbe397a18183bb4495b8fe754f3",
+      "category": "flutter_source",
+      "size_bytes": 2184
+    },
+    {
+      "path": "ios-app/lib/ui_v2/theme/quant_typography.dart",
+      "sha256": "3fb742e8dc6e681451dd527cd7cece13d96c50f90dc6fa48396dccf0fbcb52d4",
+      "category": "flutter_source",
+      "size_bytes": 2053
+    },
+    {
+      "path": "ios-app/lib/ui_v2/utils/quant_formatters.dart",
+      "sha256": "037100a51e7c7fd543e63923530f32325671fcc8ae8df5d72e645443c6d79938",
+      "category": "flutter_source",
+      "size_bytes": 2966
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/environment_badge.dart",
+      "sha256": "98d93223eb3735e239cee556ec60d27e33ebd7621470086f65119197c6a7ac8f",
+      "category": "flutter_source",
+      "size_bytes": 2433
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_confirm_sheet.dart",
+      "sha256": "5ffe39a384b540ef4b9f9cfb1915bfd7a5274380e8345f5981850c1c35726293",
+      "category": "flutter_source",
+      "size_bytes": 7220
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_empty_state.dart",
+      "sha256": "a9d8d8d60a00e564dc69e8c007e0310fd6a7d206f2282c2e85b5c55de643dedc",
+      "category": "flutter_source",
+      "size_bytes": 1855
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_loading.dart",
+      "sha256": "0e26ff5064952147642414d878b4138433d0c9f016707c1c1669b59d987cbfdf",
+      "category": "flutter_source",
+      "size_bytes": 1224
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_metric.dart",
+      "sha256": "d911ffa0316888a9d00930565217060e5ffe8026ef2a0f9cd8be548cd165f2d0",
+      "category": "flutter_source",
+      "size_bytes": 3714
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_panel.dart",
+      "sha256": "6bb2961e9c6f36056d6c389d93a30882e84a6cd8acf6be381541b56f1e333193",
+      "category": "flutter_source",
+      "size_bytes": 3871
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_risk_banner.dart",
+      "sha256": "cf2ea3d6ccdeabf83ab1534b4909a39249b2ba95e0dcd47f0217b362a795fac1",
+      "category": "flutter_source",
+      "size_bytes": 2854
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_section_header.dart",
+      "sha256": "b60dd584a4c4a745659e22053ad117f67377b65e0ea52bef31d3cab98d8fba8f",
+      "category": "flutter_source",
+      "size_bytes": 1670
+    },
+    {
+      "path": "ios-app/lib/ui_v2/widgets/quant_status_badge.dart",
+      "sha256": "8ee628e238292e289acefdf46ab8c6a1382a3205ae6d4ec1d579068b4479e1f7",
+      "category": "flutter_source",
+      "size_bytes": 2512
+    },
+    {
+      "path": "ios-app/test/ui_v2_phase3_test.dart",
+      "sha256": "fd7f5bd25489a9d11443536b20246db984929220e79c2ddd161e85e3daa573fd",
+      "category": "tests_flutter",
+      "size_bytes": 16471
+    },
+    {
+      "path": "ios-app/test/ui_v2_phase4_test.dart",
+      "sha256": "6b91f34c1eb0cd0b4cfc5304d51374e72c0fe182d86e9968ac3b26e4cdc86e3f",
+      "category": "tests_flutter",
+      "size_bytes": 11407
+    },
+    {
+      "path": "ios-app/test/ui_v2_phase5_rc_test.dart",
+      "sha256": "c24f60048e7a466b036f13e2ddc066a68480bf4af1811f18a0c8a8c38dacf6ca",
+      "category": "tests_flutter",
+      "size_bytes": 9835
+    },
+    {
+      "path": "tests/test_ui_v2_foundation.py",
+      "sha256": "c06f14007b9ff81d5c24e855574d2a2358b52f03456be42b8928141d91a61936",
+      "category": "tests_python",
+      "size_bytes": 4859
+    },
+    {
+      "path": "tests/test_ui_v2_phase4_operator.py",
+      "sha256": "0c6e178615f00f861681b5279441fbd1d7ee907808a3526ecc9116eaea2a3180",
+      "category": "tests_python",
+      "size_bytes": 10730
+    },
+    {
+      "path": "tests/test_ui_v2_phase5_rc.py",
+      "sha256": "dca7e08b8293667cf26c8e9b2a5efb8e0cf8e88231a0fa2a0190dbc0b1113d91",
+      "category": "tests_python",
+      "size_bytes": 12147
+    },
+    {
+      "path": "tests/test_ui_v2_web.py",
+      "sha256": "6a36d9329ebe1619afa0bf01d31fdbb5ae05b5565cee814a3041bb7cef81a753",
+      "category": "tests_python",
+      "size_bytes": 8333
+    },
+    {
+      "path": "web/app.py",
+      "sha256": "d598bfc5f0d0776193b119d69b2329a611a19cd1c776b650f753d6c39bcfefd4",
+      "category": "web_application",
+      "size_bytes": 516756
+    },
+    {
+      "path": "web/static/ui_v2/base.css",
+      "sha256": "b349c4c724c1acbebd9aa2d8ac580236d5dde6ea7a087ece7856561217b8e694",
+      "category": "web_static",
+      "size_bytes": 2839
+    },
+    {
+      "path": "web/static/ui_v2/components.css",
+      "sha256": "cd28f8159b43349fbc50f4220b72034e0d79d877a9dfd676f5b487339f9c90d8",
+      "category": "web_static",
+      "size_bytes": 17993
+    },
+    {
+      "path": "web/static/ui_v2/js/activity.js",
+      "sha256": "58f30f11d92547c073a8e9e201941ef4ba38f62e0d8f52a364b65a6168f5ea66",
+      "category": "web_static",
+      "size_bytes": 4764
+    },
+    {
+      "path": "web/static/ui_v2/js/api.js",
+      "sha256": "bb220721741ffae3bccf0bc9ecff086dc3ffc6c10393768f3f966e2b4313a642",
+      "category": "web_static",
+      "size_bytes": 2521
+    },
+    {
+      "path": "web/static/ui_v2/js/dashboard.js",
+      "sha256": "0a234a2e911afe1985bacde4f9374e937811ba89444ed9ca007e304601148979",
+      "category": "web_static",
+      "size_bytes": 6744
+    },
+    {
+      "path": "web/static/ui_v2/js/formatters.js",
+      "sha256": "73810e9fec36fe730d374469024f9405e80c739d7cd49a58d5859a0dedffddb7",
+      "category": "web_static",
+      "size_bytes": 3842
+    },
+    {
+      "path": "web/static/ui_v2/js/overview.js",
+      "sha256": "c5af194aae98dfdb282e7262286c07532a50512281a017a73bbc515a505208fd",
+      "category": "web_static",
+      "size_bytes": 14656
+    },
+    {
+      "path": "web/static/ui_v2/js/polling.js",
+      "sha256": "f2905fe785a3b60a714beb4ed06acbd8e7b4fc69af7be71afd432f93a2af4628",
+      "category": "web_static",
+      "size_bytes": 4738
+    },
+    {
+      "path": "web/static/ui_v2/js/positions.js",
+      "sha256": "c5402acba681b0379144c99bec74c4ede8fa3b8255647465acb9e57b137a1c35",
+      "category": "web_static",
+      "size_bytes": 10943
+    },
+    {
+      "path": "web/static/ui_v2/js/risk.js",
+      "sha256": "340eae3c394fb7838165d712b7f667ad0bdf330600337eb4bb9d26a373d4f3b4",
+      "category": "web_static",
+      "size_bytes": 14993
+    },
+    {
+      "path": "web/static/ui_v2/js/state.js",
+      "sha256": "5719b877693f1b0ebc89b27cc569b1572c6c39fead701ce8e9d215d5e17fea9f",
+      "category": "web_static",
+      "size_bytes": 1499
+    },
+    {
+      "path": "web/static/ui_v2/js/system.js",
+      "sha256": "0938505bbc018ce38d14f72cca29fd2991d497cdddbd63ac866219adf83f1b51",
+      "category": "web_static",
+      "size_bytes": 10303
+    },
+    {
+      "path": "web/static/ui_v2/layout.css",
+      "sha256": "bac737ebed8752363fad6fb1ca1a6826a476103416021d09eb558e0e4e201be6",
+      "category": "web_static",
+      "size_bytes": 4754
+    },
+    {
+      "path": "web/static/ui_v2/obsidian_quants.css",
+      "sha256": "954234abeda087625fad92ab509e16b35c6d9458a2f7be0d0761deb1573b3265",
+      "category": "web_static",
+      "size_bytes": 256
+    },
+    {
+      "path": "web/static/ui_v2/responsive.css",
+      "sha256": "98557cf74666a42523fdf0c74a1090eef67d6d3b8c994b697862ce466fd3647a",
+      "category": "web_static",
+      "size_bytes": 3021
+    },
+    {
+      "path": "web/static/ui_v2/tokens.css",
+      "sha256": "e39eaa2a1196e8e1ea8271e9db987e21c342f9ba7dfe19dcce1279e6be5a74d5",
+      "category": "web_static",
+      "size_bytes": 2592
+    },
+    {
+      "path": "web/templates/ui_v2/base.html",
+      "sha256": "b2c6d3026c4edf09c18df5a16fbf6ba781a80f5096bbfd05f60c848f51ca243c",
+      "category": "web_templates",
+      "size_bytes": 1018
+    },
+    {
+      "path": "web/templates/ui_v2/dashboard.html",
+      "sha256": "d8276b13f56113e2212a8452a04ee75d0ca7abcdc67fe499685ae67bf7922e62",
+      "category": "web_templates",
+      "size_bytes": 2849
+    },
+    {
+      "path": "web/templates/ui_v2/landing.html",
+      "sha256": "79b527b8778f3b584e915c923fecc908f6ac74084c243afd28e8b4d28bde67b8",
+      "category": "web_templates",
+      "size_bytes": 5163
+    },
+    {
+      "path": "web/templates/ui_v2/login.html",
+      "sha256": "79a1013835d7c59eb7eaacb5ab2eaa261fdd3f5e7e074e33dc7233a6dd0bfc55",
+      "category": "web_templates",
+      "size_bytes": 5659
+    },
+    {
+      "path": "web/templates/ui_v2/partials/navigation.html",
+      "sha256": "da06fc067a5f60c5ae05526649c474fcd0ff65efae721ab2258d2c4c35bb93f2",
+      "category": "web_templates",
+      "size_bytes": 1437
+    },
+    {
+      "path": "web/templates/ui_v2/partials/telemetry_bar.html",
+      "sha256": "552e38390f645266e5e41b625c34be860909e01886b0225362e06a889d3d17c4",
+      "category": "web_templates",
+      "size_bytes": 2206
+    },
+    {
+      "path": "web/templates/ui_v2/privacy.html",
+      "sha256": "6910abd90e8aeb7e52794b3fe7c7a6fc2d4678423f1c46bd523e89a11410f9d8",
+      "category": "web_templates",
+      "size_bytes": 3434
+    },
+    {
+      "path": "web/templates/ui_v2/risk_warning.html",
+      "sha256": "72b6973461ad86908c11ebbbe951953765f04f2ebeb75037bb9a05593390afc8",
+      "category": "web_templates",
+      "size_bytes": 3441
+    },
+    {
+      "path": "web/templates/ui_v2/terms.html",
+      "sha256": "6891fe1d03f58f43517fb2d898666781fb48ee7f14b407328ab51f6c0d5bd6e3",
+      "category": "web_templates",
+      "size_bytes": 3561
+    },
+    {
+      "path": "web/view_models.py",
+      "sha256": "6455a22630cee23b9253a6a1d11c012593e031fe3ba6ea26d30eb0731801f4cb",
+      "category": "web_application",
+      "size_bytes": 4188
+    }
+  ]
+}

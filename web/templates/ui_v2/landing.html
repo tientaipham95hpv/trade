@@ -1,0 +1,97 @@
+{% extends "ui_v2/base.html" %}
+
+{% block title %}Binance Quant Pro — Institutional Quant Trading & Risk Terminal{% endblock %}
+
+{% block body %}
+<div class="terminal-shell min-h-screen flex flex-col justify-between">
+    <!-- Top Telemetry Header -->
+    <header class="top-telemetry-bar">
+        <div class="top-telemetry-left">
+            <a href="/" class="top-telemetry-brand">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F0B90B" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <span class="text-gold font-bold">BINANCE QUANT PRO</span>
+            </a>
+            <span class="env-badge env-badge--offline">OFFLINE_SANDBOX</span>
+        </div>
+        <div class="top-telemetry-right">
+            <a href="/portal/login" class="btn btn--outline btn--sm font-mono text-xs">
+                CỔNG VẬN HÀNH (PORTAL)
+            </a>
+        </div>
+    </header>
+
+    <!-- Hero & Architecture -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-6 my-auto">
+        <div class="text-center max-w-3xl mx-auto mb-10">
+            <div class="badge-subtle font-mono text-cyan mb-3">INSTITUTIONAL QUANT SYSTEM V2</div>
+            <h1 class="text-3xl sm:text-4xl font-black text-primary tracking-tight mb-4">
+                Hệ Thống Giao Dịch Định Lượng & Quản Trị Rủi Ro Cấp Độ Tổ Chức
+            </h1>
+            <p class="text-secondary text-sm sm:text-base leading-relaxed">
+                Kiến trúc cô lập quy trình đa tầng với Execution Core độc lập, ngắt mạch tự động fail-closed, và giám sát vận hành thời gian thực.
+            </p>
+            <div class="mt-6 flex justify-center gap-4">
+                <a href="/portal/login" class="btn btn--primary font-mono font-bold" style="background-color: var(--gold); color: #000; border-color: var(--gold);">
+                    TRUY CẬP CỔNG GIÁM SÁT
+                </a>
+                <a href="/risk-warning" class="btn btn--outline font-mono text-xs">
+                    CẢNH BÁO RỦI RO
+                </a>
+            </div>
+        </div>
+
+        <!-- 3 Pillars Grid -->
+        <div class="terminal-grid-12">
+            <div class="col-span-4">
+                <div class="terminal-panel h-full">
+                    <div class="panel-header">
+                        <span class="panel-title">FROZEN EXECUTION CORE</span>
+                        <span class="status-badge status-badge--healthy font-mono">CERTIFIED</span>
+                    </div>
+                    <div class="panel-body text-xs text-secondary leading-relaxed">
+                        Lõi thực thi deterministic được mã hóa và xác thực toàn vẹn 15/15 file checksum. Đảm bảo trạng thái lệnh, Stop Loss và Take Profit bất biến trước mọi sự cố mạng.
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-4">
+                <div class="terminal-panel h-full">
+                    <div class="panel-header">
+                        <span class="panel-title">CIRCUIT BREAKER BẢO TOÀN</span>
+                        <span class="status-badge status-badge--healthy font-mono">FAIL-CLOSED</span>
+                    </div>
+                    <div class="panel-body text-xs text-secondary leading-relaxed">
+                        Tự động ngắt toàn bộ hoạt động giao dịch khi chạm giới hạn lỗ hàng ngày hoặc chuỗi lệnh lỗ liên tiếp. Cơ chế CAS generation ngăn chặn mọi hành vi resume trái phép.
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-span-4">
+                <div class="terminal-panel h-full">
+                    <div class="panel-header">
+                        <span class="panel-title">BẢO MẬT PHI LƯU KÝ</span>
+                        <span class="status-badge status-badge--healthy font-mono">ZERO CREDENTIAL</span>
+                    </div>
+                    <div class="panel-body text-xs text-secondary leading-relaxed">
+                        Ứng dụng Web hoàn toàn không lưu trữ Binance API Key hay Secret. Quyền truy cập được xác thực qua HttpOnly Cookie và kiến trúc loopback IPC an toàn.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-4 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
+        <div>&copy; 2026 Binance Quant Pro. OFFLINE EXECUTION CORE ACCEPTED.</div>
+        <div class="flex gap-4">
+            <a href="/risk-warning" class="hover:text-primary">Cảnh báo rủi ro</a>
+            <a href="/privacy" class="hover:text-primary">Chính sách</a>
+            <a href="/terms" class="hover:text-primary">Điều khoản</a>
+        </div>
+    </footer>
+</div>
+{% endblock %}

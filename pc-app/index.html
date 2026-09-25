@@ -543,11 +543,11 @@
       <div class="space-y-3 text-xs font-mono">
         <div>
           <label class="text-gray-400 block mb-1">Tên đăng nhập quản trị:</label>
-          <input type="text" id="loginUsername" value="admin" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
+          <input type="text" id="loginUsername" value="" autocomplete="username" placeholder="Tên quản trị đã bootstrap" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div>
           <label class="text-gray-400 block mb-1">Mật khẩu quản trị:</label>
-          <input type="password" id="loginPassword" value="admin123456" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
+          <input type="password" id="loginPassword" value="" autocomplete="current-password" placeholder="Mật khẩu quản trị đã bootstrap" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div id="loginErrorMsg" class="text-lossRed text-[11px] hidden"></div>
       </div>
@@ -574,10 +574,6 @@
         <div>
           <label class="text-gray-400 block mb-1">Địa chỉ máy chủ VPS (Server URL):</label>
           <input type="text" id="cfgServerUrl" value="https://trader.noza.site" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
-        </div>
-        <div>
-          <label class="text-gray-400 block mb-1">Mã xác thực phiên (Auth Token / Password):</label>
-          <input type="password" id="cfgAuthToken" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div class="pt-2 space-y-2 border-t border-darkBorder">
           <label class="flex items-center space-x-2 cursor-pointer">

@@ -6,6 +6,9 @@ import logging
 import threading
 import html
 import re
+import secrets
+import hashlib
+import hmac
 from typing import Optional, Any, Dict, List
 import requests
 from config.settings import BotConfig
@@ -39,6 +42,12 @@ class TelegramNotifier:
         raw_chats = str(config.telegram_chat_id).replace(";", ",").split(",")
         self.authorized_chat_ids = [c.strip() for c in raw_chats if c.strip()]
         self.chat_id = self.authorized_chat_ids[0] if self.authorized_chat_ids else ""
+        pair_config = getattr(config, "telegram_authorized_pairs", "") or os.getenv(
+            "TELEGRAM_AUTHORIZED_PAIRS", ""
+        )
+        self.authorized_command_pairs = self._parse_authorized_pairs(
+            pair_config, self.authorized_chat_ids
+        )
         self.base_url = f"https://api.telegram.org/bot{self.bot_token}"
 
         self.bot_controller = None
@@ -46,79 +55,242 @@ class TelegramNotifier:
         self._is_listening = False
         self._last_update_id = 0
         self._live_alert_sent = False
+        self._pending_manual_signals: Dict[str, Dict[str, Any]] = {}
+        self._pending_manual_signals_lock = threading.Lock()
+        self._proposal_signing_key = secrets.token_bytes(32)
+        self._manual_signal_ttl_seconds = 900
+        self._halt_generation: Optional[int] = None
+
+    @staticmethod
+    def _parse_authorized_pairs(raw_pairs: Any, legacy_chat_ids: List[str]) -> set:
+        """Parse sender:chat bindings; legacy IDs remain private-chat bindings only."""
+        pairs = {(chat_id, chat_id) for chat_id in legacy_chat_ids}
+        for item in str(raw_pairs or "").replace(";", ",").split(","):
+            item = item.strip()
+            separator = ":" if ":" in item else ("@" if "@" in item else None)
+            if not separator:
+                continue
+            sender_id, chat_id = (part.strip() for part in item.split(separator, 1))
+            if sender_id and chat_id:
+                pairs.add((sender_id, chat_id))
+        return pairs
+
+    def _is_authorized_command(self, sender_id: str, chat_id: str) -> bool:
+        return (str(sender_id).strip(), str(chat_id).strip()) in self.authorized_command_pairs
+
+    @staticmethod
+    def _halt_generation_from(value: Any) -> Optional[int]:
+        data = value.data if hasattr(value, "data") else value
+        if not isinstance(data, dict):
+            return None
+        generation = data.get("halt_generation", data.get("generation"))
+        if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+            return None
+        return generation
+    @classmethod
+    def _authoritative_halt_state(cls, status: Any) -> Dict[str, Any]:
+        if not isinstance(status, dict) or not status.get("success"):
+            return {
+                "classification": "SERVICE_UNAVAILABLE",
+                "state": "UNKNOWN",
+                "reason": "Execution Service status unavailable",
+                "generation": None,
+                "resume_allowed": False,
+            }
+        state = str(status.get("state", "UNKNOWN")).upper()
+        reason = str(status.get("halt_reason") or "")
+        generation = cls._halt_generation_from(status)
+        if status.get("recovery_required") is True:
+            classification = "NON_RESUMABLE_HALT"
+        elif status.get("global_halt") is False:
+            classification = "NO_ACTIVE_HALT"
+        elif status.get("global_halt") is not True or state != "HALTED":
+            classification = "STATUS_INCONSISTENT"
+        elif generation is None:
+            classification = "ACTIVE_HALT_GENERATION_MISSING"
+        else:
+            classification = "ACTIVE_OPERATOR_HALT"
+        return {
+            "classification": classification,
+            "state": state,
+            "reason": reason,
+            "generation": generation,
+            "resume_allowed": classification == "ACTIVE_OPERATOR_HALT",
+        }
+
+
+    @staticmethod
+    def _strict_positive_number(value: Any, field: str) -> float:
+        from core.execution.validation import finite_float
+
+        if isinstance(value, str) and not re.fullmatch(
+            r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", value.strip()
+        ):
+            raise ValueError(f"{field} is not a strict decimal")
+        return finite_float(value, field, positive=True)
+
+    def _proposal_digest(self, proposal: Dict[str, Any]) -> str:
+        bound = {key: proposal[key] for key in sorted(proposal) if key != "binding_digest"}
+        payload = json.dumps(bound, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+        return hmac.new(self._proposal_signing_key, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def _consume_manual_proposal(
+        self, proposal_id: str, principal: str, chat_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Validate and consume exactly once while holding the proposal lock."""
+        now = time.time()
+        with self._pending_manual_signals_lock:
+            proposal = self._pending_manual_signals.get(proposal_id)
+            if not proposal:
+                return None
+            supplied = str(proposal.get("binding_digest", ""))
+            valid = (
+                now <= proposal.get("expires_at", 0.0)
+                and proposal.get("principal") == principal
+                and proposal.get("chat_id") == chat_id
+                and bool(supplied)
+                and hmac.compare_digest(supplied, self._proposal_digest(proposal))
+            )
+            if not valid:
+                return None
+            return self._pending_manual_signals.pop(proposal_id)
+
+    def _is_offline_mode(self) -> bool:
+        return str(getattr(self.config, "trader_environment", "")).upper() == "OFFLINE"
+
+    @staticmethod
+    def _offline_message_allowed(command: str, normalized: str) -> bool:
+        slash_command = command.split(maxsplit=1)[0]
+        if slash_command in {
+            "/start", "/help", "/menu", "/app", "/terminal", "/webapp",
+            "/status", "/positions", "/health", "/system", "/livecheck",
+            "/pause", "/resume", "/closeall",
+        }:
+            return True
+        return command in {
+            "menu", "help", "trợ giúp", "bắt đầu", "web terminal", "app",
+            "mini app", "terminal", "trạng thái", "status", "pnl", "xem pnl",
+            "số dư", "tiền", "vị thế đang mở", "vị thế", "positions", "lệnh",
+            "sức khỏe vps", "sức khỏe", "health", "vps", "ram", "cpu",
+            "kiểm tra api", "livecheck", "kiểm tra", "tạm dừng", "pause",
+            "tiếp tục", "resume", "đóng khẩn cấp", "closeall", "panic",
+            "đóng hết", "cắt hết",
+        } or normalized in {
+            "menu", "help", "tro giup", "bat dau", "web terminal", "app",
+            "mini app", "terminal", "trang thai", "status", "pnl", "xem pnl",
+            "so du", "tien", "vi the dang mo", "vi the", "positions", "lenh",
+            "suc khoe vps", "suc khoe", "health", "vps", "ram", "cpu",
+            "kiem tra api", "livecheck", "kiem tra", "tam dung", "pause",
+            "tiep tuc", "resume", "dong khan cap", "closeall", "panic",
+            "dong het", "cat het",
+        }
+
+    def _offline_disabled(self, target_chat_id: Optional[str] = None) -> bool:
+        message = (
+            "OFFLINE_COMMAND_DISABLED: This command requires a separately "
+            "certified scanner, strategy, AI, Testnet, or LIVE context."
+        )
+        if target_chat_id:
+            return self._send_to_chat(target_chat_id, message)
+        return self.send_message(message)
+
+    @staticmethod
+    def _offline_callback_allowed(data: str) -> bool:
+        return data in {
+            "btn_app", "btn_status", "btn_positions", "btn_health",
+            "btn_livecheck", "btn_pause", "btn_resume", "btn_closeall",
+        }
 
     @property
     def web_terminal_url(self) -> str:
-        """Đường dẫn Web Terminal bảo mật với token quản trị tự động đăng nhập"""
-        try:
-            import hashlib
-            token = hashlib.sha256(f"{self.config.web_username}:{self.config.web_password}:{self.config.telegram_bot_token}".encode()).hexdigest()
-            return f"https://trader.noza.site/?token={token}"
-        except Exception:
-            return "https://trader.noza.site/"
+        """Use Telegram initData or normal browser login; never put credentials in URLs."""
+        return "https://trader.noza.site/telegram-mini-app"
 
     def register_bot_commands(self):
-        """Đăng ký danh sách lệnh chính thức với Telegram để hiển thị nút Menu góc trái"""
+        """Register only commands supported by the active deployment mode."""
         if not self.enabled:
             return
         try:
-            url = f"{self.base_url}/setMyCommands"
-            commands = [
-                {"command": "app", "description": "🚀 Mở Web App Terminal (Mini App)"},
-                {"command": "menu", "description": "📱 Bật bàn phím nút bấm điều khiển"},
-                {"command": "status", "description": "📊 Xem số dư & PnL tổng quan"},
-                {"command": "positions", "description": "⚡ Xem các lệnh đang chạy"},
-                {"command": "sentiment", "description": "🔥 Chỉ số Fear & Greed thị trường"},
-                {"command": "funding", "description": "💰 Săn lợi nhuận Funding Rate APY (Bản 6.0)"},
-                {"command": "news", "description": "📰 Tin tức vĩ mô & crypto AI (Bản 6.0)"},
-                {"command": "liquidation", "description": "🌊 Bản đồ thanh lý đòn bẩy cá voi (Bản 6.0)"},
-                {"command": "ai", "description": "🤖 Hỏi Trợ lý AI Cyber-Nova về thị trường"},
-                {"command": "analytics", "description": "📈 Hiệu suất từng cặp coin & Streak"},
-                {"command": "mode", "description": "🎯 Đổi chế độ quét (BTC/ETH vs All Altcoin)"},
-                {"command": "eval", "description": "🏆 Tiến độ đủ điều kiện đánh thật"},
-                {"command": "health", "description": "🩺 Sức khỏe máy chủ VPS & Ping sàn"},
-                {"command": "export", "description": "📥 Tải file CSV lịch sử lệnh"},
-                {"command": "pause", "description": "⏸️ Tạm dừng mở vị thế mới"},
-                {"command": "resume", "description": "▶️ Tiếp tục quét và mở lệnh"},
-                {"command": "closeall", "description": "🚨 ĐÓNG SẠCH LỆNH KHẨN CẤP"},
-                {"command": "train", "description": "🧠 AI Tự học & Đào tạo chiến lược từ lịch sử"}
-            ]
-            res = requests.post(url, json={"commands": commands}, timeout=10)
+            if self._is_offline_mode():
+                commands = [
+                    {"command": "app", "description": "Open the OFFLINE monitoring terminal"},
+                    {"command": "menu", "description": "Show OFFLINE controls"},
+                    {"command": "status", "description": "Show service-backed status and PnL"},
+                    {"command": "positions", "description": "Show service-backed positions"},
+                    {"command": "health", "description": "Show runtime health"},
+                    {"command": "livecheck", "description": "Show non-secret credential readiness"},
+                    {"command": "pause", "description": "Durably HALT new exposure"},
+                    {"command": "resume", "description": "Generation-bound resume"},
+                    {"command": "closeall", "description": "Emergency close through Execution Service"},
+                ]
+            else:
+                commands = [
+                    {"command": "app", "description": "Open Web App Terminal"},
+                    {"command": "menu", "description": "Show controls"},
+                    {"command": "status", "description": "Show balance and PnL"},
+                    {"command": "positions", "description": "Show open positions"},
+                    {"command": "sentiment", "description": "Show market sentiment"},
+                    {"command": "funding", "description": "Show funding rates"},
+                    {"command": "news", "description": "Show market news"},
+                    {"command": "liquidation", "description": "Show liquidation map"},
+                    {"command": "ai", "description": "Ask the configured AI assistant"},
+                    {"command": "analytics", "description": "Show performance analytics"},
+                    {"command": "mode", "description": "Change scanner mode"},
+                    {"command": "eval", "description": "Show readiness evaluation"},
+                    {"command": "health", "description": "Show runtime health"},
+                    {"command": "export", "description": "Export trade history"},
+                    {"command": "pause", "description": "Pause new exposure"},
+                    {"command": "resume", "description": "Resume new exposure"},
+                    {"command": "closeall", "description": "Emergency close"},
+                    {"command": "train", "description": "Train configured strategy AI"},
+                ]
+            res = requests.post(
+                f"{self.base_url}/setMyCommands", json={"commands": commands}, timeout=10
+            )
             if res.status_code == 200:
-                logger.info("Đã đăng ký danh sách lệnh thành công với Telegram Menu.")
-            # 1. Reset Menu Button mặc định toàn cầu về default (người lạ không thể thấy nút Terminal hay Token)
-            requests.post(f"{self.base_url}/setChatMenuButton", json={
-                "menu_button": {"type": "default"}
-            }, timeout=8)
-
-            # 2. Chỉ cấp quyền Menu Button Web Terminal riêng biệt cho các Admin Chat ID được ủy quyền
+                logger.info("Registered Telegram command menu for %s mode.", getattr(self.config, "trader_environment", "UNKNOWN"))
+            requests.post(
+                f"{self.base_url}/setChatMenuButton",
+                json={"menu_button": {"type": "default"}},
+                timeout=8,
+            )
             for cid in self.authorized_chat_ids:
                 try:
-                    requests.post(f"{self.base_url}/setChatMenuButton", json={
-                        "chat_id": cid,
-                        "menu_button": {
-                            "type": "web_app",
-                            "text": "📱 Terminal",
-                            "web_app": {"url": self.web_terminal_url}
-                        }
-                    }, timeout=8)
+                    requests.post(
+                        f"{self.base_url}/setChatMenuButton",
+                        json={
+                            "chat_id": cid,
+                            "menu_button": {
+                                "type": "web_app",
+                                "text": "Terminal",
+                                "web_app": {"url": self.web_terminal_url},
+                            },
+                        },
+                        timeout=8,
+                    )
                 except Exception:
                     pass
-        except Exception as e:
-            logger.debug("Lỗi đăng ký bot commands: %s", e)
+        except Exception as exc:
+            logger.debug("Unable to register Telegram commands: %s", exc)
+
 
     def get_main_keyboard(self) -> dict:
-        """Bàn phím nút bấm cảm ứng lớn cố định dưới màn hình chat"""
-        return {
-            "keyboard": [
+        """Return controls that are valid for the active deployment mode."""
+        if self._is_offline_mode():
+            keyboard = [
+                [{"text": "Web Terminal"}, {"text": "Status"}, {"text": "Positions"}],
+                [{"text": "Health"}, {"text": "Livecheck"}],
+                [{"text": "Pause"}, {"text": "Resume"}, {"text": "Closeall"}],
+            ]
+        else:
+            keyboard = [
                 [{"text": "🚀 Web Terminal"}, {"text": "📊 Trạng Thái"}, {"text": "⚡ Vị Thế Đang Mở"}],
                 [{"text": "🔥 Fear & Greed"}, {"text": "💰 Funding Arbitrage"}, {"text": "📈 Phân Tích Coin"}],
                 [{"text": "🏆 Tiến Độ Đánh Thật"}, {"text": "🩺 Sức Khỏe VPS"}, {"text": "📥 Tải CSV"}],
-                [{"text": "⏸️ Tạm Dừng"}, {"text": "▶️ Tiếp Tục"}, {"text": "🚨 Đóng Khẩn Cấp"}]
-            ],
-            "resize_keyboard": True,
-            "is_persistent": True
-        }
+                [{"text": "⏸️ Tạm Dừng"}, {"text": "▶️ Tiếp Tục"}, {"text": "🚨 Đóng Khẩn Cấp"}],
+            ]
+        return {"keyboard": keyboard, "resize_keyboard": True, "is_persistent": True}
+
 
     def start_listener(self, bot_context: Any):
         """Khởi chạy luồng chạy ngầm để lắng nghe lệnh điều khiển từ Telegram"""
@@ -174,12 +346,18 @@ class TelegramNotifier:
     def _handle_callback_query(self, query: dict):
         """Xử lý khi người dùng chạm vào nút bấm Inline"""
         sender_id = str(query.get("from", {}).get("id", "")).strip()
-        if sender_id not in self.authorized_chat_ids:
-            self._answer_callback(query.get("id"), "⛔ Quyền truy cập bị từ chối! Tài khoản chưa được ủy quyền.", show_alert=True)
+        chat_id = str(query.get("message", {}).get("chat", {}).get("id", "")).strip()
+        if not self._is_authorized_command(sender_id, chat_id):
+            self._answer_callback(query.get("id"), "⛔ Quyền truy cập bị từ chối! Cặp tài khoản/chat chưa được ủy quyền.", show_alert=True)
             return
 
         qid = query.get("id")
         data = query.get("data", "")
+        if self._is_offline_mode() and not self._offline_callback_allowed(data):
+            self._answer_callback(qid, "Command disabled in OFFLINE mode", show_alert=True)
+            self._offline_disabled(chat_id)
+            return
+
         self._answer_callback(qid, "Đang xử lý...")
 
         if data == "btn_status":
@@ -261,13 +439,9 @@ class TelegramNotifier:
                 "• Mở lệnh theo từng cơ hội độc lập của từng coin."
             )
         elif data == "btn_pause":
-            if self.bot_controller:
-                self.bot_controller.is_paused = True
-                self.send_message("⏸️ <b>ĐÃ TẠM DỪNG BOT!</b> Không mở vị thế mới.")
+            self._set_durable_pause(True)
         elif data == "btn_resume":
-            if self.bot_controller:
-                self.bot_controller.is_paused = False
-                self.send_message("▶️ <b>ĐÃ BẬT LẠI BOT!</b> Tiếp tục quét thị trường.")
+            self._set_durable_pause(False)
         elif data == "btn_closeall":
             self._cmd_closeall()
         elif data == "btn_export":
@@ -277,40 +451,134 @@ class TelegramNotifier:
         elif data == "btn_ai_train":
             self._cmd_ai_train()
         elif data.startswith("manual_exec_"):
-            parts = data.split("_")
-            if len(parts) >= 4:
-                side = parts[2]
-                sym = parts[3]
-                if self.bot_controller and hasattr(self.bot_controller, "order_manager"):
-                    bal = self.bot_controller.get_current_balance()
-                    res = self.bot_controller.order_manager.execute_manual_order(
-                        symbol=sym,
-                        side=side,
-                        balance=bal,
-                        leverage=self.config.leverage,
-                        risk_percent=self.config.risk_per_trade_percent,
-                        simulated_balance_holder=self.bot_controller.simulated_balance_holder
+            proposal_id = data[len("manual_exec_"):]
+            chat_id = str(query.get("message", {}).get("chat", {}).get("id", "")).strip()
+            pending = self._consume_manual_proposal(proposal_id, sender_id, chat_id)
+            if not pending:
+                self.send_message(
+                    "❌ <b>KHÔNG THỂ VÀO LỆNH:</b> APPROVAL_INVALID_OR_EXPIRED - "
+                    "đề xuất đã hết hạn, đã dùng, sai người nhận, hoặc bị thay đổi."
+                )
+                return
+            if not self.bot_controller:
+                self.send_message("❌ <b>KHÔNG THỂ VÀO LỆNH:</b> Bot controller unavailable")
+                return
+            risk_mgr = getattr(self.bot_controller, "risk_manager", None)
+            if risk_mgr is None:
+                self.send_message("❌ <b>KHÔNG THỂ VÀO LỆNH:</b> Risk manager unavailable")
+                return
+            balance = self._strict_positive_number(pending["capital"], "capital")
+            pos_count = len(getattr(self.bot_controller.order_manager, "active_positions", {})) if hasattr(self.bot_controller, "order_manager") else 0
+            can_open, gate_reason = risk_mgr.can_open_new_position(pos_count, balance)
+            if not can_open:
+                self.send_message(f"🚨 <b>RISK GATE CHẶN LỆNH:</b> {html.escape(str(gate_reason))}")
+                return
+            try:
+                qty = self._strict_positive_number(pending["qty"], "qty")
+                entry = self._strict_positive_number(pending["entry"], "entry")
+                stop_loss = self._strict_positive_number(pending["stop_loss"], "stop_loss")
+                take_profit = self._strict_positive_number(pending["take_profit"], "take_profit")
+                leverage = int(self._strict_positive_number(pending["leverage"], "leverage"))
+                result = self._get_telegram_execution_client().open_position(
+                    symbol=str(pending["symbol"]),
+                    side=str(pending["side"]),
+                    qty=qty,
+                    entry_price=entry,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    leverage=leverage,
+                    total_capital=balance,
+                    source="telegram",
+                    command_id=str(pending["command_id"]),
+                )
+            except Exception as exc:
+                self.send_message(f"❌ <b>EXECUTION SERVICE ERROR:</b> {html.escape(str(exc))}")
+                return
+            if result and result.success:
+                self.send_message(
+                    f"✅ <b>ĐÃ MỞ VỊ THẾ ĐƯỢC BẢO VỆ:</b> {pending['symbol']} {pending['side']}"
+                )
+            else:
+                error = html.escape(str(result.error if result else "UNKNOWN"))
+                self.send_message(f"❌ <b>LỆNH BỊ TỪ CHỐI:</b> {error}")
+            return
+
+    def _set_durable_pause(self, paused: bool) -> bool:
+        """Use authoritative service state and generation-bound HALT/RESUME."""
+        try:
+            client = self._get_telegram_execution_client()
+            if paused:
+                result = client.set_halt(reason="Telegram operator pause", source="telegram")
+                generation = self._halt_generation_from(result)
+                if generation is None:
+                    generation = self._halt_generation_from(client.query_status())
+                if not result or not result.success or generation is None:
+                    error = html.escape(str(result.error if result else "HALT generation unavailable"))
+                    self.send_message(f"❌ <b>HALT KHÔNG ĐƯỢC XÁC NHẬN:</b> {error}")
+                    return False
+            else:
+                before = self._authoritative_halt_state(client.query_status())
+                classification = before["classification"]
+                if classification == "NO_ACTIVE_HALT":
+                    self._halt_generation = None
+                    if self.bot_controller:
+                        self.bot_controller.is_paused = False
+                    self.send_message(
+                        "ℹ️ <b>Hệ thống hiện không ở trạng thái HALT.</b>\n"
+                        "Không cần RESUME. Không có lệnh thay đổi trạng thái nào được gửi."
                     )
-                    if res.get("success"):
-                        order = res.get("order", {})
-                        action_str = "LONG 🟢" if side == "BUY" else "SHORT 🔴"
+                    return True
+                if classification == "NON_RESUMABLE_HALT":
+                    reason = html.escape(before["reason"] or "Safety recovery is required")
+                    state = html.escape(before["state"])
+                    self.send_message(
+                        "❌ <b>Không thể RESUME.</b>\n\n"
+                        f"Lý do: <code>{reason}</code>\n"
+                        f"Trạng thái: <code>{state}</code>\n\n"
+                        "Cần xử lý nguyên nhân an toàn trước khi RESUME."
+                    )
+                    return False
+                if classification != "ACTIVE_OPERATOR_HALT":
+                    self.send_message(
+                        "❌ <b>RESUME BỊ TỪ CHỐI:</b> Không lấy được trạng thái HALT "
+                        f"authoritative an toàn (<code>{classification}</code>)."
+                    )
+                    return False
+                generation = before["generation"]
+                if not hasattr(client, "resume"):
+                    self.send_message(
+                        "❌ <b>RESUME BỊ TỪ CHỐI:</b> generation-bound RESUME chưa được hỗ trợ."
+                    )
+                    return False
+                result = client.resume(generation, source="telegram")
+                if not result or not result.success:
+                    after = self._authoritative_halt_state(client.query_status())
+                    changed = after.get("generation") != generation
+                    if changed:
                         self.send_message(
-                            f"⚡ <b>ĐÃ VÀO LỆNH {action_str} THÀNH CÔNG!</b>\n"
-                            f"━━━━━━━━━━━━━━━━━━━━\n"
-                            f"• <b>Cặp:</b> <code>{sym}</code>\n"
-                            f"• <b>Khối lượng:</b> <code>{order.get('qty', 0)}</code>\n"
-                            f"• <b>Giá khớp:</b> <code>${order.get('entry_price', 0):,.4f}</code>\n"
-                            f"• <b>Stop Loss:</b> <code>${order.get('stop_loss', 0):,.4f}</code>\n"
-                            f"• <b>Take Profit:</b> <code>${order.get('take_profit', 0):,.4f}</code>\n"
-                            f"• <b>Ký quỹ:</b> <code>${order.get('margin', 0):.2f} USDT</code>"
+                            "❌ <b>RESUME BỊ TỪ CHỐI:</b> HALT generation đã thay đổi. "
+                            "HALT mới vẫn được giữ nguyên; hãy kiểm tra lại trước khi thao tác lần nữa."
                         )
                     else:
-                        self.send_message(f"❌ <b>KHÔNG THỂ VÀO LỆNH:</b> {res.get('message')}")
+                        error = html.escape(str(result.error if result else "UNKNOWN"))
+                        self.send_message(f"❌ <b>KHÔNG THỂ RESUME:</b> {error}")
+                    return False
+        except Exception as exc:
+            self.send_message(f"❌ <b>EXECUTION SERVICE ERROR:</b> {html.escape(str(exc))}")
+            return False
+        self._halt_generation = generation if paused else None
+        if self.bot_controller:
+            self.bot_controller.is_paused = paused
+        message = "⏸️ <b>ĐÃ TẠM DỪNG BỀN VỮNG!</b>" if paused else "▶️ <b>ĐÃ TIẾP TỤC BỀN VỮNG!</b>"
+        self.send_message(message + " Execution Service đã xác nhận trạng thái generation-bound.")
+        return True
+
 
     @staticmethod
     def _strip_vietnamese_accents(text: str) -> str:
         """Chuyển đổi tiếng Việt có dấu thành không dấu chuẩn xác"""
         import unicodedata
+
         text = unicodedata.normalize('NFD', text)
         text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
         text = text.replace('đ', 'd').replace('Đ', 'D')
@@ -333,12 +601,13 @@ class TelegramNotifier:
     def _handle_incoming_message(self, message: dict):
         """Xử lý lệnh từ người dùng linh hoạt bằng cả văn bản và nút bấm"""
         sender_chat_id = str(message.get("chat", {}).get("id", "")).strip()
-        if sender_chat_id not in self.authorized_chat_ids:
-            logger.warning("Tin nhắn từ tài khoản Telegram chưa ủy quyền: %s", sender_chat_id)
+        sender_id = str(message.get("from", {}).get("id", "")).strip()
+        if not self._is_authorized_command(sender_id, sender_chat_id):
+            logger.warning("Tin nhắn từ cặp Telegram chưa ủy quyền: user=%s chat=%s", sender_id, sender_chat_id)
             unauth_msg = (
                 "⛔ <b>TRUY CẬP BỊ TỪ CHỐI (ACCESS DENIED)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n"
-                f"Tài khoản Telegram của bạn (ID: <code>{sender_chat_id}</code>) chưa được cấp quyền quản trị hệ thống bot.\n\n"
+                f"Cặp tài khoản/chat Telegram (<code>{sender_id}</code>/<code>{sender_chat_id}</code>) chưa được cấp quyền.\n\n"
                 "🛡️ Mọi yêu cầu điều khiển đều bị chặn để đảm bảo an ninh danh mục.\n"
                 "Vui lòng liên hệ trực tiếp Quản trị viên để được cấp phép."
             )
@@ -351,6 +620,10 @@ class TelegramNotifier:
 
         cmd = self._clean_cmd(raw_text)
         u = self._strip_vietnamese_accents(cmd)
+
+        if self._is_offline_mode() and not self._offline_message_allowed(cmd, u):
+            self._offline_disabled(sender_chat_id)
+            return
 
         # 1. Menu & Help
         if cmd in ["/start", "/help", "/menu", "menu", "help", "trợ giúp", "bắt đầu"]:
@@ -398,19 +671,11 @@ class TelegramNotifier:
 
         # 9. Tạm dừng
         elif cmd in ["/pause", "tạm dừng", "pause"] or u in ["pause", "tam dung", "dung bot", "nghi ngoi", "stop", "dung lai"] :
-            if self.bot_controller:
-                self.bot_controller.is_paused = True
-                self.send_message("⏸️ <b>ĐÃ TẠM DỪNG BOT!</b> Bot sẽ không mở thêm vị thế mới. Các lệnh đang chạy vẫn được bảo vệ.")
-            else:
-                self.send_message("Không tìm thấy bot controller.")
+            self._set_durable_pause(True)
 
         # 10. Tiếp tục
         elif cmd in ["/resume", "tiếp tục", "resume"] or u in ["resume", "tiep tuc", "bat lai", "chay lai", "start bot", "run", "chay tiep"] :
-            if self.bot_controller:
-                self.bot_controller.is_paused = False
-                self.send_message("▶️ <b>ĐÃ BẬT LẠI BOT!</b> Hệ thống tiếp tục quét thị trường và tìm setup vào lệnh.")
-            else:
-                self.send_message("Không tìm thấy bot controller.")
+            self._set_durable_pause(False)
 
         # 11. Đóng khẩn cấp
         elif cmd in ["/closeall", "đóng khẩn cấp", "closeall", "panic", "đóng hết", "cắt hết"] or u in ["closeall", "dong het", "dong toan bo", "cat het", "cat lo", "panic", "thoat hang", "chot het", "huy het", "dong lenh"] or any(k in u for k in ["dong het", "cat het", "dong toan bo", "cat lo"]) :
@@ -661,6 +926,10 @@ class TelegramNotifier:
         )
 
     def _cmd_mode(self):
+        if self._is_offline_mode():
+            self._offline_disabled()
+            return
+
         cur_mode = getattr(self.config, "trading_mode", "MARKET_ALL")
         cur_label = "🛡️ Chỉ BTC & ETH (BLUECHIP_ONLY)" if cur_mode == "BLUECHIP_ONLY" else "🚀 Toàn Bộ Altcoin/Meme (MARKET_ALL)"
 
@@ -702,16 +971,51 @@ class TelegramNotifier:
             return
 
         ctrl = self.bot_controller
-        state_str = "⏸️ TẠM DỪNG" if ctrl.is_paused else "▶️ ĐANG CHẠY"
-        mode_str = "🧪 DRY RUN (GIẢ LẬP)" if self.config.dry_run else "⚡ REAL LIVE"
-        cur_mode = getattr(self.config, "trading_mode", "MARKET_ALL")
-        scan_target_label = "🛡️ Chỉ BTC & ETH (15m)" if cur_mode == "BLUECHIP_ONLY" else "🚀 Toàn Bộ Top 50 Alt/Meme"
-
         bal = ctrl.get_current_balance()
         pos_count = ctrl.order_manager.get_open_position_count()
         u_pnl = ctrl.get_total_unrealized_pnl()
         pnl_icon = "🟢" if u_pnl >= 0 else "🔴"
         pnl_sign = "+" if u_pnl >= 0 else ""
+        if self._is_offline_mode():
+            try:
+                halt = self._authoritative_halt_state(
+                    self._get_telegram_execution_client().query_status()
+                )
+            except Exception:
+                halt = self._authoritative_halt_state(None)
+            generation = halt["generation"] if halt["generation"] is not None else "N/A"
+            reason = html.escape(halt["reason"] or "N/A")
+            resume_allowed = "YES" if halt["resume_allowed"] else "NO"
+            halt_active = "ACTIVE" if halt["classification"] in {
+                "ACTIVE_OPERATOR_HALT", "NON_RESUMABLE_HALT",
+                "ACTIVE_HALT_GENERATION_MISSING",
+            } else "INACTIVE"
+            msg = (
+                "📊 <b>OFFLINE MONITORING STATUS</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"• <b>Execution Service:</b> <code>{halt['state']}</code>\n"
+                f"• <b>HALT:</b> <code>{halt_active}</code>\n"
+                f"• <b>HALT generation:</b> <code>{generation}</code>\n"
+                f"• <b>HALT reason:</b> <code>{reason}</code>\n"
+                f"• <b>Resume allowed:</b> <code>{resume_allowed}</code>\n"
+                "• <b>Scanner/strategy:</b> <code>DISABLED_OFFLINE</code>\n"
+                "• <b>AI/copy-trade:</b> <code>DISABLED_OFFLINE</code>\n"
+                f"• <b>Open positions:</b> <code>{pos_count}</code>\n"
+                f"• <b>Unrealized PnL:</b> {pnl_icon} <code>{pnl_sign}${u_pnl:,.2f} USDT</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n🕒 <i>Updated: {_now_vn_str()}</i>"
+            )
+            self.send_message(
+                msg,
+                inline_keyboard=[
+                    [{"text": "Refresh", "callback_data": "btn_status"}, {"text": "Positions", "callback_data": "btn_positions"}],
+                    [{"text": "Health", "callback_data": "btn_health"}],
+                ],
+            )
+            return
+        state_str = "⏸️ TẠM DỪNG" if ctrl.is_paused else "▶️ ĐANG CHẠY"
+        mode_str = "🧪 DRY RUN (GIẢ LẬP)" if self.config.dry_run else "⚡ REAL LIVE"
+        cur_mode = getattr(self.config, "trading_mode", "MARKET_ALL")
+        scan_target_label = "🛡️ Chỉ BTC & ETH (15m)" if cur_mode == "BLUECHIP_ONLY" else "🚀 Toàn Bộ Top 50 Alt/Meme"
 
         msg = (
             "📊 <b>TỔNG QUAN TÀI KHOẢN</b>\n"
@@ -735,8 +1039,21 @@ class TelegramNotifier:
             ]
         )
 
+
     def _cmd_app(self):
         """Mở Web Dashboard trên trình duyệt ngoài hoặc Telegram Mini App tiện lợi"""
+        if self._is_offline_mode():
+            self.send_message(
+                "<b>OFFLINE MONITORING TERMINAL</b>\n"
+                "Service health, authoritative ledger analytics, positions, and operator controls are available. "
+                "Scanner, strategy, AI, copy-trade, Testnet, and LIVE execution remain disabled.",
+                inline_keyboard=[
+                    [{"text": "Open monitoring terminal", "web_app": {"url": self.web_terminal_url}}],
+                    [{"text": "Status", "callback_data": "btn_status"}, {"text": "Positions", "callback_data": "btn_positions"}],
+                ],
+            )
+            return
+
         web_url = self.web_terminal_url
         msg = (
             "🚀 <b>BINANCE QUANT PRO - WEB DASHBOARD TERMINAL</b>\n"
@@ -1437,14 +1754,20 @@ class TelegramNotifier:
             return
 
         ctrl = self.bot_controller
-        prices = ctrl.get_current_prices()
-        res = ctrl.order_manager.close_all_positions(
-            reason="Lệnh /closeall từ Telegram",
-            current_prices=prices,
-            simulated_balance_holder=ctrl.simulated_balance_holder
-        )
+        exec_client = self._get_telegram_execution_client()
+        if exec_client is not None:
+            cmd_res = exec_client.emergency_close_all(reason="Lệnh /closeall từ Telegram", source="telegram")
+            if not cmd_res.success:
+                self.send_message(f"🚨 <b>PANIC CLOSE THẤT BẠI:</b> {cmd_res.error}")
+                return
+            self.send_message(
+                f"🚨 <b>KẾT QUẢ PANIC CLOSE (EXECUTION SERVICE):</b>\n\nThực thi thành công qua Execution Service. Receipt: {cmd_res.execution_receipt_id}",
+                inline_keyboard=[[{"text": "📊 Xem Số Dư Mới", "callback_data": "btn_status"}]]
+            )
+            return
+
         self.send_message(
-            f"🚨 <b>KẾT QUẢ PANIC CLOSE:</b>\n\n{res['message']}",
+            "🚨 <b>LỖI HỆ THỐNG:</b> Dịch vụ Execution Service không khả dụng (Hard Cutover). Không thể panic close.",
             inline_keyboard=[[{"text": "📊 Xem Số Dư Mới", "callback_data": "btn_status"}]]
         )
 
@@ -1588,40 +1911,45 @@ class TelegramNotifier:
             self.send_message(f"Lỗi kiểm tra sức khỏe hệ thống: {e}")
 
     def _cmd_livecheck(self):
-        if not self.bot_controller or not self.bot_controller.client:
-            self.send_message("Bot client chưa sẵn sàng.")
-            return
-
-        client = self.bot_controller.client
-        if not (self.config.api_key and self.config.api_secret):
-            self.send_message(
-                "⚠️ <b>CHƯA CẤU HÌNH API KEY THẬT!</b>\n\n"
-                "Hệ thống hiện đang chạy ở chế độ <b>Giả lập (Dry-Run)</b> an toàn.\n"
-                "Để kết nối tài khoản thật, vui lòng cấu hình <code>BINANCE_API_KEY</code> và <code>BINANCE_API_SECRET</code> trong file <code>.env</code> trên VPS.",
-                inline_keyboard=[
-                    [{"text": "🏆 Xem Tiến Độ Đánh Thật", "callback_data": "btn_eval"}]
-                ]
-            )
-            return
-
+        """Report only the Execution Service's non-secret credential readiness contract."""
         try:
-            acc = client.client.futures_account()
-            usdt_bal = 0.0
-            for a in acc.get("assets", []):
-                if a.get("asset") == "USDT":
-                    usdt_bal = float(a.get("availableBalance", 0.0))
-            can_trade = acc.get("canTrade", False)
+            service_client = self._get_telegram_execution_client()
+            status = service_client.query_status()
+        except Exception:
+            status = {"success": False, "state": "UNKNOWN"}
 
-            status_text = (
-                "✅ <b>API KEY HỢP LỆ VÀ SẴN SÀNG LIVE!</b>\n\n"
-                f"• <b>Chế độ:</b> {'Testnet' if self.config.use_testnet else 'Binance Live Thật'}\n"
-                f"• <b>Quyền giao dịch:</b> {'✅ BẬT (OK)' if can_trade else '❌ TẮT (Chưa cấp quyền Futures)'}\n"
-                f"• <b>Số dư USDT ví Futures:</b> <code>${usdt_bal:,.2f} USDT</code>\n"
-                f"• <b>Chiết khấu phí BNB:</b> {client.check_fee_discount_recommendation()['message']}"
+        readiness = status.get("credential_readiness") if isinstance(status, dict) else None
+        if isinstance(readiness, dict):
+            state = str(readiness.get("state", "UNKNOWN")).upper()
+            reason = str(readiness.get("reason", ""))
+        elif isinstance(readiness, str):
+            state = readiness.upper()
+            reason = ""
+        else:
+            state = "UNKNOWN"
+            reason = "Execution Service did not provide credential readiness."
+
+        if not status.get("success") or state not in {"READY", "NOT_READY"}:
+            self.send_message(
+                "⚠️ <b>TRẠNG THÁI API: UNKNOWN</b>\n\n"
+                "Không thể xác minh trạng thái thông tin xác thực qua Execution Service. "
+                "Hệ thống không suy đoán trạng thái an toàn từ cấu hình Application."
             )
-            self.send_message(status_text)
-        except Exception as e:
-            self.send_message(f"❌ <b>LỖI KẾT NỐI API BINANCE:</b>\n<code>{e}</code>")
+            return
+
+        if state == "READY":
+            self.send_message(
+                "✅ <b>EXECUTION SERVICE: CREDENTIALS READY</b>\n\n"
+                "Execution Service xác nhận thông tin xác thực giao dịch đã sẵn sàng. "
+                "Không có khóa hoặc bí mật nào được đọc bởi Telegram/Application."
+            )
+            return
+
+        suffix = f"\n<code>{html.escape(reason)}</code>" if reason else ""
+        self.send_message(
+            "❌ <b>EXECUTION SERVICE: CREDENTIALS NOT READY</b>\n\n"
+            "Dịch vụ xác nhận chưa sẵn sàng cho giao dịch." + suffix
+        )
 
     def _cmd_evaluation(self):
         """Báo cáo tiến độ đạt chuẩn đánh thật kèm thanh tiến trình trực quan"""
@@ -1970,56 +2298,102 @@ class TelegramNotifier:
             return False
 
     def notify_signal(self, symbol: str, signal: str, entry: float, sl: float, tp: float, reason: str, df: Any = None):
-        is_long = (signal in ["BUY", "LONG"])
+        normalized_side = str(signal).strip().upper()
+        normalized_side = "BUY" if normalized_side in {"BUY", "LONG"} else "SELL" if normalized_side in {"SELL", "SHORT"} else ""
+        normalized_symbol = str(symbol).strip().upper()
+        if not normalized_side or not re.fullmatch(r"[A-Z0-9]{3,20}", normalized_symbol):
+            raise ValueError("Invalid signal side or symbol")
+        entry_value = self._strict_positive_number(entry, "entry")
+        stop_value = self._strict_positive_number(sl, "stop_loss")
+        take_value = self._strict_positive_number(tp, "take_profit")
+        leverage = int(self._strict_positive_number(getattr(self.config, "leverage", 5), "leverage"))
+
+        capital = 0.0
+        quantity = 0.0
+        step_size = 0.001
+        min_qty = 0.001
+        if self.bot_controller:
+            capital = self._strict_positive_number(self.bot_controller.get_current_balance(), "capital")
+            market_client = getattr(self.bot_controller, "client", None)
+            filters = market_client.get_symbol_filter_info(normalized_symbol) if market_client and hasattr(market_client, "get_symbol_filter_info") else {}
+            filters = filters or {}
+            step_size = self._strict_positive_number(filters.get("step_size", step_size), "step_size")
+            min_qty = self._strict_positive_number(filters.get("min_qty", min_qty), "min_qty")
+            risk_manager = getattr(self.bot_controller, "risk_manager", None)
+            if risk_manager:
+                sizing = risk_manager.calculate_position_size(
+                    current_balance=capital,
+                    entry_price=entry_value,
+                    stop_loss_price=stop_value,
+                    step_size=step_size,
+                    min_qty=min_qty,
+                    leverage=leverage,
+                )
+                if isinstance(sizing, dict) and sizing.get("valid") is True:
+                    quantity = self._strict_positive_number(sizing.get("qty"), "qty")
+        capital = self._strict_positive_number(capital, "capital")
+        quantity = self._strict_positive_number(quantity, "qty")
+
+        created_at = time.time()
+        base_proposal = {
+            "symbol": normalized_symbol,
+            "side": normalized_side,
+            "entry": entry_value,
+            "stop_loss": stop_value,
+            "take_profit": take_value,
+            "capital": capital,
+            "qty": quantity,
+            "leverage": leverage,
+            "risk_percent": self._strict_positive_number(
+                getattr(self.config, "risk_per_trade_percent", 1.0), "risk_percent"
+            ),
+            "sizing_mode": str(getattr(self.config, "sizing_mode", "risk_percent")),
+            "step_size": step_size,
+            "min_qty": min_qty,
+            "created_at": created_at,
+            "expires_at": created_at + self._manual_signal_ttl_seconds,
+        }
+
+        is_long = normalized_side == "BUY"
         icon = "🟢" if is_long else "🔻"
         action = "MUA / LONG 📈 (Kỳ vọng giá tăng)" if is_long else "BÁN KHỐNG / SHORT 📉 (Kỳ vọng giá giảm)"
-        # Escape các ký tự đặc biệt trong reason như < hoặc > (ví dụ: EMA50 < EMA200)
         safe_reason = html.escape(str(reason))
         msg = (
-            f"<b>{icon} [TÍN HIỆU CHIẾN LƯỢC] {symbol}</b>\n"
+            f"<b>{icon} [TÍN HIỆU CHIẾN LƯỢC] {normalized_symbol}</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"• <b>Hướng lệnh:</b> <b>{action}</b>\n"
-            f"• <b>Điểm vào (Entry):</b> <code>${entry:,.4f}</code>\n"
-            f"• <b>Cắt lỗ (Stop Loss):</b> <code>${sl:,.4f}</code>\n"
-            f"• <b>Chốt lời (Take Profit):</b> <code>${tp:,.4f}</code>\n"
-            f"• <b>Tỷ lệ R:R:</b> <code>1:1.5</code>\n"
+            f"• <b>Điểm vào (Entry):</b> <code>${entry_value:,.4f}</code>\n"
+            f"• <b>Cắt lỗ (Stop Loss):</b> <code>${stop_value:,.4f}</code>\n"
+            f"• <b>Chốt lời (Take Profit):</b> <code>${take_value:,.4f}</code>\n"
+            f"• <b>Khối lượng đã khóa:</b> <code>{quantity}</code>\n"
             f"• <b>Phân tích kỹ thuật:</b> <i>{safe_reason}</i>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 <i>Ghi chú: Đây là cơ hội vào lệnh do bot phát hiện (KHÔNG PHẢI THÔNG BÁO LỖI). Bấm nút dưới để khớp lệnh:</i>"
+            f"💡 <i>Phê duyệt này hết hạn sau {self._manual_signal_ttl_seconds // 60} phút và chỉ dùng một lần.</i>"
         )
         btn_action_label = "⚡ Duyệt Lệnh LONG 1-Click" if is_long else "⚡ Duyệt Lệnh SHORT 1-Click"
-        btns = [
-            [{"text": btn_action_label, "callback_data": f"manual_exec_{signal}_{symbol}"}],
-            [{"text": "📱 Mở Mini App", "web_app": {"url": self.web_terminal_url}}, {"text": "⚡ Xem Vị Thế", "callback_data": "btn_positions"}]
-        ]
-
-        # Thử tạo và gửi ảnh chụp biểu đồ nến kỹ thuật trực quan (Bản 5.0)
-        chart_sent = False
-        try:
-            from utils.chart_generator import TelegramChartGenerator
-            chart_df = df
-            if chart_df is None and self.bot_controller and hasattr(self.bot_controller, "client"):
-                chart_df = self.bot_controller.client.get_klines_df(symbol, interval="15m", limit=50)
-
-            if chart_df is not None and len(chart_df) >= 15:
-                chart_bytes = TelegramChartGenerator.generate_signal_chart(
-                    symbol=symbol,
-                    df=chart_df,
-                    entry_price=entry,
-                    stop_loss=sl,
-                    take_profit=tp,
-                    side=signal,
-                    reason=reason
-                )
-                if chart_bytes:
-                    chart_sent = self.send_photo(photo_bytes=chart_bytes, caption=msg, inline_keyboard=btns)
-        except Exception as e:
-            logger.debug("Không thể tạo biểu đồ nến Telegram: %s", e)
-
-        # Nếu không gửi được ảnh, gửi tin nhắn dạng HTML thông thường
-        if not chart_sent:
-            self.send_message(msg, inline_keyboard=btns)
-
+        proposal_ids = {}
+        for principal, target_chat_id in sorted(self.authorized_command_pairs):
+            proposal_id = secrets.token_urlsafe(18)
+            proposal = {
+                **base_proposal,
+                "proposal_id": proposal_id,
+                "principal": principal,
+                "chat_id": target_chat_id,
+                "command_id": f"telegram-proposal-{proposal_id}",
+            }
+            proposal["binding_digest"] = self._proposal_digest(proposal)
+            with self._pending_manual_signals_lock:
+                self._pending_manual_signals[proposal_id] = proposal
+            proposal_ids[target_chat_id] = proposal_id
+            buttons = [
+                [{"text": btn_action_label, "callback_data": f"manual_exec_{proposal_id}"}],
+                [
+                    {"text": "📱 Mở Mini App", "web_app": {"url": self.web_terminal_url}},
+                    {"text": "⚡ Xem Vị Thế", "callback_data": "btn_positions"},
+                ],
+            ]
+            self._send_to_chat(target_chat_id, msg, inline_keyboard=buttons)
+        return proposal_ids
     def notify_multi_tp(
         self,
         symbol: str,
@@ -2238,3 +2612,19 @@ class TelegramNotifier:
             )
         except Exception as e:
             self.send_message(f"❌ <b>Lỗi trong quá trình huấn luyện AI:</b> <code>{str(e)}</code>")
+    def _get_telegram_execution_client(self):
+        from core.execution_service.client import ExecutionServiceClient
+        ctrl = getattr(self, "bot_controller", None)
+        if ctrl and hasattr(ctrl, "_exec_client_telegram") and getattr(ctrl, "_exec_client_telegram"):
+            return ctrl._exec_client_telegram
+        svc_host = getattr(self.config, "execution_service_host", "127.0.0.1")
+        svc_port = getattr(self.config, "execution_service_port", 50051)
+        tok = getattr(self.config, "ipc_token_telegram", "")
+        if not tok:
+            raise RuntimeError("Telegram IPC principal credential is not configured")
+        client = ExecutionServiceClient(
+            host=svc_host, port=svc_port, auth_token=tok, principal="telegram-client"
+        )
+        if ctrl:
+            ctrl._exec_client_telegram = client
+        return client

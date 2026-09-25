@@ -109,7 +109,6 @@ const $ = (id) => document.getElementById(id);
 async function initApp() {
   let cfg = {
     serverUrl: 'https://trader.noza.site',
-    authToken: '',
     soundEnabled: true
   };
 
@@ -131,17 +130,22 @@ async function initApp() {
   } else {
     try {
       const local = localStorage.getItem('desktop_config');
-      if (local) cfg = { ...cfg, ...JSON.parse(local) };
+      if (local) {
+        const localCfg = JSON.parse(local);
+        delete localCfg.authToken;
+        cfg = { ...cfg, ...localCfg };
+        localStorage.setItem('desktop_config', JSON.stringify(localCfg));
+      }
     } catch (e) {}
   }
 
+  localStorage.removeItem('auth_token');
+  authToken = '';
   serverUrl = cfg.serverUrl || 'https://trader.noza.site';
-  authToken = cfg.authToken || localStorage.getItem('auth_token') || '';
   soundEnabled = cfg.soundEnabled !== undefined ? cfg.soundEnabled : true;
   updateAudioIcon();
 
   if ($('cfgServerUrl')) $('cfgServerUrl').value = serverUrl;
-  if ($('cfgAuthToken')) $('cfgAuthToken').value = authToken;
   if ($('cfgSound')) $('cfgSound').checked = soundEnabled;
 
   setupNavigationTabs();
@@ -151,7 +155,7 @@ async function initApp() {
   setupHeaderButtons();
 
   if (!authToken) {
-    await tryAutoLogin('admin', 'admin123456');
+    showLoginModal('Đăng nhập quản trị để bắt đầu phiên làm việc. Token không được lưu trên thiết bị.');
   }
 
   // Bắt đầu chu kỳ quét dữ liệu
@@ -227,7 +231,7 @@ function switchTab(tabKey) {
 // =======================================================
 // GIAO TIẾP VỚI MÁY CHỦ & XÁC THỰC
 // =======================================================
-async function tryAutoLogin(user, pass) {
+async function loginWithCredentials(user, pass) {
   try {
     const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/login`, {
       method: 'POST',
@@ -239,8 +243,6 @@ async function tryAutoLogin(user, pass) {
       authToken = data.token;
       currentUser = data.username || user;
       if ($('userBadge')) $('userBadge').textContent = currentUser;
-      localStorage.setItem('auth_token', authToken);
-      saveDesktopConfig({ authToken });
       return true;
     }
   } catch (e) {
@@ -267,6 +269,8 @@ async function fetchApi(endpoint, options = {}) {
     if ($('pingLatency')) $('pingLatency').textContent = `${latency} ms`;
 
     if (res.status === 401) {
+      authToken = '';
+      currentUser = '';
       if ($('connIndicator')) $('connIndicator').className = 'inline-block w-2 h-2 rounded-full bg-yellow-400';
       if ($('connStatus')) $('connStatus').textContent = 'Yêu cầu đăng nhập quản trị';
       showLoginModal('Phiên làm việc hết hạn hoặc chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.');
@@ -288,6 +292,7 @@ async function fetchApi(endpoint, options = {}) {
 // TAB 1: TỔNG QUAN & VỊ THẾ LIVE
 // =======================================================
 async function pollDashboardData() {
+  if (!authToken) return;
   try {
     const data = await fetchApi('/api/status');
     if (!data) return;
@@ -1066,8 +1071,9 @@ function setupHeaderButtons() {
 
       $('btnLoginSubmit').innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ĐANG XÁC THỰC...';
       try {
-        const success = await tryAutoLogin(user, pass);
+        const success = await loginWithCredentials(user, pass);
         if (success) {
+          if ($('loginPassword')) $('loginPassword').value = '';
           hideLoginModal();
           pollDashboardData();
         } else {
@@ -1094,14 +1100,12 @@ function setupHeaderButtons() {
   if ($('btnSaveSettings')) {
     $('btnSaveSettings').addEventListener('click', async () => {
       serverUrl = $('cfgServerUrl') ? $('cfgServerUrl').value.trim() : serverUrl;
-      authToken = $('cfgAuthToken') ? $('cfgAuthToken').value.trim() : authToken;
       soundEnabled = $('cfgSound') ? $('cfgSound').checked : soundEnabled;
       const minimizeTray = $('cfgMinimizeTray') ? $('cfgMinimizeTray').checked : false;
       const hotkey = $('cfgHotkey') ? $('cfgHotkey').value.trim() : 'Ctrl+Shift+K';
 
       saveDesktopConfig({
         serverUrl,
-        authToken,
         soundEnabled,
         minimizeToTray: minimizeTray,
         hotkeyEmergency: hotkey
@@ -1172,8 +1176,13 @@ function hideLoginModal() {
 
 async function saveDesktopConfig(patch) {
   try {
+    const safePatch = { ...(patch || {}) };
+    delete safePatch.authToken;
     const local = localStorage.getItem('desktop_config');
-    const merged = { ...(local ? JSON.parse(local) : {}), ...patch };
+    const stored = local ? JSON.parse(local) : {};
+    delete stored.authToken;
+    const merged = { ...stored, ...safePatch };
+    localStorage.removeItem('auth_token');
     localStorage.setItem('desktop_config', JSON.stringify(merged));
     if (window.electronAPI) {
       await window.electronAPI.saveConfig(merged);

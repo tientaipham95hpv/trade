@@ -12,24 +12,32 @@ CONFIG_FILE = os.path.join(CONFIG_DIR, "desktop_config.json")
 class DesktopAPI:
     """API Cầu nối giữa Python và JavaScript Frontend"""
     def get_config(self):
+        defaults = {
+            "serverUrl": "https://trader.noza.site",
+            "soundEnabled": True,
+            "minimizeToTray": True,
+            "hotkeyEmergency": "Ctrl+Shift+K",
+        }
         try:
             if os.path.exists(CONFIG_FILE):
                 with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                had_legacy_token = "authToken" in data
+                data.pop("authToken", None)
+                if had_legacy_token:
+                    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                return {**defaults, **data}
         except Exception as e:
             print("Error loading config:", e)
-        return {
-            "serverUrl": "https://trader.noza.site",
-            "authToken": "",
-            "soundEnabled": True,
-            "minimizeToTray": True,
-            "hotkeyEmergency": "Ctrl+Shift+K"
-        }
+        return defaults
 
     def save_config(self, cfg):
         try:
+            safe_cfg = dict(cfg or {})
+            safe_cfg.pop("authToken", None)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=2, ensure_ascii=False)
+                json.dump(safe_cfg, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
             print("Error saving config:", e)

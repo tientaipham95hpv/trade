@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Obsidian Quants — UI V2 Component Foundation Preview</title>
+  <link rel="stylesheet" href="/static/ui_v2/obsidian_quants.css">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+</head>
+<body>
+  <!-- TerminalShell -->
+  <div class="terminal-shell">
+    
+    <!-- Top Telemetry Bar -->
+    <header class="top-telemetry-bar" role="banner">
+      <div class="top-telemetry-left">
+        <div class="top-telemetry-brand">
+          <span>Binance Quant Pro</span>
+        </div>
+        <!-- EnvironmentBadge -->
+        <span class="env-badge env-offline" id="preview-env-badge">OFFLINE</span>
+        <!-- TelemetryItems -->
+        <div class="telemetry-item healthy">
+          <span class="telemetry-item-indicator"></span>
+          <span class="telemetry-item-label">EXECUTION</span>
+          <span class="telemetry-item-value">HEALTHY</span>
+        </div>
+        <div class="telemetry-item healthy">
+          <span class="telemetry-item-indicator"></span>
+          <span class="telemetry-item-label">WEB</span>
+          <span class="telemetry-item-value">READY</span>
+        </div>
+        <div class="telemetry-item healthy">
+          <span class="telemetry-item-indicator"></span>
+          <span class="telemetry-item-label">TELEGRAM</span>
+          <span class="telemetry-item-value">READY</span>
+        </div>
+      </div>
+
+      <div class="top-telemetry-right">
+        <div class="telemetry-item offline">
+          <span class="telemetry-item-label">HALT</span>
+          <span class="telemetry-item-value">INACTIVE</span>
+        </div>
+        <div class="telemetry-item healthy">
+          <span class="telemetry-item-label">RECOVERY</span>
+          <span class="telemetry-item-value">CLEAR</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-item-label">LATENCY</span>
+          <span class="telemetry-item-value">18 ms</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Master Navigation Rail -->
+    <nav class="terminal-nav-bar" aria-label="Terminal Navigation">
+      <div class="terminal-nav-tabs" role="tablist">
+        <button class="terminal-nav-tab active" role="tab" aria-selected="true">OVERVIEW</button>
+        <button class="terminal-nav-tab" role="tab" aria-selected="false">POSITIONS</button>
+        <button class="terminal-nav-tab" role="tab" aria-selected="false">RISK</button>
+        <button class="terminal-nav-tab" role="tab" aria-selected="false">ACTIVITY</button>
+        <button class="terminal-nav-tab" role="tab" aria-selected="false">SYSTEM</button>
+      </div>
+      <div>
+        <span class="status-badge disabled">TESTNET: DISABLED</span>
+      </div>
+    </nav>
+
+    <!-- Main Terminal Viewport -->
+    <main class="terminal-viewport">
+      
+      <!-- SectionHeader -->
+      <div class="section-header">
+        <div class="section-header-title">
+          <span>OPERATIONAL OBSERVABILITY TERMINAL</span>
+          <span class="status-badge healthy">SUPERVISED</span>
+        </div>
+        <div class="section-header-meta">
+          <span>HOST: 127.0.0.1:50051 • MODE: OFFLINE</span>
+        </div>
+      </div>
+
+      <!-- RiskAlert Primitive Preview -->
+      <div class="risk-alert info" role="alert">
+        <span class="risk-alert-icon">ℹ</span>
+        <div class="risk-alert-content">
+          <div class="risk-alert-title">OFFLINE EXECUTION ACTIVE</div>
+          <div class="risk-alert-description">
+            The system is operating in certified OFFLINE mode. Exchange mutations and live capital exposure are disabled.
+          </div>
+        </div>
+      </div>
+
+      <!-- 12-Column Grid Layout -->
+      <div class="terminal-grid-12">
+        
+        <!-- Row 1: System Status (Col 3) -->
+        <div class="col-span-3">
+          <section class="terminal-panel" aria-labelledby="status-panel-title">
+            <div class="terminal-panel-header">
+              <div class="terminal-panel-title-group">
+                <span class="terminal-panel-title" id="status-panel-title">SYSTEM STATUS</span>
+              </div>
+              <span class="status-badge healthy">HEALTHY</span>
+            </div>
+            <div class="terminal-panel-body">
+              <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Execution Svc</span>
+                  <span class="status-badge healthy">PID 13024</span>
+                </div>
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">IPC Connection</span>
+                  <span class="status-badge healthy">LOOPBACK</span>
+                </div>
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Database Access</span>
+                  <span class="status-badge healthy">CONNECTED</span>
+                </div>
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Certification</span>
+                  <span class="status-badge offline">OFFLINE CORE ACCEPTED</span>
+                </div>
+              </div>
+            </div>
+            <div class="terminal-panel-footer">
+              <span>Authority: Service-Only</span>
+              <span>v1.0.0</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 1: MetricCards (Col 6) -->
+        <div class="col-span-6">
+          <section class="terminal-panel" aria-labelledby="perf-panel-title">
+            <div class="terminal-panel-header">
+              <div class="terminal-panel-title-group">
+                <span class="terminal-panel-title" id="perf-panel-title">PERFORMANCE METRICS</span>
+              </div>
+              <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">LEDGER TRUTH</span>
+            </div>
+            <div class="terminal-panel-body">
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xs);">
+                
+                <!-- MetricCard: Realized PnL -->
+                <div class="metric-card">
+                  <div class="metric-card-label">
+                    <span>Realized PnL</span>
+                  </div>
+                  <div class="metric-card-value-row">
+                    <span class="metric-card-value color-green">+$0.00</span>
+                    <span class="metric-card-unit">USDT</span>
+                  </div>
+                  <div class="metric-card-delta neutral">
+                    <span>—</span>
+                  </div>
+                </div>
+
+                <!-- MetricCard: Win Rate (Null / Empty State) -->
+                <div class="metric-card">
+                  <div class="metric-card-label">
+                    <span>Win Rate</span>
+                  </div>
+                  <div class="metric-card-value-row">
+                    <span class="metric-card-value empty">—</span>
+                  </div>
+                  <div class="metric-card-delta neutral">
+                    <span>No data</span>
+                  </div>
+                </div>
+
+                <!-- MetricCard: Total Trades -->
+                <div class="metric-card">
+                  <div class="metric-card-label">
+                    <span>Total Trades</span>
+                  </div>
+                  <div class="metric-card-value-row">
+                    <span class="metric-card-value">0</span>
+                    <span class="metric-card-unit">orders</span>
+                  </div>
+                  <div class="metric-card-delta neutral">
+                    <span>Verified</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 1: Risk / Breaker (Col 3) -->
+        <div class="col-span-3">
+          <section class="terminal-panel" aria-labelledby="risk-panel-title">
+            <div class="terminal-panel-header">
+              <div class="terminal-panel-title-group">
+                <span class="terminal-panel-title" id="risk-panel-title">CIRCUIT BREAKER</span>
+              </div>
+              <span class="status-badge healthy">HEALTHY</span>
+            </div>
+            <div class="terminal-panel-body">
+              <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Consecutive Losses</span>
+                  <span class="font-mono tabular-nums" style="font-weight: 700;">0 / 3</span>
+                </div>
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Daily Loss Limit</span>
+                  <span class="font-mono tabular-nums" style="font-weight: 700;">$0.00 / $50.00</span>
+                </div>
+                <div class="panel-row-between">
+                  <span style="font-size: 0.70rem; color: var(--text-muted);">Cooldown Timer</span>
+                  <span class="font-mono tabular-nums" style="color: var(--text-muted);">INACTIVE</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 2: DenseTable (Col 12) -->
+        <div class="col-span-12">
+          <section class="terminal-panel" aria-labelledby="positions-panel-title">
+            <div class="terminal-panel-header">
+              <div class="terminal-panel-title-group">
+                <span class="terminal-panel-title" id="positions-panel-title">ACTIVE POSITIONS</span>
+                <span class="status-badge offline">0 OPEN</span>
+              </div>
+              <div class="terminal-panel-actions">
+                <button class="btn-terminal danger" id="btn-preview-halt" aria-haspopup="dialog">TRIGGER HALT</button>
+              </div>
+            </div>
+            <div class="terminal-panel-body" style="padding: 0;">
+              
+              <!-- DenseTable Wrapper -->
+              <div class="dense-table-wrapper">
+                <table class="dense-table">
+                  <thead>
+                    <tr>
+                      <th>SYMBOL</th>
+                      <th>SIDE</th>
+                      <th class="num-col">QTY</th>
+                      <th class="num-col">ENTRY</th>
+                      <th class="num-col">MARK</th>
+                      <th class="num-col">UNREALIZED PNL</th>
+                      <th class="num-col">SL</th>
+                      <th class="num-col">TP</th>
+                      <th>PROTECTION</th>
+                      <th>STATE</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Empty State in Table -->
+                    <tr>
+                      <td colspan="10">
+                        <div class="empty-state">
+                          <span class="empty-state-icon">⬚</span>
+                          <span class="empty-state-title">No Active Positions</span>
+                          <span class="empty-state-desc">Execution core is flat. No open exposure in current snapshot.</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </section>
+        </div>
+
+        <!-- Row 3: Loading Skeletons Showcase (Col 12) -->
+        <div class="col-span-12">
+          <section class="terminal-panel">
+            <div class="terminal-panel-header">
+              <span class="terminal-panel-title">LOADING SKELETON PRIMITIVES</span>
+              <span style="font-size: 0.68rem; color: var(--text-muted);">PREVIEW</span>
+            </div>
+            <div class="terminal-panel-body">
+              <div style="display: flex; gap: var(--space-md); align-items: center;">
+                <div class="skeleton skeleton-badge"></div>
+                <div class="skeleton skeleton-text" style="width: 140px;"></div>
+                <div class="skeleton skeleton-metric" style="width: 100px;"></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ConfirmDialog Preview (Hidden by default, triggered for accessibility verification) -->
+  <div class="confirm-dialog-backdrop" id="preview-confirm-dialog" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="confirm-dialog-box">
+      <div class="confirm-dialog-header danger">
+        <span id="dialog-title">CONFIRM OPERATOR HALT</span>
+      </div>
+      <div class="confirm-dialog-body">
+        <p>This action signals the Execution Service to immediately halt all new order admission.</p>
+        <div class="confirm-dialog-meta">
+          <div>TARGET: ALL TRADING ADMISSION</div>
+          <div>CURRENT HALT GENERATION: 3</div>
+        </div>
+      </div>
+      <div class="confirm-dialog-footer">
+        <button class="btn-terminal" id="btn-dialog-cancel">CANCEL</button>
+        <button class="btn-terminal danger" id="btn-dialog-confirm">EXECUTE HALT</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Light script solely for interactive verification of modal and theme tokens
+    const haltBtn = document.getElementById('btn-preview-halt');
+    const dialog = document.getElementById('preview-confirm-dialog');
+    const cancelBtn = document.getElementById('btn-dialog-cancel');
+    const confirmBtn = document.getElementById('btn-dialog-confirm');
+
+    if (haltBtn && dialog) {
+      haltBtn.addEventListener('click', () => {
+        dialog.style.display = 'flex';
+      });
+      if (cancelBtn) cancelBtn.addEventListener('click', () => { dialog.style.display = 'none'; });
+      if (confirmBtn) confirmBtn.addEventListener('click', () => { dialog.style.display = 'none'; });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+{% extends "ui_v2/base.html" %}
+
+{% block title %}Điều Khoản Dịch Vụ — Binance Quant Pro (Obsidian Quants){% endblock %}
+
+{% block body %}
+<div class="terminal-shell min-h-screen flex flex-col justify-between">
+    <!-- Header -->
+    <header class="top-telemetry-bar">
+        <div class="top-telemetry-left">
+            <a href="/" class="top-telemetry-brand">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F0B90B" stroke-width="2">
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+                <span class="text-gold font-bold">BINANCE QUANT PRO</span>
+            </a>
+            <span class="badge-subtle font-mono text-cyan">TERMS</span>
+        </div>
+        <div class="top-telemetry-right">
+            <a href="/" class="btn btn--outline btn--sm font-mono text-xs">VỀ TRANG CHỦ</a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-6 my-8">
+        <div class="terminal-panel">
+            <div class="panel-header">
+                <span class="panel-title">ĐIỀU KHOẢN SỬ DỤNG DỊCH VỤ</span>
+                <span class="status-badge status-badge--healthy font-mono">TERMS OF SERVICE</span>
+            </div>
+            <div class="panel-body space-y-4 text-secondary leading-relaxed">
+                <p>
+                    Chào mừng bạn đến với cổng giám sát OFFLINE Binance Quant Pro. Bằng việc truy cập hoặc sử dụng dịch vụ, bạn đồng ý với các điều khoản sau:
+                </p>
+
+                <div class="telemetry-list mt-4">
+                    <div class="telemetry-item">
+                        <span class="telemetry-key">Phạm vi hiện tại:</span>
+                        <span class="telemetry-val text-primary">Dashboard cung cấp trạng thái Execution Service, health/readiness, vị thế và lịch sử được hỗ trợ ở chế độ read-only.</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-key">Tính năng vô hiệu hóa:</span>
+                        <span class="telemetry-val text-primary">Client-account trading, copy-trade, credential enrollment, Testnet và LIVE không được hỗ trợ trong kiến trúc hiện tại.</span>
+                    </div>
+                    <div class="telemetry-item">
+                        <span class="telemetry-key">Trách nhiệm người dùng:</span>
+                        <span class="telemetry-val text-primary">Người dùng tự bảo mật thông tin đăng nhập Portal; ứng dụng không yêu cầu Binance API key hoặc secret.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-3 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
+        <div>&copy; 2026 Binance Quant Pro — Nền tảng Giao dịch Định lượng Phi Lưu Ký.</div>
+        <div class="flex gap-4">
+            <a href="/risk-warning" class="hover:text-primary">Cảnh báo rủi ro</a>
+            <a href="/privacy" class="hover:text-primary">Chính sách</a>
+            <a href="/terms" class="hover:text-primary">Điều khoản</a>
+        </div>
+    </footer>
+</div>
+{% endblock %}

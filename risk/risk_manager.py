@@ -1,5 +1,6 @@
 import math
 import logging
+from decimal import Decimal, ROUND_FLOOR, ROUND_HALF_UP
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Tuple, Optional
 from config.settings import BotConfig
@@ -7,6 +8,31 @@ from config.settings import BotConfig
 logger = logging.getLogger("RiskManager")
 
 VIETNAM_TZ = timezone(timedelta(hours=7))
+
+class PositionSizingResult(dict):
+    """
+    Kết quả tính toán Position Sizing, hỗ trợ cả truy cập dạng Dict:
+    sizing["qty"], sizing["margin"], sizing["risk_amount"], sizing["valid"]
+    và unpacking dạng Tuple: qty, margin, risk = sizing
+    """
+    def __iter__(self):
+        return iter((self.get("qty", 0.0), self.get("margin", 0.0), self.get("risk_amount", 0.0)))
+
+    @property
+    def qty(self) -> float:
+        return self.get("qty", 0.0)
+
+    @property
+    def margin(self) -> float:
+        return self.get("margin", 0.0)
+
+    @property
+    def risk_amount(self) -> float:
+        return self.get("risk_amount", 0.0)
+
+    @property
+    def valid(self) -> bool:
+        return self.get("valid", False)
 
 
 class RiskManager:
@@ -16,62 +42,129 @@ class RiskManager:
     - Làm tròn số lượng theo stepSize/lotSize của Binance.
     - Kiểm soát sụt giảm tài khoản trong ngày (Max Daily Drawdown).
     - Giới hạn số lượng vị thế mở đồng thời.
+    - Chống thất thoát dữ liệu Circuit Breaker xuyên tiến trình / khởi động lại.
     """
 
-    def __init__(self, config: BotConfig):
+    def __init__(self, config: BotConfig, execution_service_client: Optional[Any] = None):
         self.config = config
+        self.execution_service_client = execution_service_client
         self.daily_start_balance = 0.0
         self.last_reset_day = None
-        self.circuit_breaker_triggered = False
-        self.circuit_breaker_until: Optional[datetime] = None
+        self.circuit_breaker_triggered = True
+        self._circuit_breaker_until: Optional[datetime] = None
+        self.corrupt_circuit_breaker = False
+        self.circuit_breaker_state = "UNKNOWN"
+        self._load_circuit_breaker()
+
+    @property
+    def circuit_breaker_until(self) -> Optional[datetime]:
+        self._load_circuit_breaker()
+        return self._circuit_breaker_until
+
+    @circuit_breaker_until.setter
+    def circuit_breaker_until(self, value: Optional[datetime]):
+        """Update display projection only; applications cannot write breaker authority."""
+        self._circuit_breaker_until = value
+        self.circuit_breaker_triggered = value is not None
+        self.circuit_breaker_state = "TRIPPED" if value is not None else "UNKNOWN"
+
+    def _save_circuit_breaker(self):
+        """Retained as a no-op for compatibility; breaker authority is service-only."""
+        logger.debug("Ignored application breaker persistence request (projection-only)")
+
+    def _load_circuit_breaker(self):
+        """Refresh the read-only breaker projection from the Execution Service."""
+        client = getattr(self, "execution_service_client", None)
+        if client is None or not hasattr(client, "query_circuit_breaker"):
+            self.circuit_breaker_state = "UNKNOWN"
+            self.circuit_breaker_triggered = True
+            self._circuit_breaker_until = None
+            return
+
+        try:
+            result = client.query_circuit_breaker()
+        except Exception:
+            result = None
+        if not isinstance(result, dict) or not result.get("success"):
+            self.circuit_breaker_state = "UNKNOWN"
+            self.circuit_breaker_triggered = True
+            self._circuit_breaker_until = None
+            return
+
+        nested = result.get("circuit_breaker")
+        breaker = nested if isinstance(nested, dict) else result
+        state_raw = breaker.get("state")
+        active_raw = breaker.get("is_active", breaker.get("circuit_breaker_triggered"))
+        if not isinstance(state_raw, str) or not isinstance(active_raw, bool):
+            self.circuit_breaker_state = "UNKNOWN"
+            self.circuit_breaker_triggered = True
+            self._circuit_breaker_until = None
+            return
+
+        state = state_raw.strip().upper()
+        if state not in {"HEALTHY", "TRIPPED"}:
+            self.circuit_breaker_state = "UNKNOWN"
+            self.circuit_breaker_triggered = True
+            self._circuit_breaker_until = None
+            return
+        cooldown = breaker.get("cooldown_until")
+        expired_trip = False
+        if state == "TRIPPED" and active_raw is False:
+            if isinstance(cooldown, bool) or not isinstance(cooldown, (int, float)):
+                self.circuit_breaker_state = "UNKNOWN"
+                self.circuit_breaker_triggered = True
+                self._circuit_breaker_until = None
+                return
+            timestamp = float(cooldown)
+            expired_trip = math.isfinite(timestamp) and timestamp >= 0 and timestamp <= datetime.now(timezone.utc).timestamp()
+        if active_raw != (state == "TRIPPED") and not expired_trip:
+            self.circuit_breaker_state = "UNKNOWN"
+            self.circuit_breaker_triggered = True
+            self._circuit_breaker_until = None
+            return
+
+        self.circuit_breaker_state = "HEALTHY" if expired_trip else state
+        self.circuit_breaker_triggered = False if expired_trip else active_raw
+        self._circuit_breaker_until = None
+        cooldown = breaker.get("cooldown_until")
+        if cooldown is not None:
+            if isinstance(cooldown, bool) or not isinstance(cooldown, (int, float)):
+                self.circuit_breaker_state = "UNKNOWN"
+                self.circuit_breaker_triggered = True
+                return
+            timestamp = float(cooldown)
+            if not math.isfinite(timestamp) or timestamp < 0:
+                self.circuit_breaker_state = "UNKNOWN"
+                self.circuit_breaker_triggered = True
+                return
+            if timestamp > 0:
+                self._circuit_breaker_until = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+        baseline = breaker.get("daily_baseline_balance", breaker.get("daily_start_balance"))
+        if baseline is not None and not isinstance(baseline, bool) and isinstance(baseline, (int, float)):
+            parsed = float(baseline)
+            if math.isfinite(parsed) and parsed > 0:
+                self.daily_start_balance = parsed
 
     def reset_daily_stats_if_needed(self, current_balance: float):
-        """Reset mốc vốn đầu ngày vào 00:00 Giờ Việt Nam (UTC+7)"""
-        current_day = datetime.now(VIETNAM_TZ).date()
-        if self.last_reset_day != current_day:
-            self.last_reset_day = current_day
-            self.daily_start_balance = current_balance
-            self.circuit_breaker_triggered = False
-            self.circuit_breaker_until = None
-            logger.info(f"Đã reset vốn mốc đầu ngày mới (Giờ VN UTC+7): ${self.daily_start_balance:.2f}")
+        """Refresh the service projection; applications never reset authoritative state."""
+        del current_balance
+        self._load_circuit_breaker()
 
     def check_circuit_breaker(self, current_balance: float) -> Tuple[bool, str]:
-        """Kiểm tra xem có chạm ngưỡng cắt lỗ cả ngày (Max Daily Loss / Circuit Breaker) hay không"""
-        self.reset_daily_stats_if_needed(current_balance)
-
-        now = datetime.now(VIETNAM_TZ)
-        if self.circuit_breaker_until and now < self.circuit_breaker_until:
-            remain = self.circuit_breaker_until - now
-            hours_left = remain.total_seconds() / 3600.0
-            msg = f"🚨 CẦU DAO ĐANG KHÓA (Circuit Breaker Cooldown): Còn {hours_left:.1f} giờ để bảo vệ vốn trước khi mở lại."
-            return False, msg
-
-        if not getattr(self.config, "enable_circuit_breaker", True):
-            return True, "Circuit Breaker đã tắt"
-
-        if self.daily_start_balance <= 0:
-            return True, "Hệ thống sẵn sàng"
-
-        loss_usdt = self.daily_start_balance - current_balance
-        drawdown_pct = (loss_usdt / self.daily_start_balance * 100.0) if self.daily_start_balance > 0 else 0.0
-
-        max_loss_usdt = getattr(self.config, "circuit_breaker_max_daily_loss", 30.0)
-        max_loss_pct = getattr(self.config, "max_daily_loss_percent", 3.0)
-
-        if drawdown_pct >= max_loss_pct or loss_usdt >= max_loss_usdt:
-            self.circuit_breaker_triggered = True
-            cooldown_h = getattr(self.config, "circuit_breaker_cooldown_hours", 12)
-            self.circuit_breaker_until = now + timedelta(hours=cooldown_h)
-            msg = (
-                f"🚨 CẦU DAO BẢO VỆ VỐN ĐÃ KÍCH HOẠT (CIRCUIT BREAKER)!\n"
-                f"• Tổng lỗ trong ngày: -${loss_usdt:.2f} USDT (-{drawdown_pct:.2f}%)\n"
-                f"• Ngưỡng ngắt cho phép: ${max_loss_usdt:.2f} USDT ({max_loss_pct}%)\n"
-                f"• Khóa tạm thời: {cooldown_h} tiếng để tránh bão thị trường!"
-            )
-            logger.warning(msg)
-            return False, msg
-
-        return True, f"Drawdown ngày an toàn: -${max(0.0, loss_usdt):.2f} (-{max(0.0, drawdown_pct):.2f}%)"
+        """Fail closed unless the service explicitly projects a healthy breaker."""
+        del current_balance
+        self._load_circuit_breaker()
+        if self.circuit_breaker_state == "UNKNOWN":
+            return False, "CIRCUIT_BREAKER_UNKNOWN: authoritative service sync is unavailable"
+        if self.circuit_breaker_state == "TRIPPED":
+            if self._circuit_breaker_until:
+                return False, (
+                    "CIRCUIT_BREAKER_TRIPPED: authoritative cooldown until "
+                    f"{self._circuit_breaker_until.isoformat()}"
+                )
+            return False, "CIRCUIT_BREAKER_TRIPPED: authoritative service has halted entries"
+        return True, "Authoritative circuit breaker projection is HEALTHY."
 
     def is_news_blackout_window(self) -> Tuple[bool, str]:
         """
@@ -80,13 +173,12 @@ class RiskManager:
         - 17:55 - 19:05 UTC: Khung giờ công bố Lãi suất FED & Họp báo FOMC (2:00 PM EST)
         - 23:55 - 00:05 UTC: Khung giờ biến động giao phiên ngày mới & Quyết toán Funding Rate
         """
-        if not self.config.enable_news_filter:
+        if not getattr(self.config, "enable_news_filter", False):
             return False, "News filter tắt"
 
         now_utc = datetime.now(timezone.utc).time()
         current_minute = now_utc.hour * 60 + now_utc.minute
 
-        # Danh sách các khoảng phút trong ngày theo UTC cần né lệnh
         blackout_intervals = [
             (12 * 60 + 25, 13 * 60 + 35, "Tin tức vĩ mô Mỹ 8:30 AM EST (CPI / NFP / PPI / GDP)"),
             (17 * 60 + 55, 19 * 60 + 5, "Họp báo FED & Quyết định Lãi suất FOMC"),
@@ -102,149 +194,106 @@ class RiskManager:
 
         return False, "Thời gian thị trường bình thường"
 
-    def can_open_new_position(self, current_open_positions: int, current_balance: float) -> Tuple[bool, str]:
-        """Kiểm tra điều kiện an toàn trước khi vào lệnh mới"""
-        # 1. Kiểm tra Circuit Breaker (Max daily drawdown)
-        safe, reason = self.check_circuit_breaker(current_balance)
-        if not safe:
-            return False, reason
+    def can_open_new_position(self, current_positions_count: int, current_balance: float) -> Tuple[bool, str]:
+        """Check entry policy without granting application-side breaker authority."""
+        cb_ok, cb_msg = self.check_circuit_breaker(current_balance)
+        if not cb_ok:
+            return False, cb_msg
 
-        # 2. Kiểm tra bộ lọc tin tức vĩ mô (Economic News Blackout)
-        in_blackout, blackout_reason = self.is_news_blackout_window()
-        if in_blackout:
-            return False, blackout_reason
+        max_positions = getattr(self.config, "max_concurrent_positions", 3)
+        if current_positions_count >= max_positions:
+            return False, f"Đã đạt số lượng vị thế mở tối đa ({current_positions_count}/{max_positions})."
 
-        # 3. Kiểm tra số lệnh tối đa
-        if current_open_positions >= self.config.max_concurrent_positions:
-            return False, f"Đã đạt số vị thế mở tối đa cho phép ({current_open_positions}/{self.config.max_concurrent_positions})"
-
-        # 4. Kiểm tra số dư tối thiểu
-        if current_balance < 10.0:
-            return False, f"Số dư khả dụng quá thấp (${current_balance:.2f} USDT) để mở lệnh mới"
-
-        return True, "Đủ điều kiện an toàn để mở vị thế"
-
-    def calculate_dynamic_leverage(self, entry_price: float, stop_loss_price: float) -> int:
-        """
-        Tự động tính toán mức đòn bẩy thích ứng (Dynamic Volatility Leverage):
-        - SL hẹp (<= 1.2% - như BTC, ETH): Đòn bẩy 10x (tiết kiệm ký quỹ, tận dụng vốn tối đa)
-        - SL vừa (1.2% - 1.8%): Đòn bẩy 8x
-        - SL chuẩn (1.8% - 2.5%): Đòn bẩy 5x
-        - SL rộng (2.5% - 3.5%): Đòn bẩy 3x
-        - SL biến động lớn (> 3.5% - Altcoin râu dài, Meme): Đòn bẩy 2x (an toàn tuyệt đối, thanh lý cực xa)
-        """
-        if not getattr(self.config, "enable_dynamic_leverage", True):
-            return int(self.config.leverage)
-
-        sl_pct = (abs(entry_price - stop_loss_price) / entry_price) * 100.0 if entry_price > 0 else 2.0
-        min_lev = getattr(self.config, "min_leverage", 2)
-        max_lev = getattr(self.config, "max_leverage", 10)
-
-        if sl_pct <= 1.2:
-            lev = 10
-        elif sl_pct <= 1.8:
-            lev = 8
-        elif sl_pct <= 2.5:
-            lev = 5
-        elif sl_pct <= 3.5:
-            lev = 3
-        else:
-            lev = 2
-
-        return max(min_lev, min(max_lev, lev))
+        return True, "Đủ điều kiện mở vị thế mới."
 
     def calculate_position_size(
         self,
-        balance: float,
-        entry_price: float,
-        stop_loss_price: float,
+        current_balance: float = 0.0,
+        entry_price: float = 0.0,
+        stop_loss_price: float = 0.0,
         step_size: float = 0.001,
         min_qty: float = 0.001,
-        min_notional: float = 5.0,
-        leverage: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """
-        Tính toán khối lượng vào lệnh (Quantity) theo chế độ đã cấu hình kết hợp Đòn bẩy thích ứng (Dynamic Leverage):
-        - risk_percent: Số tiền lỗ nếu dính SL cố định = balance * risk%
-        - margin_percent: Ký quỹ = balance * margin%
-        - fixed_amount: Ký quỹ cố định = fixed_usdt
-        """
-        if balance <= 0 or entry_price <= 0 or stop_loss_price <= 0:
-            return {"valid": False, "qty": 0.0, "reason": "Dữ liệu đầu vào giá/vốn không hợp lệ"}
+        leverage: Optional[int] = None,
+        ai_score: Optional[float] = None,
+        **kwargs
+    ) -> PositionSizingResult:
+        """Tính toán khối lượng lệnh (Quantity) và Ký quỹ (Margin) dựa trên quy tắc quản trị rủi ro"""
+        bal = kwargs.get("balance", current_balance)
+        if bal <= 0:
+            bal = current_balance
 
-        sl_distance = abs(entry_price - stop_loss_price)
-        if sl_distance <= 0:
-            return {"valid": False, "qty": 0.0, "reason": "Khoảng cách Stop Loss bằng 0"}
+        if bal <= 0 or entry_price <= 0:
+            return PositionSizingResult(valid=False, qty=0.0, margin=0.0, risk_amount=0.0, reason="Invalid balance or price")
 
-        # Xác định mức đòn bẩy thích ứng cho lệnh
-        effective_leverage = leverage if leverage is not None else self.calculate_dynamic_leverage(entry_price, stop_loss_price)
+        eff_leverage = leverage or getattr(self.config, "leverage", 5)
+        stop_distance = abs(entry_price - stop_loss_price)
+        if stop_distance <= 0:
+            return PositionSizingResult(valid=False, qty=0.0, margin=0.0, risk_amount=0.0, reason="Zero stop distance")
 
-        mode = self.config.sizing_mode
-
-        if mode == "risk_percent":
-            risk_amount = balance * (self.config.risk_per_trade_percent / 100.0)
-            raw_qty = risk_amount / sl_distance
-            actual_margin = (raw_qty * entry_price) / effective_leverage
-            # Nếu tiền ký quỹ vượt quá 35% tổng tài khoản, giới hạn lại để tránh over-leverage
-            max_allowed_margin = balance * 0.35
-            if actual_margin > max_allowed_margin:
-                raw_qty = (max_allowed_margin * effective_leverage) / entry_price
-                risk_amount = raw_qty * sl_distance
+        mode = getattr(self.config, "sizing_mode", "risk_percent").lower()
+        if mode == "fixed_amount":
+            fixed_usdt = float(getattr(self.config, "fixed_usdt_per_trade", 50.0))
+            margin = min(fixed_usdt, bal * 0.5)
+            notional = margin * eff_leverage
+            raw_qty = notional / entry_price
+            risk_amount = raw_qty * stop_distance
         elif mode == "margin_percent":
-            margin = balance * (self.config.margin_percent_per_trade / 100.0)
-            notional = margin * effective_leverage
+            margin_pct = float(getattr(self.config, "margin_percent_per_trade", 5.0))
+            margin = bal * (margin_pct / 100.0)
+            notional = margin * eff_leverage
             raw_qty = notional / entry_price
-            risk_amount = raw_qty * sl_distance
-        else:  # fixed_amount
-            margin = min(self.config.fixed_usdt_per_trade, balance * 0.5)
-            notional = margin * effective_leverage
-            raw_qty = notional / entry_price
-            risk_amount = raw_qty * sl_distance
+            risk_amount = raw_qty * stop_distance
+        else:
+            risk_percent = getattr(self.config, "risk_per_trade_percent", 1.5)
+            if ai_score is not None:
+                if ai_score >= 8.5:
+                    risk_percent = min(risk_percent * 1.25, 2.5)
+                elif ai_score <= 6.5:
+                    risk_percent = max(risk_percent * 0.75, 0.8)
 
-        # Làm tròn theo step_size của sàn Binance
+            risk_amount = bal * (risk_percent / 100.0)
+            raw_qty = risk_amount / stop_distance
+            max_notional = bal * eff_leverage * 0.95
+            raw_qty = min(raw_qty, max_notional / entry_price)
+
+        hard_cap = getattr(self.config, "real_trading_hard_cap", 0.0)
+        is_dry_run = getattr(self.config, "dry_run", True)
+        if not is_dry_run and hard_cap and hard_cap > 0:
+            max_cap_notional = hard_cap * eff_leverage
+            raw_qty = min(raw_qty, max_cap_notional / entry_price)
+
         qty = self._round_step_size(raw_qty, step_size)
-        notional_value = qty * entry_price
-        required_margin = notional_value / effective_leverage
-
-        # Kiểm tra ngưỡng tối thiểu
         if qty < min_qty:
-            return {
-                "valid": False,
-                "qty": 0.0,
-                "reason": f"Khối lượng ({qty}) nhỏ hơn mức tối thiểu của sàn ({min_qty})"
-            }
+            return PositionSizingResult(valid=False, qty=0.0, margin=0.0, risk_amount=0.0, reason="Quantity below min_qty")
 
-        if notional_value < min_notional:
-            return {
-                "valid": False,
-                "qty": 0.0,
-                "reason": f"Giá trị vị thế (${notional_value:.2f}) nhỏ hơn mức tối thiểu ${min_notional} USDT"
-            }
+        actual_notional = qty * entry_price
+        actual_margin = actual_notional / eff_leverage
+        actual_risk = qty * stop_distance
 
-        if required_margin > balance * 0.9:
-            return {
-                "valid": False,
-                "qty": 0.0,
-                "reason": f"Ký quỹ cần (${required_margin:.2f}) vượt quá số dư khả dụng (${balance:.2f})"
-            }
-
-        return {
-            "valid": True,
-            "qty": qty,
-            "notional": round(notional_value, 2),
-            "margin": round(required_margin, 2),
-            "risk_amount": round(risk_amount, 2),
-            "risk_percent_actual": round((risk_amount / balance) * 100.0, 2),
-            "leverage": effective_leverage,
-            "sl_percent": round((sl_distance / entry_price) * 100.0, 2),
-            "reason": "OK"
-        }
+        return PositionSizingResult(
+            valid=True,
+            qty=qty,
+            margin=round(actual_margin, 2),
+            risk_amount=round(actual_risk, 2),
+            notional=round(actual_notional, 2),
+            leverage=eff_leverage,
+            reason="OK"
+        )
 
     @staticmethod
-    def _round_step_size(qty: float, step_size: float) -> float:
-        """Làm tròn số lượng xuống bội số của step_size"""
+    def _round_step_size(quantity: float, step_size: float) -> float:
         if step_size <= 0:
-            return round(qty, 3)
-        precision = int(round(-math.log10(step_size))) if step_size < 1 else 0
-        factor = 10 ** precision
-        return math.floor(qty * factor) / factor
+            return quantity
+        d_qty = Decimal(str(quantity))
+        d_step = Decimal(str(step_size))
+        rounded = (d_qty // d_step) * d_step
+        return float(rounded)
+
+    @staticmethod
+    def _round_tick_size(price: float, tick_size: float) -> float:
+        if tick_size <= 0:
+            return price
+        d_price = Decimal(str(price))
+        d_tick = Decimal(str(tick_size))
+        rounded = (d_price / d_tick).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * d_tick
+        return float(rounded)

@@ -1,0 +1,71 @@
+name: iOS Unsigned Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ui-v2-rc1
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned:
+    name: Build Unsigned iOS IPA
+    runs-on: macos-15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Verify Flutter Environment
+        run: |
+          flutter --version
+          dart --version
+          xcodebuild -version
+
+      - name: Install Dependencies
+        working-directory: ios-app
+        run: flutter pub get
+
+      - name: Flutter Analyze
+        working-directory: ios-app
+        run: flutter analyze
+
+      - name: Flutter Test
+        working-directory: ios-app
+        run: flutter test
+
+      - name: Build iOS Application (Release, No CodeSign)
+        working-directory: ios-app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package Unsigned IPA
+        working-directory: ios-app
+        run: |
+          set -euo pipefail
+          mkdir -p build/artifacts
+          cd build/ios/iphoneos
+          rm -rf Payload
+          mkdir Payload
+          cp -R Runner.app Payload/Runner.app
+          zip -qry ../../artifacts/BinanceQuantPro-UI_V2_RC1-unsigned.ipa Payload
+          rm -rf Payload
+          cd ../../artifacts
+          shasum -a 256 BinanceQuantPro-UI_V2_RC1-unsigned.ipa | tee SHA256SUMS.txt
+
+      - name: Upload Unsigned IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BinanceQuantPro-iOS-unsigned-UI_V2_RC1
+          path: |
+            ios-app/build/artifacts/BinanceQuantPro-UI_V2_RC1-unsigned.ipa
+            ios-app/build/artifacts/SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error
