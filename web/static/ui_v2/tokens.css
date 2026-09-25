@@ -1,89 +1,107 @@
 /**
- * Obsidian Quants — Binance Quant Pro UI V2
- * Canonical Design Tokens
+ * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C
+ * Professional Trading Terminal Design Tokens
+ * Direction: Binance Pro + Linear + Bloomberg Terminal Density
  */
 
 :root {
-  /* Foundations & Surfaces */
-  --bg: #051424;
-  --surface-lowest: #010F1F;
-  --surface-low: #0D1C2D;
-  --surface: #122131;
-  --surface-high: #1C2B3C;
-  --surface-highest: #273647;
+  /* Foundations & Surfaces (Restrained Dark Palette) */
+  --bg: #070B12;
+  --surface-lowest: #070B12;
+  --surface-low: #0D111A;
+  --surface: #0D111A;
+  --surface-high: #121824;
+  --surface-highest: #171E2B;
+  --surface-elevated: #171E2B;
 
   /* Borders & Dividers */
-  --border: #1C2E42;
+  --border: #202938;
   --border-active: #334155;
-  --border-subtle: rgba(28, 46, 66, 0.6);
+  --border-subtle: rgba(255, 255, 255, 0.06);
 
-  /* Functional Accents */
-  --gold: #F0B90B;
-  --cyan: #00F0FF;
-  --green: #0ECB81;
-  --red: #F6465D;
+  /* Functional Accents (Strictly restrained, Accent cyan max 10%) */
+  --accent-cyan: #3DD9EB;
+  --cyan: #3DD9EB;
+  --positive: #18C784;
+  --green: #18C784;
+  --negative: #F0445E;
+  --red: #F0445E;
+  --warning: #F3BA2F;
+  --gold: #F3BA2F;
+  --critical: #FF5C68;
   --purple: #A855F7;
 
   /* Text & Labels */
-  --text-primary: #D4E4FA;
-  --text-secondary: #B9CACB;
-  --text-muted: #849495;
-  --text-inverse: #051424;
+  --text-primary: #E8EDF5;
+  --text-secondary: #95A1B2;
+  --text-muted: #5E6A7D;
+  --text-inverse: #070B12;
 
   /* Semantic Status Aliases */
   --status-healthy: var(--green);
   --status-ready: var(--green);
   --status-warning: var(--gold);
-  --status-critical: var(--red);
-  --status-halted: var(--red);
+  --status-critical: var(--critical);
+  --status-halted: var(--critical);
   --status-offline: var(--cyan);
   --status-testnet: var(--gold);
   --status-live: var(--gold);
   --status-disabled: var(--text-muted);
   --status-unknown: var(--text-muted);
 
-  /* Semantic Surface Tints */
-  --tint-healthy-bg: rgba(14, 203, 129, 0.10);
-  --tint-healthy-border: rgba(14, 203, 129, 0.35);
-  --tint-warning-bg: rgba(240, 185, 11, 0.10);
-  --tint-warning-border: rgba(240, 185, 11, 0.35);
-  --tint-critical-bg: rgba(246, 70, 93, 0.10);
-  --tint-critical-border: rgba(246, 70, 93, 0.35);
-  --tint-offline-bg: rgba(0, 240, 255, 0.10);
-  --tint-offline-border: rgba(0, 240, 255, 0.35);
+  /* Semantic Surface Tints (Subtle, Non-Neon) */
+  --tint-healthy-bg: rgba(24, 199, 132, 0.08);
+  --tint-healthy-border: rgba(24, 199, 132, 0.25);
+  --tint-warning-bg: rgba(243, 186, 47, 0.08);
+  --tint-warning-border: rgba(243, 186, 47, 0.25);
+  --tint-critical-bg: rgba(255, 92, 104, 0.08);
+  --tint-critical-border: rgba(255, 92, 104, 0.25);
+  --tint-offline-bg: rgba(61, 217, 235, 0.08);
+  --tint-offline-border: rgba(61, 217, 235, 0.25);
 
   /* Typography Stacks */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
 
+  /* Typography Scale */
+  --font-size-page-title: 20px;
+  --font-size-section-title: 13px;
+  --font-size-body: 13px;
+  --font-size-table: 12px;
+  --font-size-metric: 18px;
+  --font-size-metric-lg: 22px;
+  --font-size-caption: 11px;
+
   /* Tabular Figures Feature Settings */
   --font-numeric-features: "tnum" 1, "zero" 1;
 
-  /* Spacing Scale (High-Density Trading Terminal) */
+  /* Spacing Scale (Baseline: 4, 6, 8, 12, 16, 24) */
   --space-2xs: 2px;
   --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-  --space-2xl: 32px;
+  --space-sm: 6px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 24px;
 
-  /* Radius Scale */
+  /* Radius Scale (Precise terminal, 8px max) */
   --radius-micro: 2px;
+  --radius-sm: 4px;
   --radius-default: 4px;
   --radius-container: 6px;
+  --radius-lg: 8px;
   --radius-max: 8px;
 
-  /* Elevation & Shadows (Stoic Minimalist - Surface Hierarchy over heavy glow) */
-  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-panel: 0 4px 12px rgba(1, 15, 31, 0.6);
-  --shadow-modal: 0 12px 36px rgba(1, 15, 31, 0.85);
+  /* Shadows (Minimal - Surface Contrast Over Floating Shadows) */
+  --shadow-subtle: none;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-modal: 0 8px 24px rgba(0, 0, 0, 0.65);
 
   /* Focus Ring */
-  --focus-ring: 0 0 0 2px var(--cyan);
-  --focus-ring-gold: 0 0 0 2px var(--gold);
+  --focus-ring: 0 0 0 1px var(--accent-cyan);
+  --focus-ring-gold: 0 0 0 1px var(--gold);
 
   /* Transitions (Fast Institutional Micro-Interactions) */
-  --transition-fast: 120ms ease;
-  --transition-normal: 160ms cubic-bezier(0.2, 0.8, 0.25, 1);
+  --transition-fast: 100ms ease;
+  --transition-normal: 140ms cubic-bezier(0.2, 0.8, 0.25, 1);
 }

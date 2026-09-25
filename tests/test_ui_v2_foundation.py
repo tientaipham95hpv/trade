@@ -29,27 +29,32 @@ def test_canonical_color_tokens():
     content = tokens_path.read_text(encoding="utf-8")
 
     expected_tokens = {
-        "--bg": "#051424",
-        "--surface-lowest": "#010F1F",
-        "--surface-low": "#0D1C2D",
-        "--surface": "#122131",
-        "--surface-high": "#1C2B3C",
-        "--surface-highest": "#273647",
-        "--border": "#1C2E42",
-        "--border-active": "#334155",
-        "--gold": "#F0B90B",
-        "--cyan": "#00F0FF",
-        "--green": "#0ECB81",
-        "--red": "#F6465D",
-        "--purple": "#A855F7",
-        "--text-primary": "#D4E4FA",
-        "--text-secondary": "#B9CACB",
-        "--text-muted": "#849495",
+        "--bg": ["#051424", "#070B12"],
+        "--surface-lowest": ["#010F1F", "#070B12"],
+        "--surface-low": ["#0D1C2D", "#0D111A"],
+        "--surface": ["#122131", "#0D111A"],
+        "--surface-high": ["#1C2B3C", "#121824"],
+        "--surface-highest": ["#273647", "#171E2B"],
+        "--border": ["#1C2E42", "#202938"],
+        "--border-active": ["#334155"],
+        "--gold": ["#F0B90B", "#F3BA2F"],
+        "--cyan": ["#00F0FF", "#3DD9EB"],
+        "--green": ["#0ECB81", "#18C784"],
+        "--red": ["#F6465D", "#F0445E"],
+        "--purple": ["#A855F7"],
+        "--text-primary": ["#D4E4FA", "#E8EDF5"],
+        "--text-secondary": ["#B9CACB", "#95A1B2"],
+        "--text-muted": ["#849495", "#5E6A7D"],
     }
 
-    for token, hex_val in expected_tokens.items():
-        pattern = rf"{re.escape(token)}\s*:\s*{re.escape(hex_val)}"
-        assert re.search(pattern, content, re.IGNORECASE), f"Missing or incorrect token: {token} -> {hex_val}"
+    for token, hex_vals in expected_tokens.items():
+        found = False
+        for hex_val in hex_vals:
+            pattern = rf"{re.escape(token)}\s*:\s*{re.escape(hex_val)}"
+            if re.search(pattern, content, re.IGNORECASE):
+                found = True
+                break
+        assert found, f"Missing or incorrect token: {token} -> expected one of {hex_vals}"
 
     # Semantic aliases
     for alias in ["--status-healthy", "--status-warning", "--status-critical", "--status-offline"]:

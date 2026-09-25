@@ -280,38 +280,42 @@ class OverviewTab extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(pos.symbol, style: QuantTypography.heading.copyWith(fontSize: 13.0)),
-                    const SizedBox(width: QuantSpacing.spaceXs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                      decoration: BoxDecoration(
-                        color: sideColor.withValues(alpha: 0.12),
-                        border: Border.all(color: sideColor.withValues(alpha: 0.4)),
-                        borderRadius: QuantSpacing.borderMicro,
-                      ),
-                      child: Text(
-                        pos.side,
-                        style: QuantTypography.technical.copyWith(
-                          color: sideColor,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(pos.symbol, style: QuantTypography.heading.copyWith(fontSize: 13.0)),
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: sideColor.withValues(alpha: 0.12),
+                          border: Border.all(color: sideColor.withValues(alpha: 0.4)),
+                          borderRadius: QuantSpacing.borderMicro,
+                        ),
+                        child: Text(
+                          pos.side,
+                          style: QuantTypography.technical.copyWith(
+                            color: sideColor,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Entry: ${QuantFormatters.formatCurrency(pos.entryPrice)} | Qty: ${QuantFormatters.formatNumber(pos.qty)}',
-                  style: QuantTypography.caption,
-                ),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Entry: ${QuantFormatters.formatCurrency(pos.entryPrice)} | Qty: ${QuantFormatters.formatNumber(pos.qty)}',
+                    style: QuantTypography.caption,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: QuantSpacing.spaceSm),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -338,15 +342,28 @@ class OverviewTab extends StatelessWidget {
 
   Widget _buildGovRow(String label, String value, Color color) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(label, style: QuantTypography.caption),
-        Text(
-          value,
-          style: QuantTypography.technical.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-            fontSize: 11.0,
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: QuantTypography.caption,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: QuantSpacing.spaceXs),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: QuantTypography.technical.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 10.5,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

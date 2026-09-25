@@ -1,6 +1,7 @@
 /**
- * Obsidian Quants — Binance Quant Pro UI V2
- * Responsive Breakpoint System
+ * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C
+ * Professional Trading Terminal Responsive Breakpoints
+ * Breakpoints: Desktop (>=1440px), Tablet/Compact (1024px-1439px), Mobile (<1024px, <640px)
  */
 
 /* ==========================================================================
@@ -8,11 +9,11 @@
    ========================================================================== */
 @media (min-width: 1440px) {
   .terminal-viewport {
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-xl);
   }
 
-  .terminal-grid-12 {
-    gap: var(--space-sm);
+  .band-work-area {
+    grid-template-columns: 65% calc(35% - var(--space-md));
   }
 }
 
@@ -20,56 +21,100 @@
    Tablet & Compact Desktop (1024px - 1439px)
    ========================================================================== */
 @media (max-width: 1439px) and (min-width: 1024px) {
-  .col-span-12-lg { grid-column: span 12 / span 12; }
-  .col-span-6-lg  { grid-column: span 6 / span 6; }
+  .terminal-sidebar {
+    width: 180px;
+    min-width: 180px;
+  }
 
-  /* Collapse 3-column top row to 2-column or full width where needed */
-  .col-span-3 { grid-column: span 6 / span 6; }
-  .col-span-6 { grid-column: span 12 / span 12; }
-  .col-span-8 { grid-column: span 12 / span 12; }
-  .col-span-4 { grid-column: span 12 / span 12; }
+  .band-work-area {
+    grid-template-columns: 60% calc(40% - var(--space-md));
+  }
+
+  .risk-two-column {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* ==========================================================================
-   Mobile Operator Surface (< 1024px)
+   Mobile & Tablet Surface (< 1024px)
    ========================================================================== */
 @media (max-width: 1023px) {
-  .top-telemetry-bar {
+  .terminal-body-wrapper {
     flex-direction: column;
-    align-items: stretch;
-    padding: var(--space-xs);
-    gap: var(--space-xs);
   }
 
-  .top-telemetry-left,
-  .top-telemetry-right {
-    justify-content: space-between;
+  .terminal-sidebar {
     width: 100%;
+    min-width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: var(--space-xs) 0;
   }
 
-  .terminal-nav-bar {
+  .terminal-sidebar-nav {
+    flex-direction: row;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 0 var(--space-xs);
+    gap: var(--space-xs);
+    padding: 0 var(--space-sm);
   }
 
-  .terminal-nav-tab {
-    padding: var(--space-xs) var(--space-sm);
+  .terminal-nav-link {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    border-radius: var(--radius-micro);
     white-space: nowrap;
-    min-height: 40px;
-    display: inline-flex;
-    align-items: center;
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+
+  .terminal-nav-link--active,
+  .terminal-nav-link.active {
+    border-left-color: transparent !important;
+    border-bottom-color: var(--accent-cyan) !important;
+  }
+
+  .terminal-sidebar-footer {
+    display: none;
   }
 
   .terminal-viewport {
     padding: var(--space-sm);
   }
 
-  /* Single Column Stack */
+  .top-telemetry-bar {
+    padding: 0 var(--space-sm);
+    gap: var(--space-sm);
+  }
+
+  .top-telemetry-bar__center {
+    display: none; /* Hide middle strip on smaller screens to avoid overflow */
+  }
+
+  .band-system-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .band-financial-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .band-work-area {
+    grid-template-columns: 1fr;
+  }
+
+  .risk-two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .dense-table-container {
+    -webkit-overflow-scrolling: touch;
+  }
+
   .terminal-grid-12 {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: var(--space-md);
   }
 
   .col-span-1,  .col-span-2,  .col-span-3,
@@ -79,15 +124,8 @@
     width: 100%;
   }
 
-  /* Table horizontal overflow */
-  .dense-table-wrapper {
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Accessible Touch Targets for Mobile Controls */
-  .btn-terminal {
-    min-height: 42px;
-    padding: var(--space-xs) var(--space-lg);
+  .position-drawer {
+    max-width: 100%;
   }
 }
 
@@ -95,28 +133,23 @@
    Compact Mobile Phone (< 640px)
    ========================================================================== */
 @media (max-width: 639px) {
-  html {
-    font-size: 13px;
+  .top-telemetry-bar {
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    padding: 6px var(--space-sm);
   }
 
-  .top-telemetry-brand {
-    font-size: 0.76rem;
+  .band-system-strip {
+    grid-template-columns: 1fr;
   }
 
-  .telemetry-item {
-    font-size: 0.64rem;
-    padding: 2px 4px;
+  .band-financial-strip {
+    grid-template-columns: 1fr;
   }
 
-  .metric-card-value {
-    font-size: 1.05rem;
-  }
-
-  .confirm-dialog-backdrop {
-    padding: var(--space-xs);
-  }
-
-  .confirm-dialog-box {
-    max-width: 100%;
+  .btn-terminal {
+    width: 100%;
+    justify-content: center;
   }
 }

@@ -297,10 +297,10 @@ class _RiskTabState extends State<RiskTab> {
                 SizedBox(
                   height: QuantSpacing.minTouchTarget,
                   child: OutlinedButton.icon(
-                    icon: const Icon(Icons.block, color: QuantColors.textMuted, size: 18),
+                    icon: const Icon(Icons.block, color: QuantColors.textMuted, size: 16),
                     label: Text(
                       'CLOSE ALL (KHÔNG KHẢ DỤNG)',
-                      style: QuantTypography.sectionTitle.copyWith(color: QuantColors.textMuted),
+                      style: QuantTypography.caption.copyWith(color: QuantColors.textMuted),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: QuantColors.border),
@@ -321,13 +321,24 @@ class _RiskTabState extends State<RiskTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: QuantTypography.caption),
-        Text(
-          value,
-          style: QuantTypography.technical.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-            fontSize: 11.5,
+        Expanded(
+          child: Text(
+            label,
+            style: QuantTypography.caption,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: QuantSpacing.spaceXs),
+        Flexible(
+          child: Text(
+            value,
+            style: QuantTypography.technical.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -341,7 +352,14 @@ class _RiskTabState extends State<RiskTab> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: QuantTypography.caption),
+        Expanded(
+          child: Text(
+            label,
+            style: QuantTypography.caption,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: QuantSpacing.spaceXs),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
           decoration: BoxDecoration(

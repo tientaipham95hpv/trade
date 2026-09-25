@@ -5,59 +5,67 @@
 {% block body %}
 <div class="terminal-shell">
     {% include "ui_v2/partials/telemetry_bar.html" %}
-    {% include "ui_v2/partials/navigation.html" %}
 
-    <main id="terminal-viewport" class="terminal-viewport">
-        <!-- Initial skeleton shown before JS hydration -->
-        <div class="terminal-grid-12">
-            <div class="col-span-4">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">SYSTEM STATUS</span>
+    <div class="terminal-body-wrapper">
+        {% include "ui_v2/partials/navigation.html" %}
+
+        <main id="terminal-viewport" class="terminal-viewport">
+            <!-- Initial skeleton shown before JS hydration -->
+            <div class="overview-band-wrapper">
+                <div class="band-system-strip">
+                    <div class="system-strip-item">
+                        <span class="system-strip-label">EXECUTION</span>
+                        <div class="skeleton skeleton-text" style="width: 60px; height: 14px;"></div>
                     </div>
-                    <div class="panel-body">
-                        <div class="skeleton skeleton-text mb-2"></div>
-                        <div class="skeleton skeleton-text mb-2" style="width: 70%;"></div>
-                        <div class="skeleton skeleton-text" style="width: 50%;"></div>
+                    <div class="system-strip-item">
+                        <span class="system-strip-label">ENVIRONMENT</span>
+                        <div class="skeleton skeleton-text" style="width: 50px; height: 14px;"></div>
+                    </div>
+                    <div class="system-strip-item">
+                        <span class="system-strip-label">BREAKER</span>
+                        <div class="skeleton skeleton-text" style="width: 55px; height: 14px;"></div>
+                    </div>
+                    <div class="system-strip-item">
+                        <span class="system-strip-label">HALT</span>
+                        <div class="skeleton skeleton-text" style="width: 55px; height: 14px;"></div>
+                    </div>
+                    <div class="system-strip-item">
+                        <span class="system-strip-label">LATENCY</span>
+                        <div class="skeleton skeleton-text" style="width: 40px; height: 14px;"></div>
+                    </div>
+                </div>
+
+                <div class="band-financial-strip">
+                    <div class="financial-strip-item">
+                        <span class="financial-strip-label">REALIZED PNL</span>
+                        <div class="skeleton skeleton-metric" style="width: 80px; height: 20px;"></div>
+                    </div>
+                    <div class="financial-strip-item">
+                        <span class="financial-strip-label">UNREALIZED PNL</span>
+                        <div class="skeleton skeleton-metric" style="width: 80px; height: 20px;"></div>
+                    </div>
+                    <div class="financial-strip-item">
+                        <span class="financial-strip-label">OPEN POSITIONS</span>
+                        <div class="skeleton skeleton-metric" style="width: 60px; height: 20px;"></div>
+                    </div>
+                    <div class="financial-strip-item">
+                        <span class="financial-strip-label">DAILY LOSS</span>
+                        <div class="skeleton skeleton-metric" style="width: 70px; height: 20px;"></div>
+                    </div>
+                    <div class="financial-strip-item">
+                        <span class="financial-strip-label">LOSS STREAK</span>
+                        <div class="skeleton skeleton-metric" style="width: 40px; height: 20px;"></div>
+                    </div>
+                </div>
+
+                <div class="terminal-panel">
+                    <div class="panel-body py-12 text-center">
+                        <span class="font-mono text-cyan text-sm">CONNECTING TO EXECUTION SERVICE...</span>
                     </div>
                 </div>
             </div>
-            <div class="col-span-4">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">PNL & PERFORMANCE</span>
-                    </div>
-                    <div class="panel-body">
-                        <div class="skeleton skeleton-text mb-2"></div>
-                        <div class="skeleton skeleton-text mb-2" style="width: 80%;"></div>
-                        <div class="skeleton skeleton-text" style="width: 60%;"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-span-4">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">RISK & BREAKER</span>
-                    </div>
-                    <div class="panel-body">
-                        <div class="skeleton skeleton-text mb-2"></div>
-                        <div class="skeleton skeleton-text mb-2" style="width: 75%;"></div>
-                        <div class="skeleton skeleton-text" style="width: 45%;"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-span-12">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">LOADING REALTIME TELEMETRY...</span>
-                    </div>
-                    <div class="panel-body py-8 text-center">
-                        <div class="font-mono text-cyan text-sm">CONNECTING TO EXECUTION SERVICE...</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </main>
+        </main>
+    </div>
 </div>
 {% endblock %}
 

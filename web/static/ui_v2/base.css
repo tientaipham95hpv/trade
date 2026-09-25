@@ -1,6 +1,6 @@
 /**
- * Obsidian Quants — Binance Quant Pro UI V2
- * Base Resets, Typography & Accessibility Styles
+ * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C
+ * Base Resets, Typography & Trading Terminal Baseline
  */
 
 *,
@@ -12,8 +12,8 @@
 }
 
 html {
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-text-size-adjust: 100%;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -28,6 +28,7 @@ body {
   background-color: var(--bg);
   color: var(--text-primary);
   font-family: var(--font-sans);
+  font-size: var(--font-size-body);
   overflow-x: hidden;
 }
 
@@ -39,32 +40,49 @@ body {
 .font-mono {
   font-family: var(--font-mono);
   font-feature-settings: var(--font-numeric-features);
+  font-variant-numeric: tabular-nums;
 }
 
 .tabular-nums {
   font-feature-settings: var(--font-numeric-features);
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
 
 /* Text Hierarchy */
-h1, h2, h3, h4, h5, h6 {
-  font-weight: 700;
+h1 {
+  font-size: var(--font-size-page-title);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.015em;
 }
 
+h3, h4, h5, h6 {
+  font-size: var(--font-size-section-title);
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
 /* Institutional Terminal Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--surface-lowest);
+  background: var(--bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--surface-high);
+  background: var(--border);
   border-radius: var(--radius-micro);
 }
 
@@ -72,70 +90,28 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--border-active);
 }
 
-/* Universal Focus Rings for Keyboard Accessibility */
+/* Accessibility Focus Ring */
 :focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-  border-radius: var(--radius-micro);
 }
 
-/* Link and Button Resets */
-a {
-  color: var(--cyan);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
+/* Utility Colors */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-positive { color: var(--positive); }
+.text-negative { color: var(--negative); }
+.text-warning { color: var(--warning); }
+.text-critical { color: var(--critical); }
+.text-cyan { color: var(--accent-cyan); }
 
-a:hover {
-  color: #38f4ff;
-}
+/* Text Alignment */
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+.text-center { text-align: center; }
 
-button {
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  cursor: pointer;
-  border: 1px solid transparent;
-  background: transparent;
-  color: inherit;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-/* Value Change Flash Utilities */
-@keyframes flash-green {
-  0% {
-    background-color: rgba(14, 203, 129, 0.24);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-@keyframes flash-red {
-  0% {
-    background-color: rgba(246, 70, 93, 0.24);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-.flash-up {
-  animation: flash-green 300ms ease-out;
-}
-
-.flash-down {
-  animation: flash-red 300ms ease-out;
-}
-
-/* Accessible Reduced Motion Support */
+/* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

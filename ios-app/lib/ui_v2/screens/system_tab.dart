@@ -209,15 +209,28 @@ class SystemTab extends StatelessWidget {
 
   Widget _buildGovRow(String label, String value, Color color) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(child: Text(label, style: QuantTypography.caption)),
-        Text(
-          value,
-          style: QuantTypography.technical.copyWith(
-            color: color,
-            fontWeight: FontWeight.w700,
-            fontSize: 11.0,
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: QuantTypography.caption,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: QuantSpacing.spaceXs),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: QuantTypography.technical.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 10.5,
+            ),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

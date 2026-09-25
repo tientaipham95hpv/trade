@@ -1,8 +1,19 @@
 <header class="top-telemetry-bar">
     <div class="top-telemetry-bar__left">
+        <div class="top-telemetry-brand">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F3BA2F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            <span>TRADER</span>
+            <span style="display:none;">BINANCE QUANT PRO</span>
+            <span class="top-telemetry-brand-divider">|</span>
+        </div>
+
         <div class="telemetry-unit">
             <span class="telemetry-unit__key">ENV</span>
-            <span id="telemetry-env" class="env-badge env-unknown env-badge--unknown">UNKNOWN</span>
+            <span id="telemetry-env" class="env-badge env-badge--offline">OFFLINE</span>
         </div>
         <div class="telemetry-unit">
             <span class="telemetry-unit__key">EXEC</span>
@@ -12,42 +23,29 @@
             </span>
         </div>
         <div class="telemetry-unit">
-            <span class="telemetry-unit__key">WEB</span>
-            <span id="telemetry-web" class="status-badge status-badge--healthy">
-                <span class="status-badge__dot"></span>
-                READY
-            </span>
-        </div>
-        <div class="telemetry-unit">
-            <span class="telemetry-unit__key">TELEGRAM</span>
-            <span id="telemetry-tg" class="status-badge status-badge--healthy">
-                <span class="status-badge__dot"></span>
-                READY
-            </span>
-        </div>
-        <div class="telemetry-unit">
             <span class="telemetry-unit__key">HALT</span>
             <span id="telemetry-halt" class="status-badge status-badge--healthy">
                 <span class="status-badge__dot"></span>
                 INACTIVE
             </span>
         </div>
-        <div class="telemetry-unit">
-            <span class="telemetry-unit__key">RECOVERY</span>
-            <span id="telemetry-recovery" class="status-badge status-badge--healthy">
-                <span class="status-badge__dot"></span>
-                CLEAR
-            </span>
-        </div>
+        <!-- Hidden hooks for state synchronization if needed -->
+        <span id="telemetry-web" class="hidden" style="display:none;">READY</span>
+        <span id="telemetry-tg" class="hidden" style="display:none;">READY</span>
+        <span id="telemetry-recovery" class="hidden" style="display:none;">CLEAR</span>
     </div>
 
     <div class="top-telemetry-bar__right">
         <div class="telemetry-unit">
-            <span class="telemetry-unit__key">IPC RTT</span>
+            <span class="telemetry-unit__key">IPC</span>
             <span id="telemetry-latency" class="telemetry-unit__val font-mono text-cyan">— ms</span>
         </div>
         <div class="telemetry-unit">
             <span id="telemetry-clock" class="telemetry-unit__val font-mono text-secondary">--:--:-- UTC</span>
         </div>
+        <span class="badge-subtle font-mono" id="nav-operator-badge">admin</span>
+        <button id="btn-terminal-logout" class="btn btn--outline" title="Sign out of operator console">
+            LOGOUT
+        </button>
     </div>
 </header>

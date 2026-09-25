@@ -1,59 +1,59 @@
 {% extends "ui_v2/base.html" %}
 
-{% block title %}Binance Quant Pro — Institutional Quant Trading & Risk Terminal{% endblock %}
+{% block title %}TRADER — Deterministic Execution Control & Monitoring{% endblock %}
 
 {% block body %}
 <div class="terminal-shell min-h-screen flex flex-col justify-between">
     <!-- Top Telemetry Header -->
     <header class="top-telemetry-bar">
-        <div class="top-telemetry-left">
-            <a href="/" class="top-telemetry-brand">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F0B90B" stroke-width="2">
+        <div class="top-telemetry-bar__left">
+            <div class="top-telemetry-brand">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F3BA2F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
                     <polyline points="2 17 12 22 22 17"></polyline>
                     <polyline points="2 12 12 17 22 12"></polyline>
                 </svg>
-                <span class="text-gold font-bold">BINANCE QUANT PRO</span>
-            </a>
-            <span class="env-badge env-badge--offline">OFFLINE_SANDBOX</span>
+                <span>TRADER</span>
+            </div>
+            <span class="env-badge env-badge--offline">OFFLINE</span>
         </div>
-        <div class="top-telemetry-right">
-            <a href="/portal/login" class="btn btn--outline btn--sm font-mono text-xs">
-                CỔNG VẬN HÀNH (PORTAL)
+        <div class="top-telemetry-bar__right">
+            <a href="/portal/login" class="btn btn--outline font-mono text-xs">
+                OPERATOR LOGIN
             </a>
         </div>
     </header>
 
-    <!-- Hero & Architecture -->
-    <main class="flex-1 max-w-6xl w-full mx-auto p-6 my-auto">
-        <div class="text-center max-w-3xl mx-auto mb-10">
-            <div class="badge-subtle font-mono text-cyan mb-3">INSTITUTIONAL QUANT SYSTEM V2</div>
-            <h1 class="text-3xl sm:text-4xl font-black text-primary tracking-tight mb-4">
-                Hệ Thống Giao Dịch Định Lượng & Quản Trị Rủi Ro Cấp Độ Tổ Chức
+    <!-- Main Institutional Workstation Hero -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-6 flex flex-col justify-center">
+        <div class="text-left mb-8">
+            <div class="badge-subtle font-mono text-cyan mb-2">INSTITUTIONAL QUANT SYSTEM V2</div>
+            <h1 class="text-2xl font-bold text-primary tracking-tight mb-2">
+                TRADER
             </h1>
-            <p class="text-secondary text-sm sm:text-base leading-relaxed">
-                Kiến trúc cô lập quy trình đa tầng với Execution Core độc lập, ngắt mạch tự động fail-closed, và giám sát vận hành thời gian thực.
+            <p class="text-secondary text-sm font-mono leading-relaxed mb-6">
+                Deterministic execution control & monitoring
             </p>
-            <div class="mt-6 flex justify-center gap-4">
-                <a href="/portal/login" class="btn btn--primary font-mono font-bold" style="background-color: var(--gold); color: #000; border-color: var(--gold);">
-                    TRUY CẬP CỔNG GIÁM SÁT
+            <div class="flex gap-3">
+                <a href="/portal/login" class="btn btn-resume font-mono font-bold">
+                    OPERATOR LOGIN
                 </a>
-                <a href="/risk-warning" class="btn btn--outline font-mono text-xs">
-                    CẢNH BÁO RỦI RO
+                <a href="/portal/dashboard" class="btn btn--outline font-mono">
+                    SYSTEM STATUS
                 </a>
             </div>
         </div>
 
-        <!-- 3 Pillars Grid -->
+        <!-- 3 Technical Architecture Blocks -->
         <div class="terminal-grid-12">
             <div class="col-span-4">
                 <div class="terminal-panel h-full">
                     <div class="panel-header">
-                        <span class="panel-title">FROZEN EXECUTION CORE</span>
-                        <span class="status-badge status-badge--healthy font-mono">CERTIFIED</span>
+                        <span class="panel-title">FROZEN CORE</span>
+                        <span class="status-badge status-badge--healthy font-mono">15/15 MATCH</span>
                     </div>
                     <div class="panel-body text-xs text-secondary leading-relaxed">
-                        Lõi thực thi deterministic được mã hóa và xác thực toàn vẹn 15/15 file checksum. Đảm bảo trạng thái lệnh, Stop Loss và Take Profit bất biến trước mọi sự cố mạng.
+                        Deterministic execution engine certified invariant. State machine maintains non-reversion invariants across network interruptions.
                     </div>
                 </div>
             </div>
@@ -61,11 +61,11 @@
             <div class="col-span-4">
                 <div class="terminal-panel h-full">
                     <div class="panel-header">
-                        <span class="panel-title">CIRCUIT BREAKER BẢO TOÀN</span>
+                        <span class="panel-title">CIRCUIT BREAKER</span>
                         <span class="status-badge status-badge--healthy font-mono">FAIL-CLOSED</span>
                     </div>
                     <div class="panel-body text-xs text-secondary leading-relaxed">
-                        Tự động ngắt toàn bộ hoạt động giao dịch khi chạm giới hạn lỗ hàng ngày hoặc chuỗi lệnh lỗ liên tiếp. Cơ chế CAS generation ngăn chặn mọi hành vi resume trái phép.
+                        Automatic risk threshold enforcement. CAS halt generation guarantees atomic operator intervention and prevents stale resumption.
                     </div>
                 </div>
             </div>
@@ -73,11 +73,11 @@
             <div class="col-span-4">
                 <div class="terminal-panel h-full">
                     <div class="panel-header">
-                        <span class="panel-title">BẢO MẬT PHI LƯU KÝ</span>
-                        <span class="status-badge status-badge--healthy font-mono">ZERO CREDENTIAL</span>
+                        <span class="panel-title">ISOLATED PROCESS</span>
+                        <span class="status-badge status-badge--healthy font-mono">SERVICE ONLY</span>
                     </div>
                     <div class="panel-body text-xs text-secondary leading-relaxed">
-                        Ứng dụng Web hoàn toàn không lưu trữ Binance API Key hay Secret. Quyền truy cập được xác thực qua HttpOnly Cookie và kiến trúc loopback IPC an toàn.
+                        Zero client credentials stored. Strict separation of UI presentation from authoritative execution service process boundaries.
                     </div>
                 </div>
             </div>
@@ -85,12 +85,12 @@
     </main>
 
     <!-- Footer -->
-    <footer class="py-4 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
-        <div>&copy; 2026 Binance Quant Pro. OFFLINE EXECUTION CORE ACCEPTED.</div>
+    <footer class="py-3 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
+        <div>&copy; 2026 TRADER. OFFLINE EXECUTION CORE ACCEPTED.</div>
         <div class="flex gap-4">
-            <a href="/risk-warning" class="hover:text-primary">Cảnh báo rủi ro</a>
-            <a href="/privacy" class="hover:text-primary">Chính sách</a>
-            <a href="/terms" class="hover:text-primary">Điều khoản</a>
+            <a href="/risk-warning" class="hover:text-primary">Risk Warning</a>
+            <a href="/privacy" class="hover:text-primary">Privacy</a>
+            <a href="/terms" class="hover:text-primary">Terms</a>
         </div>
     </footer>
 </div>

@@ -61,13 +61,24 @@ class PositionsTab extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('QUYỀN ĐẶT LỆNH THỦ CÔNG', style: QuantTypography.caption),
-                    Text(
-                      'VÔ HIỆU HÓA (PROHIBITED)',
-                      style: QuantTypography.technical.copyWith(
-                        color: QuantColors.textSecondary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11.0,
+                    Expanded(
+                      child: Text(
+                        'QUYỀN ĐẶT LỆNH THỦ CÔNG',
+                        style: QuantTypography.caption,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: QuantSpacing.spaceXs),
+                    Flexible(
+                      child: Text(
+                        'VÔ HIỆU HÓA (PROHIBITED)',
+                        style: QuantTypography.technical.copyWith(
+                          color: QuantColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.0,
+                        ),
+                        textAlign: TextAlign.end,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -166,42 +177,51 @@ class PositionsTab extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('GIÁ VÀO (ENTRY)', style: QuantTypography.caption),
-                    const SizedBox(height: 2),
-                    Text(
-                      QuantFormatters.formatCurrency(pos.entryPrice),
-                      style: QuantTypography.technical.copyWith(fontSize: 12.0),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('GIÁ MARK', style: QuantTypography.caption),
-                    const SizedBox(height: 2),
-                    Text(
-                      QuantFormatters.formatCurrency(pos.markPrice),
-                      style: QuantTypography.technical.copyWith(fontSize: 12.0),
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('PNL TẠM TÍNH', style: QuantTypography.caption),
-                    const SizedBox(height: 2),
-                    Text(
-                      QuantFormatters.formatPnl(pnl),
-                      style: QuantTypography.technical.copyWith(
-                        color: pnlColor,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12.0,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GIÁ VÀO (ENTRY)', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(
+                        QuantFormatters.formatCurrency(pos.entryPrice),
+                        style: QuantTypography.technical.copyWith(fontSize: 12.0),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text('GIÁ MARK', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(
+                        QuantFormatters.formatCurrency(pos.markPrice),
+                        style: QuantTypography.technical.copyWith(fontSize: 12.0),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('PNL TẠM TÍNH', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(
+                        QuantFormatters.formatPnl(pnl),
+                        style: QuantTypography.technical.copyWith(
+                          color: pnlColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12.0,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -218,19 +238,30 @@ class PositionsTab extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Qty: ${QuantFormatters.formatNumber(pos.qty)}',
-                    style: QuantTypography.caption,
-                  ),
-                  Text(
-                    'Bảo vệ: ${pos.protectionStatus ?? "—"}',
-                    style: QuantTypography.caption.copyWith(
-                      color: pos.protectionStatus != null ? QuantColors.cyan : QuantColors.textMuted,
+                  Expanded(
+                    child: Text(
+                      'Qty: ${QuantFormatters.formatNumber(pos.qty)}',
+                      style: QuantTypography.caption,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(
-                    'Tỷ suất: ${QuantFormatters.formatPercent(pos.pnlPercent)}',
-                    style: QuantTypography.caption.copyWith(color: pnlColor),
+                  Expanded(
+                    child: Text(
+                      'Bảo vệ: ${pos.protectionStatus ?? "—"}',
+                      textAlign: TextAlign.center,
+                      style: QuantTypography.caption.copyWith(
+                        color: pos.protectionStatus != null ? QuantColors.cyan : QuantColors.textMuted,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Tỷ suất: ${QuantFormatters.formatPercent(pos.pnlPercent)}',
+                      textAlign: TextAlign.end,
+                      style: QuantTypography.caption.copyWith(color: pnlColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

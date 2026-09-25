@@ -1,6 +1,7 @@
 /**
- * Obsidian Quants — Binance Quant Pro UI V2
- * Dense Grid & Terminal Layout Architecture
+ * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C
+ * Professional Trading Terminal Layout Architecture
+ * Direction: Binance Pro + Linear + Bloomberg Terminal Density
  */
 
 /* Master Shell Container */
@@ -13,36 +14,64 @@
   width: 100%;
 }
 
-/* Sticky Top Telemetry Bar */
+/* Master 48px Top Telemetry Bar */
 .top-telemetry-bar {
   position: sticky;
   top: 0;
   z-index: 100;
-  background-color: var(--surface-lowest);
+  background-color: var(--surface-low);
   border-bottom: 1px solid var(--border);
-  padding: var(--space-xs) var(--space-md);
+  padding: 0 var(--space-xl);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
-  min-height: 38px;
+  gap: var(--space-md);
+  height: 48px;
+  min-height: 48px;
 }
 
-.top-telemetry-left,
 .top-telemetry-bar__left,
-.top-telemetry-right,
-.top-telemetry-bar__right {
+.top-telemetry-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.top-telemetry-brand {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  flex-wrap: wrap;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.top-telemetry-brand-divider {
+  color: var(--border);
+  font-weight: 300;
+  margin: 0 var(--space-xs);
+}
+
+.top-telemetry-bar__center {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+.top-telemetry-bar__right,
+.top-telemetry-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
 }
 
 .telemetry-unit {
   display: flex;
   align-items: center;
-  gap: var(--space-2xs);
-  font-size: 0.72rem;
+  gap: var(--space-xs);
+  font-size: 11px;
   font-family: var(--font-mono);
 }
 
@@ -50,141 +79,120 @@
   color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .telemetry-unit__val {
   color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Master Body Layout with Sidebar + Viewport */
+.terminal-body-wrapper {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - 48px);
+  width: 100%;
+}
+
+/* Master Left Navigation Sidebar (210px) */
+.terminal-sidebar {
+  width: 210px;
+  min-width: 210px;
+  background-color: var(--surface-low);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--space-sm) 0;
+  user-select: none;
+}
+
+.terminal-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--space-xs);
+}
+
+.terminal-nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 8px 12px;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.terminal-nav-link:hover {
+  color: var(--text-primary);
+  background-color: var(--surface-high);
+}
+
+.terminal-nav-link--active,
+.terminal-nav-link.active {
+  color: var(--text-primary) !important;
+  background-color: var(--surface-elevated) !important;
+  border-left-color: var(--accent-cyan) !important;
   font-weight: 700;
 }
 
-.top-telemetry-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-weight: 800;
-  font-size: 0.85rem;
-  color: var(--text-primary);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.terminal-nav-link svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  fill: none;
+  flex-shrink: 0;
 }
 
-/* Master Navigation Rail / Bar */
-.terminal-nav-bar {
-  background-color: var(--surface-low);
-  border-bottom: 1px solid var(--border);
-  padding: 0 var(--space-md);
+.terminal-sidebar-footer {
+  padding: var(--space-md) var(--space-md) var(--space-xs);
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sidebar-cert-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-xs);
-  min-height: 38px;
-}
-
-.terminal-nav-bar__brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  font-weight: 800;
-  font-size: 0.82rem;
-  color: var(--text-primary);
-  letter-spacing: 0.04em;
-}
-
-.terminal-brand-title {
-  color: var(--gold);
-}
-
-.terminal-brand-tag {
-  font-size: 0.65rem;
-  font-family: var(--font-mono);
-  background: var(--surface);
+  padding: 4px 8px;
+  background: var(--surface-high);
+  border-radius: var(--radius-micro);
   border: 1px solid var(--border);
-  padding: 1px 4px;
-  border-radius: var(--radius-micro);
-  color: var(--cyan);
-}
-
-.terminal-nav-tabs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
-}
-
-.terminal-nav-tab,
-.terminal-nav-link {
-  padding: var(--space-xs) var(--space-md);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  border-radius: var(--radius-micro);
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-}
-
-.terminal-nav-tab:hover,
-.terminal-nav-link:hover {
-  color: var(--text-primary);
-  background-color: var(--surface);
-}
-
-.terminal-nav-tab.active,
-.terminal-nav-link--active {
-  color: var(--gold) !important;
-  background-color: var(--surface);
-  border-color: var(--border-active) !important;
-}
-
-.terminal-nav-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.terminal-nav-tab {
-  padding: var(--space-xs) var(--space-md);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  border-radius: var(--radius-micro);
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.terminal-nav-tab:hover {
-  color: var(--text-primary);
-  background-color: var(--surface);
-}
-
-.terminal-nav-tab.active {
-  color: var(--gold);
-  background-color: var(--surface);
-  border-color: var(--border-active);
 }
 
 /* Main Terminal Content Viewport */
 .terminal-viewport {
   flex: 1;
-  padding: var(--space-md);
+  padding: var(--space-xl);
   max-width: 1920px;
   width: 100%;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: var(--space-lg);
+  overflow-y: auto;
 }
 
 /* 12-Column Dense Grid */
 .terminal-grid-12 {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--space-sm);
+  gap: var(--space-lg);
   width: 100%;
 }
 
@@ -202,7 +210,110 @@
 .col-span-11 { grid-column: span 11 / span 11; }
 .col-span-12 { grid-column: span 12 / span 12; }
 
-/* Flex Utility Rows */
+/* ==========================================================================
+   Phase 6C: Overview 3-Band Architecture
+   ========================================================================== */
+.overview-band-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+/* Band 1: 5-Column System Strip */
+.band-system-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background-color: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.system-strip-item {
+  background-color: var(--surface-low);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.system-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.system-strip-val {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Band 2: 5-Column Financial Telemetry Strip */
+.band-financial-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  background-color: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.financial-strip-item {
+  background-color: var(--surface);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.financial-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.financial-strip-val {
+  font-size: var(--font-size-metric);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Band 3: Main Work Area (Left 65% Active Positions, Right 35% Risk / Protection) */
+.band-work-area {
+  display: grid;
+  grid-template-columns: 65% calc(35% - var(--space-md));
+  gap: var(--space-md);
+  width: 100%;
+  align-items: start;
+}
+
+/* Risk Page 2-Column Architecture */
+.risk-two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+/* Utility Flex Rows */
 .panel-row {
   display: flex;
   align-items: center;

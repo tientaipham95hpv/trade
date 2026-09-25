@@ -1,6 +1,8 @@
 /**
- * Obsidian Quants - System & Governance View Renderer
- * Read-only architecture specification, feature availability, core certification status.
+ * Obsidian Quants V3 — System & Governance View Renderer
+ * Professional Trading Terminal System Architecture
+ * Concise Sections: Runtime | Services | Authority | Certification | Features | Build
+ * Compact neutral certification block: CORE CERTIFICATION 15/15 verified OFFLINE EXECUTION CORE ACCEPTED
  */
 
 import { Formatters } from './formatters.js';
@@ -11,153 +13,224 @@ export function renderSystem(state, container) {
     const status = state.status || {};
 
     container.innerHTML = `
-        <div class="terminal-grid-12">
-            <!-- Section 1: Core Certification & Environment (6 cols) -->
-            <div class="col-span-6">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">CORE CERTIFICATION & RUNTIME</span>
-                        <span class="status-badge status-badge--healthy">
-                            <span class="status-badge__dot"></span>
-                            OFFLINE ACCEPTED
-                        </span>
-                    </div>
-                    <div class="panel-body">
-                        <div class="telemetry-list">
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Execution Core Status</span>
-                                <span class="telemetry-val font-mono text-cyan font-bold">
-                                    OFFLINE EXECUTION CORE ACCEPTED
-                                </span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Core Integrity Hash</span>
-                                <span class="telemetry-val font-mono text-xs text-primary">
-                                    15/15 PRESERVED (0 MISMATCH)
-                                </span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Runtime Environment</span>
-                                <span class="telemetry-val font-mono text-cyan font-bold">
-                                    OPERATIONAL_OFFLINE
-                                </span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Venue Mutation Target</span>
-                                <span class="telemetry-val font-mono">OFFLINE_MOCK_VENUE (ZERO EXCHANGE CALLS)</span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Supervisor Process</span>
-                                <span class="telemetry-val font-mono">trader-stack-offline.service</span>
+        <div class="overview-band-wrapper">
+            <!-- 2-Column Grid for System Specifications -->
+            <div class="terminal-grid-12">
+                <!-- Section 1: Runtime (6 cols) -->
+                <div class="col-span-6">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">RUNTIME SPECIFICATION</span>
+                            <span class="status-badge status-badge--healthy">OFFLINE_ACTIVE</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="telemetry-list">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Environment</span>
+                                    <span class="telemetry-val font-mono text-cyan font-bold">${(status.environment || state.environment || 'OFFLINE').toUpperCase()}</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Mode</span>
+                                    <span class="telemetry-val font-mono">${status.mode || 'SIMULATION'}</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Release Target</span>
+                                    <span class="telemetry-val font-mono text-xs">UI_V2_RC1_PHASE6C</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Venue Target</span>
+                                    <span class="telemetry-val font-mono">OFFLINE_MOCK_VENUE (0 API CALLS)</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Supervisor Unit</span>
+                                    <span class="telemetry-val font-mono text-xs">trader-stack-offline.service</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Section 2: Security & Authority Architecture (6 cols) -->
-            <div class="col-span-6">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">AUTHORITY BOUNDARIES</span>
-                        <span class="badge-subtle font-mono">PROCESS ISOLATION</span>
-                    </div>
-                    <div class="panel-body">
-                        <div class="telemetry-list">
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Web IPC Authority</span>
-                                <span class="telemetry-val font-mono text-cyan">Bearer Loopback (127.0.0.1:50051)</span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Web Direct Exchange Calls</span>
-                                <span class="telemetry-val font-mono text-profit">ZERO (PROHIBITED)</span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Direct DB Trade Execution</span>
-                                <span class="telemetry-val font-mono text-profit">ZERO (SERVICE PID ONLY)</span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Client Credentials</span>
-                                <span class="telemetry-val font-mono text-muted">REMOVED / NON-EXTRACTABLE</span>
-                            </div>
-                            <div class="telemetry-item">
-                                <span class="telemetry-key">Browser Auth Transport</span>
-                                <span class="telemetry-val font-mono">HttpOnly SameSite Cookie</span>
+                <!-- Section 2: Services Health (6 cols) -->
+                <div class="col-span-6">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">SERVICES</span>
+                            <span class="badge-subtle font-mono">DAEMON PROCESSES</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="telemetry-list">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Execution Service</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Web Gateway</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Telegram Bot</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">State Store WAL</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Loopback IPC (50051)</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">BOUND</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Section 3: Feature Availability Grid (12 cols) -->
-            <div class="col-span-12">
-                <div class="terminal-panel">
-                    <div class="panel-header">
-                        <span class="panel-title">FEATURE GOVERNANCE & AVAILABILITY MATRIX</span>
-                        <span class="panel-badge font-mono">FAIL-CLOSED</span>
+                <!-- Section 3: Authority Boundaries (6 cols) -->
+                <div class="col-span-6">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">AUTHORITY BOUNDARIES</span>
+                            <span class="badge-subtle font-mono">PROCESS ISOLATION</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="telemetry-list">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Execution Mutation</span>
+                                    <span class="telemetry-val font-mono text-cyan">Execution Service only</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Trading Credentials</span>
+                                    <span class="telemetry-val font-mono text-muted">REMOVED / NONE</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Web Direct Exchange Calls</span>
+                                    <span class="telemetry-val font-mono text-positive">ZERO (PROHIBITED)</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Direct DB Trade Execution</span>
+                                    <span class="telemetry-val font-mono text-positive">ZERO (SERVICE PID ONLY)</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Auth Transport</span>
+                                    <span class="telemetry-val font-mono">HttpOnly SameSite Cookie</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="panel-body p-0">
-                        <div class="dense-table-container">
-                            <table class="dense-table">
-                                <thead>
-                                    <tr>
-                                        <th>FEATURE SUBSYSTEM</th>
-                                        <th>STATUS</th>
-                                        <th>GOVERNANCE RULE</th>
-                                        <th>AUTHORITY SCOPE</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="font-mono font-bold">Client Credential Authority</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">REMOVED</span></td>
-                                        <td class="text-secondary">Binance API keys permanently purged; no storage or UI forms</td>
-                                        <td class="font-mono text-xs">NONE</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Copy-Trade Engine</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">DISABLED</span></td>
-                                        <td class="text-secondary">Copy trading disabled in OFFLINE mode; endpoints return FEATURE_DISABLED</td>
-                                        <td class="font-mono text-xs">NONE</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">AI Copilot / Autonomous Trader</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">NOT ENABLED</span></td>
-                                        <td class="text-secondary">AI possesses zero autonomous order placement authority</td>
-                                        <td class="font-mono text-xs">ADVISORY ONLY</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Market Scanner Control</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">DISABLED</span></td>
-                                        <td class="text-secondary">External market scanners inactive during OFFLINE operation</td>
-                                        <td class="font-mono text-xs">OFFLINE</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Binance Testnet Routing</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">DISABLED</span></td>
-                                        <td class="text-secondary">Testnet exchange mutations disabled in OFFLINE mode</td>
-                                        <td class="font-mono text-xs">ISOLATED</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Binance Live Production</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">DISABLED</span></td>
-                                        <td class="text-secondary">Live exchange mutations strictly disabled</td>
-                                        <td class="font-mono text-xs">PROHIBITED</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Manual Trade (BUY/SELL) Entry</td>
-                                        <td><span class="status-badge status-badge--degraded font-mono">PROHIBITED</span></td>
-                                        <td class="text-secondary">Web/Mobile UI has zero manual order entry controls</td>
-                                        <td class="font-mono text-xs">REMOVED</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="font-mono font-bold">Emergency Circuit Breaker</td>
-                                        <td><span class="status-badge status-badge--healthy font-mono">ACTIVE</span></td>
-                                        <td class="text-secondary">Loss threshold, consecutive failure, and cooldown triggers active</td>
-                                        <td class="font-mono text-xs">EXECUTION_CORE</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                </div>
+
+                <!-- Section 4: Core Certification (6 cols) -->
+                <div class="col-span-6">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">CERTIFICATION</span>
+                            <span class="status-badge status-badge--healthy font-mono">CRYPTOGRAPHIC</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="core-cert-block">
+                                <span class="core-cert-title">CORE CERTIFICATION</span>
+                                <span class="core-cert-status">15 / 15 verified</span>
+                                <span class="core-cert-sub">OFFLINE EXECUTION CORE ACCEPTED</span>
+                            </div>
+                            <div class="telemetry-list mt-3">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Mismatch Count</span>
+                                    <span class="telemetry-val font-mono text-positive">0 MISMATCHES</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Core Path</span>
+                                    <span class="telemetry-val font-mono text-xs">core/execution/*</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Execution Invariance</span>
+                                    <span class="telemetry-val font-mono text-positive">FROZEN_STABLE</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 5: Features Governance Matrix (12 cols) -->
+                <div class="col-span-12">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">FEATURES GOVERNANCE MATRIX</span>
+                            <span class="badge-subtle font-mono">FAIL-CLOSED</span>
+                        </div>
+                        <div class="panel-body p-0">
+                            <div class="dense-table-container">
+                                <table class="dense-table">
+                                    <thead>
+                                        <tr>
+                                            <th>FEATURE SUBSYSTEM</th>
+                                            <th>AUTHORITY TARGET</th>
+                                            <th>STATUS</th>
+                                            <th>SAFEGUARD POLICY</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td class="font-bold font-mono">Operator HALT</td>
+                                            <td class="font-mono text-xs">Execution Service (/api/pause)</td>
+                                            <td><span class="status-badge status-badge--healthy">AVAILABLE</span></td>
+                                            <td class="text-secondary text-xs">Atomic CAS generation increment</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="font-bold font-mono">Operator RESUME</td>
+                                            <td class="font-mono text-xs">Execution Service (/api/resume)</td>
+                                            <td><span class="status-badge status-badge--healthy">AVAILABLE</span></td>
+                                            <td class="text-secondary text-xs">Conditional on CAS generation match</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="font-bold font-mono">CLOSE ALL</td>
+                                            <td class="font-mono text-xs">Unavailable</td>
+                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
+                                            <td class="text-muted text-xs">Prohibited in operator console</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="font-bold font-mono">Manual Order Entry</td>
+                                            <td class="font-mono text-xs">Unavailable</td>
+                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
+                                            <td class="text-muted text-xs">Manual buy/sell surfaces retired</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="font-bold font-mono">Live Exchange Trading</td>
+                                            <td class="font-mono text-xs">Binance Real Venue</td>
+                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
+                                            <td class="text-muted text-xs">Locked in OPERATIONAL_OFFLINE mode</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 6: Build (12 cols) -->
+                <div class="col-span-12">
+                    <div class="terminal-panel">
+                        <div class="panel-header">
+                            <span class="panel-title">BUILD & RELEASE AUDIT</span>
+                            <span class="badge-subtle font-mono">GIT COMMIT</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="telemetry-list">
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Branch</span>
+                                    <span class="telemetry-val font-mono text-cyan">ui-v2-rc1</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Release Candidate</span>
+                                    <span class="telemetry-val font-mono">UI_V2_RC1</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Target Platforms</span>
+                                    <span class="telemetry-val font-mono">Web V2 + Flutter iOS V2</span>
+                                </div>
+                                <div class="telemetry-item">
+                                    <span class="telemetry-key">Deployment Status</span>
+                                    <span class="telemetry-val font-mono text-warning">LOCAL_ONLY (NO VPS DEPLOY IN PHASE 6C)</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Obsidian Quants — UI V2 Component Foundation Preview</title>
+  <title>TRADER — UI V2 Visual Design Review (Dev Only)</title>
   <link rel="stylesheet" href="/static/ui_v2/obsidian_quants.css">
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
@@ -15,314 +15,250 @@
     <header class="top-telemetry-bar" role="banner">
       <div class="top-telemetry-left">
         <div class="top-telemetry-brand">
-          <span>Binance Quant Pro</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F3BA2F" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          <span>TRADER</span>
+          <span class="top-telemetry-brand-divider">|</span>
         </div>
-        <!-- EnvironmentBadge -->
-        <span class="env-badge env-offline" id="preview-env-badge">OFFLINE</span>
-        <!-- TelemetryItems -->
+        <span class="env-badge env-offline">OFFLINE</span>
         <div class="telemetry-item healthy">
           <span class="telemetry-item-indicator"></span>
           <span class="telemetry-item-label">EXECUTION</span>
           <span class="telemetry-item-value">HEALTHY</span>
         </div>
-        <div class="telemetry-item healthy">
-          <span class="telemetry-item-indicator"></span>
-          <span class="telemetry-item-label">WEB</span>
-          <span class="telemetry-item-value">READY</span>
-        </div>
-        <div class="telemetry-item healthy">
-          <span class="telemetry-item-indicator"></span>
-          <span class="telemetry-item-label">TELEGRAM</span>
-          <span class="telemetry-item-value">READY</span>
+        <div class="telemetry-item">
+          <span class="telemetry-item-label">HALT</span>
+          <span class="telemetry-item-value">INACTIVE</span>
         </div>
       </div>
 
       <div class="top-telemetry-right">
-        <div class="telemetry-item offline">
-          <span class="telemetry-item-label">HALT</span>
-          <span class="telemetry-item-value">INACTIVE</span>
-        </div>
-        <div class="telemetry-item healthy">
-          <span class="telemetry-item-label">RECOVERY</span>
-          <span class="telemetry-item-value">CLEAR</span>
-        </div>
         <div class="telemetry-item">
           <span class="telemetry-item-label">LATENCY</span>
-          <span class="telemetry-item-value">18 ms</span>
+          <span class="telemetry-item-value text-cyan">18 ms</span>
         </div>
+        <span class="badge-subtle font-mono">DEV_REVIEW</span>
+        <a href="/portal/dashboard" class="btn btn--outline">OPERATOR TERMINAL</a>
       </div>
     </header>
 
-    <!-- Master Navigation Rail -->
-    <nav class="terminal-nav-bar" aria-label="Terminal Navigation">
-      <div class="terminal-nav-tabs" role="tablist">
-        <button class="terminal-nav-tab active" role="tab" aria-selected="true">OVERVIEW</button>
-        <button class="terminal-nav-tab" role="tab" aria-selected="false">POSITIONS</button>
-        <button class="terminal-nav-tab" role="tab" aria-selected="false">RISK</button>
-        <button class="terminal-nav-tab" role="tab" aria-selected="false">ACTIVITY</button>
-        <button class="terminal-nav-tab" role="tab" aria-selected="false">SYSTEM</button>
-      </div>
-      <div>
-        <span class="status-badge disabled">TESTNET: DISABLED</span>
-      </div>
-    </nav>
-
-    <!-- Main Terminal Viewport -->
-    <main class="terminal-viewport">
-      
-      <!-- SectionHeader -->
-      <div class="section-header">
-        <div class="section-header-title">
-          <span>OPERATIONAL OBSERVABILITY TERMINAL</span>
-          <span class="status-badge healthy">SUPERVISED</span>
-        </div>
-        <div class="section-header-meta">
-          <span>HOST: 127.0.0.1:50051 • MODE: OFFLINE</span>
-        </div>
-      </div>
-
-      <!-- RiskAlert Primitive Preview -->
-      <div class="risk-alert info" role="alert">
-        <span class="risk-alert-icon">ℹ</span>
-        <div class="risk-alert-content">
-          <div class="risk-alert-title">OFFLINE EXECUTION ACTIVE</div>
-          <div class="risk-alert-description">
-            The system is operating in certified OFFLINE mode. Exchange mutations and live capital exposure are disabled.
+    <div class="terminal-body-wrapper">
+      <!-- Left Sidebar Nav -->
+      <aside class="terminal-sidebar">
+        <nav class="terminal-sidebar-nav">
+          <a href="#typography" class="terminal-nav-link terminal-nav-link--active">
+            <span>Typography</span>
+          </a>
+          <a href="#colors" class="terminal-nav-link">
+            <span>Colors</span>
+          </a>
+          <a href="#buttons" class="terminal-nav-link">
+            <span>Buttons & Actions</span>
+          </a>
+          <a href="#badges" class="terminal-nav-link">
+            <span>Badges</span>
+          </a>
+          <a href="#tables" class="terminal-nav-link">
+            <span>Dense Table</span>
+          </a>
+          <a href="#risk-states" class="terminal-nav-link">
+            <span>Risk States</span>
+          </a>
+        </nav>
+        <div class="terminal-sidebar-footer">
+          <div class="sidebar-cert-badge">
+            <span>CORE 15/15</span>
+            <span class="text-positive font-bold">MATCH</span>
           </div>
         </div>
-      </div>
+      </aside>
 
-      <!-- 12-Column Grid Layout -->
-      <div class="terminal-grid-12">
-        
-        <!-- Row 1: System Status (Col 3) -->
-        <div class="col-span-3">
-          <section class="terminal-panel" aria-labelledby="status-panel-title">
-            <div class="terminal-panel-header">
-              <div class="terminal-panel-title-group">
-                <span class="terminal-panel-title" id="status-panel-title">SYSTEM STATUS</span>
-              </div>
-              <span class="status-badge healthy">HEALTHY</span>
-            </div>
-            <div class="terminal-panel-body">
-              <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Execution Svc</span>
-                  <span class="status-badge healthy">PID 13024</span>
-                </div>
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">IPC Connection</span>
-                  <span class="status-badge healthy">LOOPBACK</span>
-                </div>
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Database Access</span>
-                  <span class="status-badge healthy">CONNECTED</span>
-                </div>
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Certification</span>
-                  <span class="status-badge offline">OFFLINE CORE ACCEPTED</span>
-                </div>
-              </div>
-            </div>
-            <div class="terminal-panel-footer">
-              <span>Authority: Service-Only</span>
-              <span>v1.0.0</span>
-            </div>
-          </section>
+      <!-- Main Viewport -->
+      <main class="terminal-viewport">
+        <!-- SectionHeader -->
+        <div class="section-header">
+          <div class="section-header-title">
+            <span>DEV-ONLY DESIGN SYSTEM V3 SHOWCASE</span>
+            <span class="status-badge healthy">RESTRICTED_FIXTURE</span>
+          </div>
+          <div class="section-header-meta">
+            <span>ZERO REAL TELEMETRY • VISUAL REGRESSION ONLY</span>
+          </div>
         </div>
 
-        <!-- Row 1: MetricCards (Col 6) -->
-        <div class="col-span-6">
-          <section class="terminal-panel" aria-labelledby="perf-panel-title">
-            <div class="terminal-panel-header">
-              <div class="terminal-panel-title-group">
-                <span class="terminal-panel-title" id="perf-panel-title">PERFORMANCE METRICS</span>
+        <!-- 1. Typography Showcase -->
+        <section id="typography" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">1. TYPOGRAPHY HIERARCHY & NUMERIC ALIGNMENT</span>
+          </div>
+          <div class="panel-body">
+            <div class="flex flex-col gap-3">
+              <div>
+                <span class="text-xs text-muted font-mono">PAGE TITLE (20-22px, 600)</span>
+                <h1>TRADER Execution Terminal</h1>
               </div>
-              <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">LEDGER TRUTH</span>
-            </div>
-            <div class="terminal-panel-body">
-              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-xs);">
-                
-                <!-- MetricCard: Realized PnL -->
-                <div class="metric-card">
-                  <div class="metric-card-label">
-                    <span>Realized PnL</span>
-                  </div>
-                  <div class="metric-card-value-row">
-                    <span class="metric-card-value color-green">+$0.00</span>
-                    <span class="metric-card-unit">USDT</span>
-                  </div>
-                  <div class="metric-card-delta neutral">
-                    <span>—</span>
-                  </div>
-                </div>
-
-                <!-- MetricCard: Win Rate (Null / Empty State) -->
-                <div class="metric-card">
-                  <div class="metric-card-label">
-                    <span>Win Rate</span>
-                  </div>
-                  <div class="metric-card-value-row">
-                    <span class="metric-card-value empty">—</span>
-                  </div>
-                  <div class="metric-card-delta neutral">
-                    <span>No data</span>
-                  </div>
-                </div>
-
-                <!-- MetricCard: Total Trades -->
-                <div class="metric-card">
-                  <div class="metric-card-label">
-                    <span>Total Trades</span>
-                  </div>
-                  <div class="metric-card-value-row">
-                    <span class="metric-card-value">0</span>
-                    <span class="metric-card-unit">orders</span>
-                  </div>
-                  <div class="metric-card-delta neutral">
-                    <span>Verified</span>
-                  </div>
-                </div>
-
+              <div>
+                <span class="text-xs text-muted font-mono">SECTION TITLE (13-14px, 600)</span>
+                <h3>Circuit Breaker & Thresholds</h3>
+              </div>
+              <div>
+                <span class="text-xs text-muted font-mono">BODY (13px, Regular)</span>
+                <p class="text-secondary text-sm">Deterministic sandbox enforcing non-reversion safety invariants across network faults.</p>
+              </div>
+              <div>
+                <span class="text-xs text-muted font-mono">METRICS (18-24px, 700, Tabular Mono)</span>
+                <div class="metric-card-value font-mono tabular-nums text-positive">+1,248.50 USDT</div>
+                <div class="metric-card-value font-mono tabular-nums text-negative">-320.15 USDT</div>
+                <div class="metric-card-value font-mono tabular-nums text-muted">—</div>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
 
-        <!-- Row 1: Risk / Breaker (Col 3) -->
-        <div class="col-span-3">
-          <section class="terminal-panel" aria-labelledby="risk-panel-title">
-            <div class="terminal-panel-header">
-              <div class="terminal-panel-title-group">
-                <span class="terminal-panel-title" id="risk-panel-title">CIRCUIT BREAKER</span>
+        <!-- 2. Colors Showcase -->
+        <section id="colors" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">2. RESTRAINED DARK COLOR PALETTE</span>
+          </div>
+          <div class="panel-body">
+            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;">
+              <div style="background: #070B12; border: 1px solid #202938; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono">#070B12</div>
+                <div class="text-xs text-muted">Background</div>
               </div>
-              <span class="status-badge healthy">HEALTHY</span>
-            </div>
-            <div class="terminal-panel-body">
-              <div style="display: flex; flex-direction: column; gap: var(--space-xs);">
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Consecutive Losses</span>
-                  <span class="font-mono tabular-nums" style="font-weight: 700;">0 / 3</span>
-                </div>
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Daily Loss Limit</span>
-                  <span class="font-mono tabular-nums" style="font-weight: 700;">$0.00 / $50.00</span>
-                </div>
-                <div class="panel-row-between">
-                  <span style="font-size: 0.70rem; color: var(--text-muted);">Cooldown Timer</span>
-                  <span class="font-mono tabular-nums" style="color: var(--text-muted);">INACTIVE</span>
-                </div>
+              <div style="background: #0D111A; border: 1px solid #202938; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono">#0D111A</div>
+                <div class="text-xs text-muted">Primary Surface</div>
               </div>
-            </div>
-          </section>
-        </div>
-
-        <!-- Row 2: DenseTable (Col 12) -->
-        <div class="col-span-12">
-          <section class="terminal-panel" aria-labelledby="positions-panel-title">
-            <div class="terminal-panel-header">
-              <div class="terminal-panel-title-group">
-                <span class="terminal-panel-title" id="positions-panel-title">ACTIVE POSITIONS</span>
-                <span class="status-badge offline">0 OPEN</span>
+              <div style="background: #121824; border: 1px solid #202938; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono">#121824</div>
+                <div class="text-xs text-muted">Secondary Surface</div>
               </div>
-              <div class="terminal-panel-actions">
-                <button class="btn-terminal danger" id="btn-preview-halt" aria-haspopup="dialog">TRIGGER HALT</button>
+              <div style="background: #171E2B; border: 1px solid #202938; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono">#171E2B</div>
+                <div class="text-xs text-muted">Elevated Surface</div>
+              </div>
+              <div style="background: #202938; border: 1px solid #334155; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono">#202938</div>
+                <div class="text-xs text-muted">Border</div>
+              </div>
+              <div style="background: #0D111A; border: 1px solid #3DD9EB; padding: 8px; border-radius: 4px;">
+                <div class="text-xs font-mono text-cyan">#3DD9EB</div>
+                <div class="text-xs text-muted">Cyan (<=10%)</div>
               </div>
             </div>
-            <div class="terminal-panel-body" style="padding: 0;">
-              
-              <!-- DenseTable Wrapper -->
-              <div class="dense-table-wrapper">
-                <table class="dense-table">
-                  <thead>
-                    <tr>
-                      <th>SYMBOL</th>
-                      <th>SIDE</th>
-                      <th class="num-col">QTY</th>
-                      <th class="num-col">ENTRY</th>
-                      <th class="num-col">MARK</th>
-                      <th class="num-col">UNREALIZED PNL</th>
-                      <th class="num-col">SL</th>
-                      <th class="num-col">TP</th>
-                      <th>PROTECTION</th>
-                      <th>STATE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <!-- Empty State in Table -->
-                    <tr>
-                      <td colspan="10">
-                        <div class="empty-state">
-                          <span class="empty-state-icon">⬚</span>
-                          <span class="empty-state-title">No Active Positions</span>
-                          <span class="empty-state-desc">Execution core is flat. No open exposure in current snapshot.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+          </div>
+        </section>
+
+        <!-- 3. Buttons & Actions Showcase -->
+        <section id="buttons" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">3. BUTTONS & OPERATOR CONTROLS</span>
+          </div>
+          <div class="panel-body">
+            <div class="flex flex-wrap gap-4 items-center">
+              <button class="btn btn-halt">HALT</button>
+              <button class="btn btn-resume">RESUME (#1)</button>
+              <button class="btn btn--outline">DEFAULT OUTLINE</button>
+              <button class="btn btn--outline" disabled>DISABLED BUTTON</button>
+            </div>
+            <div class="emergency-close-note mt-3">
+              Emergency close: Unavailable in this console
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Badges Showcase -->
+        <section id="badges" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">4. SUBDUED STATUS BADGES</span>
+          </div>
+          <div class="panel-body">
+            <div class="flex flex-wrap gap-3 items-center">
+              <span class="status-badge status-badge--healthy"><span class="status-badge__dot"></span>HEALTHY</span>
+              <span class="status-badge status-badge--warning"><span class="status-badge__dot"></span>WARNING</span>
+              <span class="status-badge status-badge--halt"><span class="status-badge__dot"></span>HALTED</span>
+              <span class="status-badge status-badge--degraded">UNKNOWN</span>
+              <span class="side-badge side-badge--long">LONG</span>
+              <span class="side-badge side-badge--short">SHORT</span>
+              <span class="env-badge env-offline">OFFLINE</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Dense Table Showcase -->
+        <section id="tables" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">5. DENSE TABLE (36-40PX ROWS, TABULAR NUMS)</span>
+          </div>
+          <div class="panel-body p-0">
+            <div class="dense-table-container">
+              <table class="dense-table">
+                <thead>
+                  <tr>
+                    <th>SYMBOL</th>
+                    <th>SIDE</th>
+                    <th class="text-right">QTY</th>
+                    <th class="text-right">ENTRY</th>
+                    <th class="text-right">MARK</th>
+                    <th class="text-right">PNL</th>
+                    <th>PROTECTION</th>
+                    <th>STATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="font-bold font-mono text-cyan">BTCUSDT</td>
+                    <td><span class="side-badge side-badge--long">LONG</span></td>
+                    <td class="text-right font-mono">0.0500</td>
+                    <td class="text-right font-mono">$65,000.00</td>
+                    <td class="text-right font-mono">$65,850.00</td>
+                    <td class="text-right font-mono text-positive">+42.50 USDT</td>
+                    <td><span class="badge-subtle font-mono">ACTIVE_STOP</span></td>
+                    <td><span class="status-badge status-badge--healthy">OPEN</span></td>
+                  </tr>
+                  <tr>
+                    <td class="font-bold font-mono text-cyan">ETHUSDT</td>
+                    <td><span class="side-badge side-badge--short">SHORT</span></td>
+                    <td class="text-right font-mono">1.2500</td>
+                    <td class="text-right font-mono">$3,450.00</td>
+                    <td class="text-right font-mono">$3,420.00</td>
+                    <td class="text-right font-mono text-positive">+37.50 USDT</td>
+                    <td><span class="badge-subtle font-mono">ACTIVE_STOP</span></td>
+                    <td><span class="status-badge status-badge--healthy">OPEN</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. Risk Alert & Empty State Showcase -->
+        <section id="risk-states" class="terminal-panel">
+          <div class="panel-header">
+            <span class="panel-title">6. RISK ALERTS & MINIMAL EMPTY STATES</span>
+          </div>
+          <div class="panel-body flex flex-col gap-4">
+            <div class="risk-alert critical" role="alert">
+              <span class="risk-alert-icon">⚠</span>
+              <div class="risk-alert-content">
+                <div class="risk-alert-title">FAIL-CLOSED CIRCUIT BREAKER ACTIVATED</div>
+                <div class="risk-alert-description">Daily loss threshold reached. All new order admission halted.</div>
               </div>
-
             </div>
-          </section>
-        </div>
 
-        <!-- Row 3: Loading Skeletons Showcase (Col 12) -->
-        <div class="col-span-12">
-          <section class="terminal-panel">
-            <div class="terminal-panel-header">
-              <span class="terminal-panel-title">LOADING SKELETON PRIMITIVES</span>
-              <span style="font-size: 0.68rem; color: var(--text-muted);">PREVIEW</span>
+            <div class="empty-state py-6">
+              <div class="empty-state-symbol">—</div>
+              <div class="empty-state-title">No active positions</div>
+              <div class="empty-state-desc">Execution remains in OFFLINE mode</div>
             </div>
-            <div class="terminal-panel-body">
-              <div style="display: flex; gap: var(--space-md); align-items: center;">
-                <div class="skeleton skeleton-badge"></div>
-                <div class="skeleton skeleton-text" style="width: 140px;"></div>
-                <div class="skeleton skeleton-metric" style="width: 100px;"></div>
-              </div>
-            </div>
-          </section>
-        </div>
-
-      </div>
-
-    </main>
-  </div>
-
-  <!-- ConfirmDialog Preview (Hidden by default, triggered for accessibility verification) -->
-  <div class="confirm-dialog-backdrop" id="preview-confirm-dialog" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-    <div class="confirm-dialog-box">
-      <div class="confirm-dialog-header danger">
-        <span id="dialog-title">CONFIRM OPERATOR HALT</span>
-      </div>
-      <div class="confirm-dialog-body">
-        <p>This action signals the Execution Service to immediately halt all new order admission.</p>
-        <div class="confirm-dialog-meta">
-          <div>TARGET: ALL TRADING ADMISSION</div>
-          <div>CURRENT HALT GENERATION: 3</div>
-        </div>
-      </div>
-      <div class="confirm-dialog-footer">
-        <button class="btn-terminal" id="btn-dialog-cancel">CANCEL</button>
-        <button class="btn-terminal danger" id="btn-dialog-confirm">EXECUTE HALT</button>
-      </div>
+          </div>
+        </section>
+      </main>
     </div>
   </div>
-
-  <script>
-    // Light script solely for interactive verification of modal and theme tokens
-    const haltBtn = document.getElementById('btn-preview-halt');
-    const dialog = document.getElementById('preview-confirm-dialog');
-    const cancelBtn = document.getElementById('btn-dialog-cancel');
-    const confirmBtn = document.getElementById('btn-dialog-confirm');
-
-    if (haltBtn && dialog) {
-      haltBtn.addEventListener('click', () => {
-        dialog.style.display = 'flex';
-      });
-      if (cancelBtn) cancelBtn.addEventListener('click', () => { dialog.style.display = 'none'; });
-      if (confirmBtn) confirmBtn.addEventListener('click', () => { dialog.style.display = 'none'; });
-    }
-  </script>
 </body>
 </html>
