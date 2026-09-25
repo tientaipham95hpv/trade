@@ -12,7 +12,22 @@ export function renderPositions(state, container) {
 
     const positions = state.positions || [];
 
+    const nowUtc = new Date().toISOString().substring(11, 19);
+
     container.innerHTML = `
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">Positions</h1>
+                <p class="page-subtitle">Active execution inventory (${positions.length} open)</p>
+            </div>
+            <div class="page-header-meta">
+                <span class="live-stream-badge">
+                    <span class="pulse-dot"></span> LIVE TELEMETRY
+                </span>
+                <span class="page-meta-time">Last update: ${nowUtc} UTC</span>
+            </div>
+        </div>
+
         <div class="terminal-panel">
             <div class="panel-header">
                 <div>

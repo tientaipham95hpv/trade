@@ -122,53 +122,74 @@ async def capture_web():
                 executable_path=r'C:\Program Files\Google\Chrome\Application\chrome.exe',
                 headless=True
             )
-            # 1. 1920x1080 Overview
+            # Desktop 1920x1080
             page = await browser.new_page(viewport={'width': 1920, 'height': 1080})
             await page.goto('http://127.0.0.1:8899/portal/dashboard', wait_until='networkidle')
             await page.wait_for_timeout(1000)
-            p1 = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_overview.png')
-            await page.screenshot(path=p1)
-            print('Captured:', p1)
+
+            # 1. 1920x1080 Overview
+            p1_final = os.path.join(SCREENSHOT_DIR, 'web_overview_final.png')
+            p1_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_overview.png')
+            await page.screenshot(path=p1_final)
+            await page.screenshot(path=p1_old)
+            print('Captured:', p1_final)
 
             # 2. 1920x1080 Positions
             await page.click('a[data-tab="positions"]')
             await page.wait_for_timeout(500)
-            p2 = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_positions.png')
-            await page.screenshot(path=p2)
-            print('Captured:', p2)
+            p2_final = os.path.join(SCREENSHOT_DIR, 'web_positions_final.png')
+            p2_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_positions.png')
+            await page.screenshot(path=p2_final)
+            await page.screenshot(path=p2_old)
+            print('Captured:', p2_final)
 
             # 3. 1920x1080 Risk
             await page.click('a[data-tab="risk"]')
             await page.wait_for_timeout(500)
-            p3 = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_risk.png')
-            await page.screenshot(path=p3)
-            print('Captured:', p3)
+            p3_final = os.path.join(SCREENSHOT_DIR, 'web_risk_final.png')
+            p3_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_risk.png')
+            await page.screenshot(path=p3_final)
+            await page.screenshot(path=p3_old)
+            print('Captured:', p3_final)
 
-            # 4. 1440x900 System
+            # 4. 1920x1080 Activity
+            await page.click('a[data-tab="activity"]')
+            await page.wait_for_timeout(500)
+            p4_final = os.path.join(SCREENSHOT_DIR, 'web_activity_final.png')
+            await page.screenshot(path=p4_final)
+            print('Captured:', p4_final)
+
+            # 5. 1440x900 System
             await page.set_viewport_size({'width': 1440, 'height': 900})
             await page.click('a[data-tab="system"]')
             await page.wait_for_timeout(500)
-            p4 = os.path.join(SCREENSHOT_DIR, 'web_1440x900_system.png')
-            await page.screenshot(path=p4)
-            print('Captured:', p4)
+            p5_final = os.path.join(SCREENSHOT_DIR, 'web_system_final.png')
+            p5_old = os.path.join(SCREENSHOT_DIR, 'web_1440x900_system.png')
+            await page.screenshot(path=p5_final)
+            await page.screenshot(path=p5_old)
+            print('Captured:', p5_final)
 
-            # 5. 390x844 Overview
+            # 6. 390x844 Mobile Overview
             await page.set_viewport_size({'width': 390, 'height': 844})
             await page.click('a[data-tab="overview"]')
             await page.wait_for_timeout(500)
-            p5 = os.path.join(SCREENSHOT_DIR, 'web_390x844_overview.png')
-            await page.screenshot(path=p5)
-            print('Captured:', p5)
+            p6_final = os.path.join(SCREENSHOT_DIR, 'web_mobile_overview_final.png')
+            p6_old = os.path.join(SCREENSHOT_DIR, 'web_390x844_overview.png')
+            await page.screenshot(path=p6_final)
+            await page.screenshot(path=p6_old)
+            print('Captured:', p6_final)
 
-            # 6. 390x844 Risk
+            # 7. 390x844 Mobile Risk
             await page.click('a[data-tab="risk"]')
             await page.wait_for_timeout(500)
-            p6 = os.path.join(SCREENSHOT_DIR, 'web_390x844_risk.png')
-            await page.screenshot(path=p6)
-            print('Captured:', p6)
+            p7_final = os.path.join(SCREENSHOT_DIR, 'web_mobile_risk_final.png')
+            p7_old = os.path.join(SCREENSHOT_DIR, 'web_390x844_risk.png')
+            await page.screenshot(path=p7_final)
+            await page.screenshot(path=p7_old)
+            print('Captured:', p7_final)
 
             await browser.close()
-            print('All 6 Web screenshots captured successfully!')
+            print('All 7 Web screenshots captured successfully!')
     except Exception as e:
         traceback.print_exc()
 

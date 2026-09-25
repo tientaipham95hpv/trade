@@ -220,7 +220,95 @@
   width: 100%;
 }
 
-/* Band 1: 5-Column System Strip */
+/* ==========================================================================
+   Phase 6C.1: Page Header Architecture
+   ========================================================================== */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 var(--space-md) 0;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-xs);
+  width: 100%;
+}
+
+.page-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.page-header-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.page-meta-time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.live-stream-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: var(--radius-micro);
+  background: rgba(24, 199, 132, 0.08);
+  border: 1px solid rgba(24, 199, 132, 0.25);
+  color: var(--positive);
+  text-transform: uppercase;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--positive);
+  display: inline-block;
+  box-shadow: 0 0 6px var(--positive);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+/* ==========================================================================
+   Phase 6C.1: Metric Cards Grid
+   ========================================================================== */
+.metric-cards-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.metric-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+/* Band 1: 5-Column System Strip (Legacy fallback wrapper) */
 .band-system-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -296,10 +384,19 @@
   white-space: nowrap;
 }
 
-/* Band 3: Main Work Area (Left 65% Active Positions, Right 35% Risk / Protection) */
+/* Band 3: Main Work Area (Left ~62% Active Positions, Right ~38% Risk / Protection) */
 .band-work-area {
   display: grid;
-  grid-template-columns: 65% calc(35% - var(--space-md));
+  grid-template-columns: minmax(0, 1.62fr) minmax(360px, 1fr);
+  gap: var(--space-md);
+  width: 100%;
+  align-items: start;
+}
+
+/* Lower Region: Subsystem Health & Operator Activity */
+.overview-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--space-md);
   width: 100%;
   align-items: start;

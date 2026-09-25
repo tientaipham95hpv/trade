@@ -12,7 +12,23 @@ export function renderSystem(state, container) {
 
     const status = state.status || {};
 
+    const nowUtc = new Date().toISOString().substring(11, 19);
+
     container.innerHTML = `
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">System Architecture & Governance</h1>
+                <p class="page-subtitle">Runtime configuration &bull; Cryptographic verification &bull; Service map</p>
+            </div>
+            <div class="page-header-meta">
+                <span class="status-badge status-badge--healthy">
+                    <span class="status-badge__dot"></span>
+                    OFFLINE_ACTIVE
+                </span>
+                <span class="page-meta-time">${nowUtc} UTC</span>
+            </div>
+        </div>
+
         <div class="overview-band-wrapper">
             <!-- 2-Column Grid for System Specifications -->
             <div class="terminal-grid-12">
@@ -20,7 +36,10 @@ export function renderSystem(state, container) {
                 <div class="col-span-6">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">RUNTIME SPECIFICATION</span>
+                            <div>
+                                <span class="panel-title">RUNTIME & TOPOLOGY</span>
+                                <span class="panel-subtitle">Process environment and host isolation</span>
+                            </div>
                             <span class="status-badge status-badge--healthy">OFFLINE_ACTIVE</span>
                         </div>
                         <div class="panel-body">
@@ -31,11 +50,11 @@ export function renderSystem(state, container) {
                                 </div>
                                 <div class="telemetry-item">
                                     <span class="telemetry-key">Mode</span>
-                                    <span class="telemetry-val font-mono">${status.mode || 'SIMULATION'}</span>
+                                    <span class="telemetry-val font-mono">${status.mode || 'PAPER / SIMULATION'}</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Release Target</span>
-                                    <span class="telemetry-val font-mono text-xs">UI_V2_RC1_PHASE6C</span>
+                                    <span class="telemetry-key">Host Target</span>
+                                    <span class="telemetry-val font-mono text-xs">Canonical Local / Dedicated Node</span>
                                 </div>
                                 <div class="telemetry-item">
                                     <span class="telemetry-key">Venue Target</span>
@@ -54,7 +73,10 @@ export function renderSystem(state, container) {
                 <div class="col-span-6">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">SERVICES</span>
+                            <div>
+                                <span class="panel-title">SERVICE HEALTH MATRIX</span>
+                                <span class="panel-subtitle">Core daemons and IPC endpoints</span>
+                            </div>
                             <span class="badge-subtle font-mono">DAEMON PROCESSES</span>
                         </div>
                         <div class="panel-body">
@@ -88,7 +110,10 @@ export function renderSystem(state, container) {
                 <div class="col-span-6">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">AUTHORITY BOUNDARIES</span>
+                            <div>
+                                <span class="panel-title">AUTHORITY & SECURITY BOUNDARIES</span>
+                                <span class="panel-subtitle">Access controls and privilege separation</span>
+                            </div>
                             <span class="badge-subtle font-mono">PROCESS ISOLATION</span>
                         </div>
                         <div class="panel-body">
@@ -122,7 +147,10 @@ export function renderSystem(state, container) {
                 <div class="col-span-6">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">CERTIFICATION</span>
+                            <div>
+                                <span class="panel-title">CRYPTOGRAPHIC CORE VERIFICATION</span>
+                                <span class="panel-subtitle">SHA-256 deterministic execution invariance</span>
+                            </div>
                             <span class="status-badge status-badge--healthy font-mono">CRYPTOGRAPHIC</span>
                         </div>
                         <div class="panel-body">

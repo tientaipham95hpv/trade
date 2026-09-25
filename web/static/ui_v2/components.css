@@ -95,48 +95,103 @@
    2. MetricCard & Key-Value Lists
    ========================================================================== */
 .metric-card {
-  background-color: var(--surface-high);
+  background: linear-gradient(180deg, #121824 0%, #0D111A 100%);
   border: 1px solid var(--border);
-  border-radius: var(--radius-micro);
-  padding: 8px 12px;
+  border-radius: var(--radius-container);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: space-between;
+  min-height: 98px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  position: relative;
   min-width: 0;
 }
 
-.metric-card-label,
-.metric-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+.metric-card:hover {
+  border-color: var(--border-active);
+}
+
+.metric-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.metric-card__header-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.metric-card__icon-box {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-micro);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.metric-card__icon-box svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.metric-card-label,
+.metric-label,
+.metric-card__label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .metric-card-value-row {
   display: flex;
   align-items: baseline;
   gap: var(--space-xs);
+  margin-top: 4px;
 }
 
 .metric-card-value,
-.metric-value {
+.metric-value,
+.metric-card__val {
   font-family: var(--font-mono);
+  font-feature-settings: var(--font-numeric-features);
   font-variant-numeric: tabular-nums;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.2;
   white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-.metric-caption {
-  font-size: 10px;
+.metric-caption,
+.metric-card__sub {
+  font-size: 11px;
+  font-weight: 400;
   color: var(--text-muted);
+  font-family: var(--font-sans);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .telemetry-item {
@@ -435,6 +490,14 @@
   background-color: rgba(61, 217, 235, 0.15);
   border-color: var(--accent-cyan);
   color: #fff;
+}
+
+.btn-resume:disabled {
+  border-color: var(--border);
+  color: var(--text-muted);
+  background-color: var(--surface-low);
+  opacity: 0.4;
+  cursor: not-allowed !important;
 }
 
 /* Emergency Close Muted Note */
