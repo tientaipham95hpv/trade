@@ -345,16 +345,17 @@ class OverviewTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          flex: 2,
+          flex: 5,
           child: Text(
             label,
             style: QuantTypography.caption,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
         const SizedBox(width: QuantSpacing.spaceXs),
         Expanded(
-          flex: 3,
+          flex: 6,
           child: Text(
             value,
             style: QuantTypography.technical.copyWith(
@@ -363,7 +364,8 @@ class OverviewTab extends StatelessWidget {
               fontSize: 10.5,
             ),
             textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
       ],

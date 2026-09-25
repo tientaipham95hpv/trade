@@ -32,7 +32,7 @@ class SystemTab extends StatelessWidget {
           // 1. Governance Matrix Panel
           QuantPanel(
             title: 'MA TRẬN QUẢN TRỊ KIẾN TRÚC (GOVERNANCE)',
-            subtitle: 'HARD RULES',
+            subtitle: 'ARCHITECTURE HARD RULES',
             trailing: EnvironmentBadge.fromString(status?.environment),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,8 +57,8 @@ class SystemTab extends StatelessWidget {
 
           // 2. Core Execution Certification
           QuantPanel(
-            title: 'CHỨNG THỰC LÕI THỰC THI (CORE CERTIFICATION)',
-            subtitle: 'OFFLINE EXECUTION CORE ACCEPTED',
+            title: 'CHỨNG THỰC LÕI THỰC THI',
+            subtitle: 'CORE EXECUTION CERTIFICATION',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -78,8 +78,8 @@ class SystemTab extends StatelessWidget {
 
           // 3. Live System Logs Viewer
           QuantPanel(
-            title: 'NHẬT KÝ VẬN HÀNH (LIVE LOGS)',
-            subtitle: '/api/logs',
+            title: 'NHẬT KÝ VẬN HÀNH',
+            subtitle: 'LIVE OPERATOR LOGS (/api/logs)',
             trailing: IconButton(
               icon: const Icon(Icons.refresh, color: QuantColors.cyan, size: 18),
               onPressed: onRefreshLogs,
@@ -212,16 +212,17 @@ class SystemTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          flex: 2,
+          flex: 5,
           child: Text(
             label,
             style: QuantTypography.caption,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
         const SizedBox(width: QuantSpacing.spaceXs),
         Expanded(
-          flex: 3,
+          flex: 6,
           child: Text(
             value,
             style: QuantTypography.technical.copyWith(
@@ -230,7 +231,8 @@ class SystemTab extends StatelessWidget {
               fontSize: 10.5,
             ),
             textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
       ],

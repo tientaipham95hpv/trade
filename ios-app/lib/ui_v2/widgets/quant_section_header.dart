@@ -29,21 +29,30 @@ class QuantSectionHeader extends StatelessWidget {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Text(
-                title.toUpperCase(),
-                style: QuantTypography.sectionTitle,
-              ),
-              if (statusBadge != null) ...[
-                const SizedBox(width: QuantSpacing.spaceXs),
-                statusBadge!,
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    title.toUpperCase(),
+                    style: QuantTypography.sectionTitle,
+                    softWrap: true,
+                    maxLines: 2,
+                  ),
+                ),
+                if (statusBadge != null) ...[
+                  const SizedBox(width: QuantSpacing.spaceXs),
+                  statusBadge!,
+                ],
               ],
-            ],
+            ),
           ),
-          if (meta != null || action != null)
+          if (meta != null || action != null) ...[
+            const SizedBox(width: QuantSpacing.spaceXs),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (meta != null)
                   Text(
@@ -56,6 +65,7 @@ class QuantSectionHeader extends StatelessWidget {
                 ],
               ],
             ),
+          ],
         ],
       ),
     );

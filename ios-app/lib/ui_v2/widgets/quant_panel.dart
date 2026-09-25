@@ -54,34 +54,38 @@ class QuantPanel extends StatelessWidget {
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          title.toUpperCase(),
-                          style: QuantTypography.heading.copyWith(fontSize: 12.0),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                      Text(
+                        title.toUpperCase(),
+                        style: QuantTypography.heading.copyWith(fontSize: 12.0),
+                        softWrap: true,
+                        maxLines: 2,
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(width: QuantSpacing.spaceXs),
-                        Flexible(
-                          child: Text(
-                            subtitle!,
-                            style: QuantTypography.caption,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: QuantTypography.caption.copyWith(
+                            fontSize: 10.0,
+                            color: QuantColors.textMuted,
                           ),
+                          softWrap: true,
+                          maxLines: 1,
                         ),
                       ],
                     ],
                   ),
                 ),
-                ?trailing,
+                if (trailing != null) ...[
+                  const SizedBox(width: QuantSpacing.spaceSm),
+                  trailing!,
+                ],
               ],
             ),
           ),

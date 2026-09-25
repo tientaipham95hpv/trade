@@ -174,7 +174,7 @@ class _RiskTabState extends State<RiskTab> {
           // 1. Circuit Breaker Telemetry Panel
           QuantPanel(
             title: 'TELEMETRY CẦU DAO RỦI RO',
-            subtitle: 'CIRCUIT BREAKER',
+            subtitle: 'CIRCUIT BREAKER TELEMETRY',
             trailing: QuantStatusBadge(
               label: riskView.circuitBreakerStatus,
               type: isHalted ? QuantStatusType.halted : QuantStatusType.healthy,
@@ -198,8 +198,8 @@ class _RiskTabState extends State<RiskTab> {
 
           // 2. Health Dimensions Breakdown
           QuantPanel(
-            title: 'CHIỀU KHÔNG GIAN BẢO MẬT (HEALTH DIMENSIONS)',
-            subtitle: 'SUBSYSTEM HEALTH',
+            title: 'CHIỀU KHÔNG GIAN BẢO MẬT',
+            subtitle: 'SUBSYSTEM HEALTH DIMENSIONS',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -217,7 +217,7 @@ class _RiskTabState extends State<RiskTab> {
 
           // 3. Operator Actions Surface (Phase 4 Active Controls)
           QuantPanel(
-            title: 'ĐIỀU KHIỂN TÁC ĐỘNG KHẨN CẤP (MUTATIONS)',
+            title: 'ĐIỀU KHIỂN TÁC ĐỘNG KHẨN CẤP',
             subtitle: 'PHASE 4 CAS GUARDS',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -320,26 +320,25 @@ class _RiskTabState extends State<RiskTab> {
   Widget _buildRow(String label, String value, Color color) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
             label,
             style: QuantTypography.caption,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
         const SizedBox(width: QuantSpacing.spaceXs),
-        Flexible(
-          child: Text(
-            value,
-            style: QuantTypography.technical.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-              fontSize: 11.5,
-            ),
-            textAlign: TextAlign.end,
-            overflow: TextOverflow.ellipsis,
+        Text(
+          value,
+          style: QuantTypography.technical.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontSize: 11.5,
           ),
+          textAlign: TextAlign.end,
         ),
       ],
     );
@@ -351,12 +350,14 @@ class _RiskTabState extends State<RiskTab> {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Text(
             label,
             style: QuantTypography.caption,
-            overflow: TextOverflow.ellipsis,
+            softWrap: true,
+            maxLines: 2,
           ),
         ),
         const SizedBox(width: QuantSpacing.spaceXs),

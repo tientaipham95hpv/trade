@@ -68,21 +68,19 @@ class PositionsTab extends StatelessWidget {
                       child: Text(
                         'QUYỀN ĐẶT LỆNH THỦ CÔNG',
                         style: QuantTypography.caption,
-                        overflow: TextOverflow.ellipsis,
+                        softWrap: true,
+                        maxLines: 2,
                       ),
                     ),
                     const SizedBox(width: QuantSpacing.spaceXs),
-                    Flexible(
-                      child: Text(
-                        'VÔ HIỆU HÓA (PROHIBITED)',
-                        style: QuantTypography.technical.copyWith(
-                          color: QuantColors.textSecondary,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 11.0,
-                        ),
-                        textAlign: TextAlign.end,
-                        overflow: TextOverflow.ellipsis,
+                    Text(
+                      'VÔ HIỆU HÓA (PROHIBITED)',
+                      style: QuantTypography.technical.copyWith(
+                        color: QuantColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11.0,
                       ),
+                      textAlign: TextAlign.end,
                     ),
                   ],
                 ),
@@ -185,12 +183,11 @@ class PositionsTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('GIÁ VÀO (ENTRY)', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      Text('GIÁ VÀO (ENTRY)', style: QuantTypography.caption, softWrap: true, maxLines: 2),
                       const SizedBox(height: 2),
                       Text(
                         QuantFormatters.formatCurrency(pos.entryPrice),
                         style: QuantTypography.technical.copyWith(fontSize: 12.0),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -199,12 +196,11 @@ class PositionsTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text('GIÁ MARK', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      Text('GIÁ MARK', style: QuantTypography.caption, softWrap: true, maxLines: 2),
                       const SizedBox(height: 2),
                       Text(
                         QuantFormatters.formatCurrency(pos.markPrice),
                         style: QuantTypography.technical.copyWith(fontSize: 12.0),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -213,7 +209,7 @@ class PositionsTab extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('PNL TẠM TÍNH', style: QuantTypography.caption, overflow: TextOverflow.ellipsis),
+                      Text('PNL TẠM TÍNH', style: QuantTypography.caption, softWrap: true, maxLines: 2),
                       const SizedBox(height: 2),
                       Text(
                         QuantFormatters.formatPnl(pnl),
@@ -222,7 +218,6 @@ class PositionsTab extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           fontSize: 12.0,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
