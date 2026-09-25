@@ -1,4 +1,4 @@
-# AUDIT REPORT — PHASE 6C: GITHUB ACTIONS MACOS IOS UNSIGNED BUILD GATE
+# AUDIT REPORT — PHASE 6C.1: GITHUB ACTIONS MACOS IOS UNSIGNED BUILD GATE
 
 ## 1. Execution Overview
 
@@ -6,10 +6,10 @@
 | :--- | :--- |
 | **Repository** | `tientaipham95hpv/trade` |
 | **Workflow** | `iOS Unsigned Build` (`.github/workflows/ios-unsigned-build.yml`) |
-| **Run ID** | `36171608197` |
-| **Run URL** | https://github.com/tientaipham95hpv/trade/actions/runs/36171608197 |
+| **Run ID** | `36176674181` |
+| **Run URL** | https://github.com/tientaipham95hpv/trade/actions/runs/36176674181 |
 | **Trigger** | Push to branch `ui-v2-rc1` |
-| **Commit** | `4ac96a6` (`feat(ui-v2): Phase 6C visual redesign & product polish (Web + Flutter)`) |
+| **Commit** | `f5da8ba` (`feat(ui-v2): Phase 6C.1 final visual target implementation (Web + Flutter)`) |
 | **Runner OS** | macOS 15.x (Apple Silicon arm64 runner) |
 | **Status** | `completed` |
 | **Conclusion** | `success` (Exit code 0) |
@@ -21,7 +21,7 @@
 | Step # | Step Name | Conclusion | Status | Notes |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Set up job | `success` | `completed` | Hosted runner initialization |
-| 2 | Checkout Code | `success` | `completed` | Checked out commit `4ac96a6` |
+| 2 | Checkout Code | `success` | `completed` | Checked out commit `f5da8ba` |
 | 3 | Setup Flutter | `success` | `completed` | Installed Flutter 3.47.4 stable |
 | 4 | Verify Flutter Environment | `success` | `completed` | Flutter 3.47.4, Dart, Xcode environment verified |
 | 5 | Install Dependencies | `success` | `completed` | `flutter pub get` resolved dependencies |
@@ -38,8 +38,8 @@
 
 ## 3. Artifact Verification
 
-- **Artifact ID**: `10881480911`
+- **Artifact ID**: `10882622817`
 - **Artifact Name**: `BinanceQuantPro-iOS-unsigned-UI_V2_RC1`
-- **Artifact Size**: 10,574,934 bytes (~10.5 MB)
-- **Archive URL**: `https://api.github.com/repos/tientaipham95hpv/trade/actions/artifacts/10881480911/zip`
-- **Verification**: The redesigned Flutter iOS codebase compiles into an unsigned release IPA without code signing errors, layout assertion errors, or test regressions.
+- **Artifact Size**: 10,574,932 bytes (~10.5 MB)
+- **Archive URL**: `https://api.github.com/repos/tientaipham95hpv/trade/actions/artifacts/10882622817/zip`
+- **Verification**: The redesigned Flutter iOS codebase compiles cleanly into an unsigned release IPA without code signing errors, layout assertion errors, or test regressions.
