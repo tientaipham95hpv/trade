@@ -208,7 +208,9 @@
 }
 
 .telemetry-key {
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-weight: 500;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.02em;

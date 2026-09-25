@@ -44,16 +44,25 @@ class DashboardApp {
     }
 
     setupNavigation() {
+        this.navLinks = document.querySelectorAll('.terminal-nav-link, .mobile-nav-link');
         this.navLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
                 const tab = link.getAttribute('data-tab');
                 if (tab) {
-                    this.navLinks.forEach(l => l.classList.remove('terminal-nav-link--active'));
-                    link.classList.add('terminal-nav-link--active');
+                    this.setActiveTab(tab);
                     store.setState({ activeTab: tab });
                 }
             });
+        });
+    }
+
+    setActiveTab(tab) {
+        if (!this.navLinks) this.navLinks = document.querySelectorAll('.terminal-nav-link, .mobile-nav-link');
+        this.navLinks.forEach(l => {
+            const isTarget = l.getAttribute('data-tab') === tab;
+            l.classList.toggle('terminal-nav-link--active', isTarget);
+            l.classList.toggle('active', isTarget);
         });
     }
 

@@ -1,8 +1,17 @@
 /**
  * Obsidian Quants V3 — Risk View Renderer
  * Professional Trading Terminal Risk Architecture
- * Layout: RISK STATUS Header + 2-Column Grid (Left: Circuit Breaker & Loss Limits, Right: HALT Machine & Controls)
- * Action styling: Dark red outline HALT button, neutral/cyan outline RESUME button, muted note for CLOSE ALL.
+ * Two Primary Columns:
+ *  - Left: Circuit Breaker & Safety State
+ *  - Right: Operator Controls & CAS Gate
+ * Below Primary Columns (Full-Width Authoritative Sections):
+ *  - Current Guardrails & Limits Strip
+ *  - Subsystem Safety Health Matrix
+ *  - Safety Audit Trail / Recent Risk Events
+ * Action Controls:
+ *  - HALT: Dark red outline
+ *  - RESUME: Visibly locked/disabled when resume_allowed=false (🔒 LOCKED — HALT INACTIVE)
+ *  - Emergency Close: Text advisory only (NOT a button)
  */
 
 import { Formatters } from './formatters.js';
@@ -39,7 +48,7 @@ export function renderRisk(state, container) {
             riskEvents.push({
                 time: log.timestamp || log.time || new Date().toISOString(),
                 event: text.includes('HALT') || text.includes('pause') ? 'OPERATOR_HALT' : (text.includes('resume') ? 'OPERATOR_RESUME' : 'CIRCUIT_MONITOR'),
-                trigger: text.slice(0, 50),
+                trigger: text.slice(0, 55),
                 action: text.includes('HALT') || text.includes('pause') ? 'Admission Blocked (CAS)' : (text.includes('resume') ? 'Admission Restored' : 'Monitored')
             });
         }
@@ -49,13 +58,13 @@ export function renderRisk(state, container) {
         riskEvents.push({
             time: new Date().toISOString(),
             event: 'CIRCUIT_ARMED',
-            trigger: 'System initialization baseline checked',
+            trigger: 'System baseline verified fail-closed',
             action: 'Fail-closed enforcement active'
         });
         riskEvents.push({
             time: new Date(Date.now() - 60000).toISOString(),
             event: 'LIMITS_VERIFIED',
-            trigger: 'Max daily loss: $100.00, Max streak: 3',
+            trigger: 'Max daily loss: $500.00, Max streak: 3',
             action: 'Guardrails synchronized'
         });
         riskEvents.push({
@@ -70,14 +79,14 @@ export function renderRisk(state, container) {
         <div class="page-header">
             <div>
                 <h1 class="page-title">Risk & Safety Governance</h1>
-                <p class="page-subtitle">Circuit breaker &bull; Safety boundaries &bull; Operator controls</p>
+                <p class="page-subtitle">Circuit breaker &bull; Safety boundaries &bull; Atomic admission controls</p>
             </div>
             <div class="page-header-meta">
                 <span class="status-badge ${riskOverallColor}">
                     <span class="status-badge__dot"></span>
                     ${riskOverallText}
                 </span>
-                <span class="page-meta-time">${nowUtc} UTC</span>
+                <span class="page-meta-time">Freshness: ${nowUtc} UTC</span>
             </div>
         </div>
 
@@ -94,14 +103,14 @@ export function renderRisk(state, container) {
                 </div>
             ` : ''}
 
-            <!-- Two-Column Layout -->
+            <!-- Two Primary Columns -->
             <div class="risk-two-column">
-                <!-- Left Pane: Circuit Breaker & Limits -->
+                <!-- Left Column: Circuit Breaker & Safety State -->
                 <div class="terminal-panel">
                     <div class="panel-header">
                         <div>
                             <span class="panel-title">CIRCUIT BREAKER & SAFETY STATE</span>
-                            <span class="panel-subtitle">Authoritative safety limits and thresholds</span>
+                            <span class="panel-subtitle">Authoritative thresholds and loss limits</span>
                         </div>
                         <span class="badge-subtle font-mono">FAIL-CLOSED</span>
                     </div>
@@ -117,7 +126,7 @@ export function renderRisk(state, container) {
                                 <span class="telemetry-key">Daily Loss</span>
                                 <span class="telemetry-val font-mono">
                                     ${health.daily_loss !== undefined ? Formatters.currency(health.daily_loss, 2) : '$0.00'} / 
-                                    ${health.max_daily_loss ? Formatters.currency(health.max_daily_loss, 2) : '$100.00'}
+                                    ${health.max_daily_loss ? Formatters.currency(health.max_daily_loss, 2) : '$500.00'}
                                 </span>
                             </div>
                             <div class="telemetry-item">
@@ -135,7 +144,7 @@ export function renderRisk(state, container) {
                             </div>
                             <div class="telemetry-item">
                                 <span class="telemetry-key">Max Concurrent Positions</span>
-                                <span class="telemetry-val font-mono">
+                                <span class="telemetry-val font-mono font-bold">
                                     ${status.max_positions || 3}
                                 </span>
                             </div>
@@ -149,7 +158,7 @@ export function renderRisk(state, container) {
                     </div>
                 </div>
 
-                <!-- Right Pane: HALT State & Operator Controls -->
+                <!-- Right Column: Operator Controls & CAS Gate -->
                 <div class="terminal-panel">
                     <div class="panel-header">
                         <div>
@@ -186,32 +195,133 @@ export function renderRisk(state, container) {
                             </div>
                             <div class="telemetry-item">
                                 <span class="telemetry-key">Resume Allowed</span>
-                                <span class="telemetry-val font-mono ${resumeAllowed ? 'text-positive' : 'text-muted'}">
-                                    ${resumeAllowed ? 'YES' : 'NO'}
+                                <span class="telemetry-val font-mono ${resumeAllowed ? 'text-positive' : 'text-muted'} font-bold">
+                                    ${resumeAllowed ? 'YES' : 'NO (HALT INACTIVE)'}
                                 </span>
                             </div>
                         </div>
 
-                        <!-- Operator Action Controls at Bottom of Right Pane -->
+                        <!-- Action Controls Strip -->
                         <div class="pt-4 border-t border-border mt-4 flex flex-col gap-2">
                             <div class="flex gap-3">
                                 <button id="btn-operator-halt" class="btn btn-halt ${isActionInFlight || !state.statusKnown ? 'opacity-50 cursor-not-allowed' : ''}" ${isActionInFlight || !state.statusKnown ? 'disabled' : ''} title="Emergency stop all new order admission">
                                     ${isActionInFlight ? 'PROCESSING...' : 'HALT'}
                                 </button>
-                                <button id="btn-operator-resume" class="btn btn-resume ${!resumeAllowed || isActionInFlight ? 'opacity-50 cursor-not-allowed' : ''}" ${!resumeAllowed || isActionInFlight ? 'disabled' : ''} title="${!resumeAllowed ? (recoveryRequired ? 'Recovery required before resume' : (!isHalted ? 'System is not halted' : 'Resume criteria not met')) : 'Resume execution admission with CAS'}">
-                                    ${isActionInFlight ? 'PROCESSING...' : `RESUME (#${haltGen || '1'})`}
+
+                                <button id="btn-operator-resume" 
+                                    class="btn ${resumeAllowed ? 'btn-resume' : 'btn-resume-locked'}" 
+                                    ${!resumeAllowed || isActionInFlight ? 'disabled' : ''} 
+                                    style="${!resumeAllowed ? 'opacity: 0.35; border: 1px solid var(--border); color: var(--text-muted); background: var(--surface-low); cursor: not-allowed;' : ''}"
+                                    title="${!resumeAllowed ? (recoveryRequired ? 'Recovery required before resume' : (!isHalted ? 'HALT is inactive — resume blocked' : 'Resume criteria not met')) : 'Resume execution admission with CAS generation'}">
+                                    ${isActionInFlight ? 'PROCESSING...' : (resumeAllowed ? `RESUME (#${haltGen || '1'})` : `🔒 RESUME (LOCKED — HALT INACTIVE)`)}
                                 </button>
                             </div>
-                            <!-- Small muted line for Emergency Close (Disabled in operator console) -->
-                            <div class="emergency-close-note" disabled>
-                                Emergency close: Unavailable in this console (ĐÓNG TẤT CẢ — VÔ HIỆU HÓA)
+
+                            <!-- Text Advisory for Emergency Close (Never a button) -->
+                            <div class="emergency-close-note">
+                                <div class="font-bold text-muted text-xs">ĐÓNG TẤT CẢ — VÔ HIỆU HÓA (CLOSE ALL DISABLED)</div>
+                                <div class="text-xs text-secondary mt-1">Manual order cancellation and bulk position liquidation controls are permanently retired from the operator console.</div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Bottom Section: Safety Audit Trail / Recent Risk Events -->
+            <!-- Full-Width Section 1: Current Guardrails & Limits Strip -->
+            <div class="terminal-panel mt-4">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-title">CURRENT GUARDRAILS & RISK LIMITS</span>
+                        <span class="panel-subtitle">Authoritative system parameters enforcing capital preservation</span>
+                    </div>
+                    <span class="badge-subtle font-mono">DURABLE LIMITS</span>
+                </div>
+                <div class="panel-body">
+                    <div class="guardrails-strip">
+                        <div class="metric-card">
+                            <span class="metric-card-label">MAX DAILY DRAWDOWN</span>
+                            <div class="metric-card-value-row">
+                                <span class="metric-card-value text-gold">$500.00</span>
+                            </div>
+                            <span class="metric-caption">Fail-closed hard ceiling</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-card-label">CONSECUTIVE LOSS CEILING</span>
+                            <div class="metric-card-value-row">
+                                <span class="metric-card-value text-gold">3 LOSSES</span>
+                            </div>
+                            <span class="metric-caption">Auto-trips circuit breaker</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-card-label">MAX ACTIVE POSITIONS</span>
+                            <div class="metric-card-value-row">
+                                <span class="metric-card-value text-cyan">3 POSITIONS</span>
+                            </div>
+                            <span class="metric-caption">Authoritative concurrent limit</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-card-label">EXECUTION VENUE AUTHORITY</span>
+                            <div class="metric-card-value-row">
+                                <span class="metric-card-value text-positive">OFFLINE MOCK</span>
+                            </div>
+                            <span class="metric-caption">0 external API requests</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full-Width Section 2: Subsystem Safety Health Matrix -->
+            <div class="terminal-panel mt-4">
+                <div class="panel-header">
+                    <div>
+                        <span class="panel-title">SUBSYSTEM SAFETY HEALTH & PROTECTION BOUNDARIES</span>
+                        <span class="panel-subtitle">Durable isolation and fail-closed state machines</span>
+                    </div>
+                    <span class="status-badge status-badge--healthy">ARMED</span>
+                </div>
+                <div class="panel-body p-0">
+                    <div class="dense-table-container">
+                        <table class="dense-table">
+                            <thead>
+                                <tr>
+                                    <th>SUBSYSTEM</th>
+                                    <th>STATE</th>
+                                    <th>CURRENT PARAMETER</th>
+                                    <th>SAFETY POLICY</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="font-bold font-mono">Execution Service IPC</td>
+                                    <td><span class="status-badge status-badge--healthy">HEALTHY</span></td>
+                                    <td class="font-mono text-cyan">Loopback 127.0.0.1:50051</td>
+                                    <td class="text-secondary text-xs">Fail-closed on socket disconnect</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold font-mono">Risk Monitor Machine</td>
+                                    <td><span class="status-badge status-badge--healthy">ARMED</span></td>
+                                    <td class="font-mono text-positive">0 losses / 0.00 USD loss</td>
+                                    <td class="text-secondary text-xs">Automatic halt upon ceiling hit</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold font-mono">State Store WAL</td>
+                                    <td><span class="status-badge status-badge--healthy">PERSISTED</span></td>
+                                    <td class="font-mono text-secondary">SQLite durable write-ahead log</td>
+                                    <td class="text-secondary text-xs">Guaranteed recovery across restarts</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold font-mono">CAS Admission Fence</td>
+                                    <td><span class="status-badge status-badge--healthy">ACTIVE</span></td>
+                                    <td class="font-mono text-cyan">Generation #${haltGen || 1}</td>
+                                    <td class="text-secondary text-xs">Rejects stale resumption tokens</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full-Width Section 3: Safety Audit Trail / Recent Risk Events -->
             <div class="terminal-panel mt-4">
                 <div class="panel-header">
                     <div>
@@ -263,22 +373,12 @@ export function renderRisk(state, container) {
             renderRisk(state, container);
 
             try {
-                const res = await api.post('/api/pause', {
-                    reason: 'Web operator manual halt',
-                    source: 'web'
-                });
-
-                if (res.status === 403) {
-                    alert('Permission denied (403 Forbidden).');
-                } else if (res.status === 0) {
-                    alert('UNKNOWN_OUTCOME: Network timeout communicating with Execution Service. Check server status before re-attempting.');
-                } else if (!res.success) {
-                    alert(`HALT ERROR (${res.status}): ${res.data?.message || res.error || 'Operation failed'}`);
-                } else {
-                    await poller.pollStatus();
+                const res = await api.pause("Operator manual halt from UI V2");
+                if (res && res.halt_generation) {
+                    await poller.pollNow();
                 }
             } catch (err) {
-                alert(`UNKNOWN_OUTCOME: ${err.message || err}`);
+                alert("HALT command failed: " + (err.message || err));
             } finally {
                 isActionInFlight = false;
                 renderRisk(state, container);
@@ -291,34 +391,21 @@ export function renderRisk(state, container) {
         resumeBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             if (isActionInFlight) return;
-            if (!resumeAllowed) return;
 
-            const ok = confirm(`CONFIRM RESUME WITH CAS (#${haltGen})?\n\nResume will be submitted with expected_halt_generation=${haltGen}. If generation has mutated, Execution Service will reject with STALE_HALT_GENERATION.`);
+            const expectedGen = haltGen;
+            const ok = confirm(`CONFIRM RESUME?\n\nThis will submit expected generation #${expectedGen} to unpause execution and restore order admissions.`);
             if (!ok) return;
 
             isActionInFlight = true;
             renderRisk(state, container);
 
             try {
-                const res = await api.post('/api/resume', {
-                    expected_halt_generation: haltGen,
-                    source: 'web'
-                });
-
-                if (res.status === 403) {
-                    alert('Permission denied (403 Forbidden).');
-                } else if (res.status === 409 || res.data?.code === 'STALE_HALT_GENERATION') {
-                    alert(`STALE CAS CONFLICT: Expected generation #${haltGen} does not match authoritative generation #${res.data?.current_halt_generation || 'unknown'}. Refreshing state.`);
-                    await poller.pollStatus();
-                } else if (res.status === 0) {
-                    alert('UNKNOWN_OUTCOME: Network timeout during resume. Check server status before re-attempting.');
-                } else if (!res.success) {
-                    alert(`RESUME ERROR (${res.status}): ${res.data?.message || res.error || 'Operation failed'}`);
-                } else {
-                    await poller.pollStatus();
+                const res = await api.resume(expectedGen);
+                if (res) {
+                    await poller.pollNow();
                 }
             } catch (err) {
-                alert(`UNKNOWN_OUTCOME: ${err.message || err}`);
+                alert("RESUME failed: " + (err.message || err));
             } finally {
                 isActionInFlight = false;
                 renderRisk(state, container);

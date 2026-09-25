@@ -87,7 +87,7 @@ class MockHandler(SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps(data).encode('utf-8'))
-            elif self.path == '/api/history':
+            elif self.path.startswith('/api/history'):
                 data = [
                     {'time': '2026-09-25T15:10:00Z', 'symbol': 'ETHUSDT', 'side': 'SELL', 'order_type': 'MARKET', 'qty': 1.25, 'price': 3450.0, 'status': 'FILLED'},
                     {'time': '2026-09-25T14:30:00Z', 'symbol': 'BTCUSDT', 'side': 'BUY', 'order_type': 'LIMIT', 'qty': 0.05, 'price': 65000.0, 'status': 'FILLED'}
@@ -96,7 +96,7 @@ class MockHandler(SimpleHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.end_headers()
                 self.wfile.write(json.dumps(data).encode('utf-8'))
-            elif self.path == '/api/logs':
+            elif self.path.startswith('/api/logs'):
                 data = [
                     {'timestamp': '2026-09-25T15:10:02Z', 'component': 'EXECUTION', 'level': 'INFO', 'message': 'Position opened: ETHUSDT SHORT 1.25'},
                     {'timestamp': '2026-09-25T14:30:05Z', 'component': 'EXECUTION', 'level': 'INFO', 'message': 'Order matched: BTCUSDT BUY 0.05 @ 65000.0'}
@@ -128,68 +128,83 @@ async def capture_web():
             await page.wait_for_timeout(1000)
 
             # 1. 1920x1080 Overview
+            p1_v2 = os.path.join(SCREENSHOT_DIR, 'web_overview_v2.png')
             p1_final = os.path.join(SCREENSHOT_DIR, 'web_overview_final.png')
             p1_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_overview.png')
+            await page.screenshot(path=p1_v2)
             await page.screenshot(path=p1_final)
             await page.screenshot(path=p1_old)
-            print('Captured:', p1_final)
+            print('Captured:', p1_v2)
 
             # 2. 1920x1080 Positions
             await page.click('a[data-tab="positions"]')
             await page.wait_for_timeout(500)
+            p2_v2 = os.path.join(SCREENSHOT_DIR, 'web_positions_v2.png')
             p2_final = os.path.join(SCREENSHOT_DIR, 'web_positions_final.png')
             p2_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_positions.png')
+            await page.screenshot(path=p2_v2)
             await page.screenshot(path=p2_final)
             await page.screenshot(path=p2_old)
-            print('Captured:', p2_final)
+            print('Captured:', p2_v2)
 
             # 3. 1920x1080 Risk
             await page.click('a[data-tab="risk"]')
             await page.wait_for_timeout(500)
+            p3_v2 = os.path.join(SCREENSHOT_DIR, 'web_risk_v2.png')
             p3_final = os.path.join(SCREENSHOT_DIR, 'web_risk_final.png')
             p3_old = os.path.join(SCREENSHOT_DIR, 'web_1920x1080_risk.png')
+            await page.screenshot(path=p3_v2)
             await page.screenshot(path=p3_final)
             await page.screenshot(path=p3_old)
-            print('Captured:', p3_final)
+            print('Captured:', p3_v2)
 
             # 4. 1920x1080 Activity
             await page.click('a[data-tab="activity"]')
             await page.wait_for_timeout(500)
+            p4_v2 = os.path.join(SCREENSHOT_DIR, 'web_activity_v2.png')
             p4_final = os.path.join(SCREENSHOT_DIR, 'web_activity_final.png')
+            await page.screenshot(path=p4_v2)
             await page.screenshot(path=p4_final)
-            print('Captured:', p4_final)
+            print('Captured:', p4_v2)
 
             # 5. 1440x900 System
             await page.set_viewport_size({'width': 1440, 'height': 900})
             await page.click('a[data-tab="system"]')
             await page.wait_for_timeout(500)
+            p5_v2 = os.path.join(SCREENSHOT_DIR, 'web_system_v2.png')
             p5_final = os.path.join(SCREENSHOT_DIR, 'web_system_final.png')
             p5_old = os.path.join(SCREENSHOT_DIR, 'web_1440x900_system.png')
+            await page.screenshot(path=p5_v2)
             await page.screenshot(path=p5_final)
             await page.screenshot(path=p5_old)
-            print('Captured:', p5_final)
+            print('Captured:', p5_v2)
 
             # 6. 390x844 Mobile Overview
             await page.set_viewport_size({'width': 390, 'height': 844})
-            await page.click('a[data-tab="overview"]')
+            # On mobile, use mobile nav link
+            await page.click('.mobile-nav-link[data-tab="overview"]')
             await page.wait_for_timeout(500)
+            p6_v2 = os.path.join(SCREENSHOT_DIR, 'web_mobile_overview_v2.png')
             p6_final = os.path.join(SCREENSHOT_DIR, 'web_mobile_overview_final.png')
             p6_old = os.path.join(SCREENSHOT_DIR, 'web_390x844_overview.png')
+            await page.screenshot(path=p6_v2)
             await page.screenshot(path=p6_final)
             await page.screenshot(path=p6_old)
-            print('Captured:', p6_final)
+            print('Captured:', p6_v2)
 
             # 7. 390x844 Mobile Risk
-            await page.click('a[data-tab="risk"]')
+            await page.click('.mobile-nav-link[data-tab="risk"]')
             await page.wait_for_timeout(500)
+            p7_v2 = os.path.join(SCREENSHOT_DIR, 'web_mobile_risk_v2.png')
             p7_final = os.path.join(SCREENSHOT_DIR, 'web_mobile_risk_final.png')
             p7_old = os.path.join(SCREENSHOT_DIR, 'web_390x844_risk.png')
+            await page.screenshot(path=p7_v2)
             await page.screenshot(path=p7_final)
             await page.screenshot(path=p7_old)
-            print('Captured:', p7_final)
+            print('Captured:', p7_v2)
 
             await browser.close()
-            print('All 7 Web screenshots captured successfully!')
+            print('All Web screenshots captured successfully!')
     except Exception as e:
         traceback.print_exc()
 

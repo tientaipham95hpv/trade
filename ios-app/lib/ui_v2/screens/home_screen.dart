@@ -116,61 +116,59 @@ class _QuantHomeScreenState extends State<QuantHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // App Brand & Mode
+                  // App Brand & Mode: TRADER | OFFLINE | HEALTHY
                   Row(
                     children: [
                       Container(
-                        width: 26,
-                        height: 26,
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
                           color: QuantColors.surfaceLow,
                           borderRadius: QuantSpacing.borderMicro,
                           border: Border.all(color: QuantColors.borderActive),
                         ),
                         child: const Center(
-                          child: Icon(Icons.show_chart_rounded, color: QuantColors.cyan, size: 16),
+                          child: Icon(Icons.show_chart_rounded, color: QuantColors.cyan, size: 15),
                         ),
                       ),
-                      const SizedBox(width: QuantSpacing.spaceSm),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'BINANCE QUANT PRO',
-                            style: QuantTypography.heading.copyWith(
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                          Row(
-                            children: [
-                              Text(
-                                'OPERATOR CONSOLE',
-                                style: QuantTypography.caption.copyWith(
-                                  color: QuantColors.cyan,
-                                  fontSize: 8.5,
-                                  letterSpacing: 0.8,
-                                ),
-                              ),
-                              const SizedBox(width: QuantSpacing.space2xs),
-                              EnvironmentBadge.fromString(status?.environment),
-                            ],
-                          ),
-                        ],
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      Text(
+                        'TRADER',
+                        style: QuantTypography.heading.copyWith(
+                          fontSize: 13.0,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                        ),
+                      ),
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      Text(
+                        '|',
+                        style: QuantTypography.caption.copyWith(
+                          color: QuantColors.borderActive,
+                          fontWeight: FontWeight.w300,
+                        ),
+                      ),
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      EnvironmentBadge.fromString(status?.environment ?? 'OFFLINE'),
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      Text(
+                        '|',
+                        style: QuantTypography.caption.copyWith(
+                          color: QuantColors.borderActive,
+                          fontWeight: FontWeight.w300,
+                        ),
+                      ),
+                      const SizedBox(width: QuantSpacing.spaceXs),
+                      QuantStatusBadge(
+                        label: status?.status ?? 'HEALTHY',
+                        type: statusType,
                       ),
                     ],
                   ),
 
-                  // Status, Latency & Refresh
+                  // Latency & Refresh
                   Row(
                     children: [
-                      QuantStatusBadge(
-                        label: status?.status ?? 'UNKNOWN',
-                        type: statusType,
-                      ),
-                      const SizedBox(width: QuantSpacing.spaceXs),
                       if (controller.lastLatencyMs != null) ...[
                         Text(
                           QuantFormatters.formatLatency(controller.lastLatencyMs),

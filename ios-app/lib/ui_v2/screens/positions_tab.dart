@@ -33,11 +33,14 @@ class PositionsTab extends StatelessWidget {
       onRefresh: onRefresh,
       color: QuantColors.cyan,
       backgroundColor: QuantColors.surface,
-      child: ListView(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(QuantSpacing.spaceMd),
-        children: [
-          // Header summary panel
-          QuantPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header summary panel
+            QuantPanel(
             title: 'QUẢN LÝ VỊ THẾ THỰC THI',
             subtitle: '${positions.length}/$maxPositions HOẠT ĐỘNG',
             child: Column(
@@ -110,7 +113,8 @@ class PositionsTab extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildPositionCard(BuildContext context, PositionView pos) {

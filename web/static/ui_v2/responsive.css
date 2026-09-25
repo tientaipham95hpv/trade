@@ -1,8 +1,13 @@
 /**
- * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C
+ * Obsidian Quants V3 — Binance Quant Pro UI V2 Phase 6C.2
  * Professional Trading Terminal Responsive Breakpoints
- * Breakpoints: Desktop (>=1440px), Tablet/Compact (1024px-1439px), Mobile (<1024px, <640px)
+ * Breakpoints: Desktop (>=1440px), Compact Desktop (1024px-1439px), Tablet (768px-1023px), Mobile (<768px)
  */
+
+/* Hide mobile bottom nav by default on desktop */
+.mobile-bottom-nav {
+  display: none !important;
+}
 
 /* ==========================================================================
    Desktop Ultra / Large (>= 1440px)
@@ -13,7 +18,11 @@
   }
 
   .band-work-area {
-    grid-template-columns: 65% calc(35% - var(--space-md));
+    grid-template-columns: 68% calc(32% - var(--space-md));
+  }
+
+  .positions-workstation {
+    grid-template-columns: 68% calc(32% - var(--space-md));
   }
 }
 
@@ -27,7 +36,11 @@
   }
 
   .band-work-area {
-    grid-template-columns: 60% calc(40% - var(--space-md));
+    grid-template-columns: 65% calc(35% - var(--space-md));
+  }
+
+  .positions-workstation {
+    grid-template-columns: 65% calc(35% - var(--space-md));
   }
 
   .risk-two-column {
@@ -36,9 +49,9 @@
 }
 
 /* ==========================================================================
-   Mobile & Tablet Surface (< 1024px)
+   Tablet Surface (768px - 1023px)
    ========================================================================== */
-@media (max-width: 1023px) {
+@media (max-width: 1023px) and (min-width: 768px) {
   .terminal-body-wrapper {
     flex-direction: column;
   }
@@ -78,51 +91,157 @@
     display: none;
   }
 
-  .terminal-viewport {
-    padding: var(--space-sm);
-  }
-
-  .top-telemetry-bar {
-    padding: 0 var(--space-sm);
-    gap: var(--space-sm);
-  }
-
-  .top-telemetry-bar__center {
-    display: none; /* Hide middle strip on smaller screens to avoid overflow */
-  }
-
-  .band-system-strip {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .band-financial-strip {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
+  .band-system-strip,
+  .band-financial-strip,
   .metric-cards-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .overview-lower-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .band-work-area {
+  .positions-workstation {
     grid-template-columns: 1fr;
   }
 
   .risk-two-column {
     grid-template-columns: 1fr;
   }
+}
 
-  .dense-table-container {
-    -webkit-overflow-scrolling: touch;
+/* ==========================================================================
+   Mobile Surface (< 768px) & Compact Mobile (640px)
+   ========================================================================== */
+@media (max-width: 640px) {
+  .metric-cards-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* 1. DO NOT show desktop sidebar or full horizontal nav at <768px */
+  .terminal-sidebar {
+    display: none !important;
+  }
+
+  /* 2. Show dedicated mobile bottom nav */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background-color: var(--surface-low);
+    border-top: 1px solid var(--border);
+    z-index: 9999;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 4px;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.6);
+  }
+
+  .mobile-nav-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    padding: 4px 10px;
+    border-radius: var(--radius-micro);
+    transition: color 0.15s ease;
+    min-width: 55px;
+  }
+
+  .mobile-nav-link svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+  }
+
+  .mobile-nav-link.active,
+  .mobile-nav-link--active {
+    color: var(--accent-cyan);
+  }
+
+  .mobile-nav-link.active svg,
+  .mobile-nav-link--active svg {
+    stroke: var(--accent-cyan);
+  }
+
+  /* 3. Terminal body wrapper leaves clearance for bottom nav */
+  .terminal-body-wrapper {
+    flex-direction: column;
+    padding-bottom: 60px;
+  }
+
+  .terminal-viewport {
+    padding: var(--space-sm);
+  }
+
+  /* 4. Top Telemetry Bar: Compact TRADER | OFFLINE | HEALTHY */
+  .top-telemetry-bar {
+    height: 44px;
+    min-height: 44px;
+    padding: 0 var(--space-sm);
+    gap: var(--space-xs);
+  }
+
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  .top-telemetry-brand {
+    font-size: 12px;
+  }
+
+  /* 5. Metric cards: 2 columns where space permits — no 10-card vertical stack */
+  .band-system-strip,
+  .band-financial-strip,
+  .metric-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .metric-card {
+    min-height: 72px;
+    padding: 8px 10px;
+  }
+
+  .metric-card-value,
+  .metric-value {
+    font-size: 15px;
+  }
+
+  .metric-card-label,
+  .metric-label {
+    font-size: 10px;
+  }
+
+  .metric-card__sub {
+    font-size: 9.5px;
+  }
+
+  /* 6. Layout structures on mobile */
+  .positions-workstation {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: var(--space-md);
+  }
+
+  .positions-table-col,
+  .positions-inspector-col {
+    width: 100% !important;
+  }
+
+  .risk-two-column {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
   }
 
   .terminal-grid-12 {
@@ -138,32 +257,19 @@
     width: 100%;
   }
 
-  .position-drawer {
-    max-width: 100%;
-  }
-}
-
-/* ==========================================================================
-   Compact Mobile Phone (< 640px)
-   ========================================================================== */
-@media (max-width: 639px) {
-  .top-telemetry-bar {
-    height: auto;
-    min-height: 48px;
-    flex-wrap: wrap;
-    padding: 6px var(--space-sm);
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: var(--space-sm);
   }
 
-  .band-system-strip {
-    grid-template-columns: 1fr;
+  .page-title {
+    font-size: 16px;
   }
 
-  .band-financial-strip {
-    grid-template-columns: 1fr;
-  }
-
-  .metric-cards-grid {
-    grid-template-columns: 1fr;
+  .dense-table-container {
+    -webkit-overflow-scrolling: touch;
   }
 
   .btn-terminal {

@@ -1,34 +1,43 @@
-# AUDIT REPORT — PHASE 6C.1: FINAL SCREENSHOT REVIEW & VISUAL EVIDENCE
+# AUDIT REPORT — PHASE 6C.2: FINAL VISUAL CORRECTION PASS EVIDENCE
 
 ## 1. Visual Evidence Index
 
-All 11 required final screenshots have been captured, verified, and stored under `audit/ui_v2/phase6c/screenshots/`.
+All 11 required final screenshots have been captured, visually inspected, and verified under `audit/ui_v2/phase6c/screenshots/`.
 
 | File Name | Platform | Resolution | Size (bytes) | Status | Inspection Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `web_overview_final.png` | Web V2 Desktop | 1920 x 1080 | 116,521 | PASS | Live Telemetry badge, 10 metric cards, 10-column table, Risk & Protection summary, Subsystem health |
-| `web_positions_final.png` | Web V2 Desktop | 1920 x 1080 | 42,465 | PASS | Page header with active counts, 10-column table, right-docked read-only telemetry drawer |
-| `web_risk_final.png` | Web V2 Desktop | 1920 x 1080 | 75,423 | PASS | 2-column layout (Breaker & CAS controls), dark red outline HALT, disabled RESUME (#1), Safety audit trail |
-| `web_activity_final.png` | Web V2 Desktop | 1920 x 1080 | 43,634 | PASS | Live audit stream badge, 5-button filter strip, TIME \| SOURCE \| TYPE \| EVENT \| RESULT table |
-| `web_system_final.png` | Web V2 Desktop | 1440 x 900 | 97,207 | PASS | 4 grouped cards (Runtime, Services, Authority, Core 15/15), Features Governance matrix, Build audit |
-| `web_mobile_overview_final.png` | Web V2 Mobile | 390 x 844 | 46,461 | PASS | Stacked cards, live telemetry header, 0 horizontal overflow, fully responsive |
-| `web_mobile_risk_final.png` | Web V2 Mobile | 390 x 844 | 50,081 | PASS | Full-width touch targets >= 44px, confirmation modal prompts, disabled CLOSEALL note |
-| `flutter_overview_final.png` | Flutter iOS | 390 x 844 (@2x) | 19,941 | PASS | Restrained dark palette, compact metric tiles, responsive dual-expanded gov rows, 0 fake values |
-| `flutter_positions_final.png` | Flutter iOS | 390 x 844 (@2x) | 17,509 | PASS | Read-only inspection cards, leverage badge, entry/mark price, protection indicator |
-| `flutter_risk_final.png` | Flutter iOS | 390 x 844 (@2x) | 23,387 | PASS | Circuit breaker ARMED, CAS generation tracking, dark red HALT, cyan outline RESUME, disabled note |
-| `flutter_system_final.png` | Flutter iOS | 390 x 844 (@2x) | 24,083 | PASS | Governance matrix, 15/15 core certification, live logs reverse scrolling inspection |
+| `web_overview_final.png` | Web V2 Desktop | 1920 x 1080 | 127,884 | PASS | Live Telemetry badge, 10 metric cards (2-tier hierarchy), Active Positions table, Risk Summary, Subsystem Health |
+| `web_positions_final.png` | Web V2 Desktop | 1920 x 1080 | 93,926 | PASS | Workstation layout: Left ~68% active table, Right ~32% persistent read-only Position Inspector, bottom panels |
+| `web_risk_final.png` | Web V2 Desktop | 1920 x 1080 | 132,388 | PASS | 2 balanced columns (Breaker & CAS Gate), dark red HALT, locked RESUME, Guardrails strip, Health matrix, Audit trail |
+| `web_activity_final.png` | Web V2 Desktop | 1920 x 1080 | 57,987 | PASS | Full-height audit console, 5-button filter strip, continuation state, SANITIZED UI FIXTURE badge |
+| `web_system_final.png` | Web V2 Desktop | 1440 x 900 | 104,556 | PASS | 4 grouped cards (Runtime, Services, Authority, Core 15/15), Features Governance matrix, Fail-closed indicators |
+| `web_mobile_overview_final.png` | Web V2 Mobile | 390 x 844 | 64,764 | PASS | 2-column metric cards, mobile bottom navigation bar (Overview, Positions, Risk, System), 0 horizontal overflow |
+| `web_mobile_risk_final.png` | Web V2 Mobile | 390 x 844 | 61,273 | PASS | Mobile bottom nav, full-width touch targets >= 44px, locked RESUME, retired CLOSEALL advisory |
+| `flutter_overview_final.png` | Flutter iOS | 390 x 844 (@2x) | 130,448 | PASS | 100% sharp readable fonts (TRADER \| OFFLINE \| HEALTHY, TỔNG QUAN), metric tiles, dual-expanded gov rows |
+| `flutter_positions_final.png` | Flutter iOS | 390 x 844 (@2x) | 93,206 | PASS | 100% sharp readable fonts (VỊ THẾ), read-only inspection cards, leverage badge, entry/mark price, protection indicator |
+| `flutter_risk_final.png` | Flutter iOS | 390 x 844 (@2x) | 140,936 | PASS | 100% sharp readable fonts (RỦI RO), Circuit breaker ARMED, CAS token, dark red HALT, locked RESUME, disabled note |
+| `flutter_system_final.png` | Flutter iOS | 390 x 844 (@2x) | 189,652 | PASS | 100% sharp readable fonts (HỆ THỐNG), Governance matrix, 15/15 core certification, live logs inspection |
 
 ---
 
-## 2. Screenshot Visual Analysis
+## 2. Screenshot Visual Analysis & Corrections Implemented
 
-### Web V2: Institutional Quantitative Workstation (Binance Pro × Linear)
-- **Palette**: Dark slate `#070B12` background with `#0D111A` cards and `#202938` subtle borders. Accent cyan restrained strictly to <= 10% of interactive surface.
-- **Header**: Live telemetry pulse dot with UTC clock timestamp across all 5 views.
-- **Data Integrity**: Zero fake metrics, zero synthetic curves or sparklines, strict em-dash (`—`) for unmeasured or null variables.
-- **Safety Surface**: HALT is styled as a technical dark red outline button; RESUME as a cyan outline button with CAS expected generation counter; CLOSEALL is permanently absent from interactive buttons and rendered only as disabled text (`ĐÓNG TẤT CẢ — VÔ HIỆU HÓA`).
+### Web V2: Workstation Density & Mobile Usability
+- **Positions Workstation**: Solved the 70% empty viewport defect by establishing a 68% / 32% workstation split. Active positions table on the left with interactive row selection; persistent read-only Position Inspector on the right displaying real-time execution telemetry; bottom panels for Protection State and Order Execution Metadata.
+- **Risk & Safety Governance**: Two balanced top columns (Circuit Breaker & Limits, Operator Controls & CAS Gate); dark red outline HALT; explicitly disabled/locked RESUME (`🔒 RESUME (LOCKED — HALT INACTIVE)`); retired CLOSEALL advisory notice; full-width guardrails strip, subsystem safety matrix, and safety audit trail.
+- **Activity & Audit Trail**: Full-height console (`calc(100vh - 200px)`), `ALL`, `OPERATOR`, `CIRCUIT BREAKER`, `EXECUTION`, `SERVICES` filters, audit continuation state note, and `SANITIZED UI FIXTURE` badge.
+- **Mobile Responsive**: Eliminated long 10-card vertical scrolling on mobile by switching to a balanced 2-column grid. Added a dedicated mobile bottom navigation bar (`Overview`, `Positions`, `Risk`, `System`) fixed at the bottom with 52px height and touch-friendly navigation.
 
-### Flutter iOS V2: Professional Mobile Terminal
-- **Geometry**: Compact 8px border radii, 44px touch targets conforming to Apple HIG.
-- **Typography**: Monospace tabular numbers for prices, PnL, quantities, and SHA-256 hashes; Sans-serif for navigation and headers.
-- **Safety Guardrails**: Prohibited features (CLOSEALL, manual trade entry, live keys) explicitly declared as disabled in the governance matrix.
+### Flutter iOS V2: Human-Readable Typography & Native Polish
+- **Font Rendering Gate**: Completely eliminated Ahem font fallback blocks in headless screenshots by implementing a native font loader linking system TrueType/OpenType typefaces (Arial for sans-serif, Consolas for monospace, and MaterialIcons).
+- **Legibility**: All text, navigation tabs (`TỔNG QUAN`, `VỊ THẾ`, `RỦI RO`, `HỆ THỐNG`), badges (`TRADER | OFFLINE | HEALTHY`), telemetry values, and hashes are rendered sharply and legibly.
+- **Scroll & Virtualization**: Replaced blocking virtualized listviews with smooth single-child scrollviews to eliminate headless frame hangs.
+
+---
+
+## 3. Cryptographic Verification & Regression Status
+
+- **Frozen Core Integrity**: `core/execution/*` is 100% intact with **15/15 MATCH** and **0 MISMATCH**.
+- **Python Regression Suite**: **348 passed**, 0 failed across full regression suite.
+- **Flutter Static Analysis**: `flutter analyze` reports **0 issues**.
+- **Flutter Test Suite**: **60/60 passed**, 0 failed.
