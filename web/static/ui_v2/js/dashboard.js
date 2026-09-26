@@ -98,51 +98,59 @@ class DashboardApp {
 
         // ENV
         if (this.envBadge) {
-            const env = (status.environment || state.environment || 'UNKNOWN').toUpperCase();
-            this.envBadge.textContent = env;
+            const rawEnv = (status.environment || state.environment || 'UNKNOWN').toUpperCase();
+            let envText = 'CHƯA RÕ';
             let badgeClass = 'env-unknown env-badge--unknown';
-            if (env === 'OFFLINE') badgeClass = 'env-offline env-badge--offline';
-            else if (env === 'TESTNET') badgeClass = 'env-testnet env-badge--testnet';
-            else if (env === 'LIVE') badgeClass = 'env-live env-badge--live';
+            if (rawEnv === 'OFFLINE') {
+                envText = 'NGOẠI TUYẾN';
+                badgeClass = 'env-offline env-badge--offline';
+            } else if (rawEnv === 'TESTNET') {
+                envText = 'MẠNG THỬ NGHIỆM';
+                badgeClass = 'env-testnet env-badge--testnet';
+            } else if (rawEnv === 'LIVE') {
+                envText = 'THỊ TRƯỜNG THẬT';
+                badgeClass = 'env-live env-badge--live';
+            }
+            this.envBadge.textContent = envText;
             this.envBadge.className = `env-badge ${badgeClass}`;
         }
 
         // EXEC
         if (this.execBadge) {
             if (!state.statusKnown) {
-                this.execBadge.textContent = 'UNKNOWN';
+                this.execBadge.textContent = 'CHƯA RÕ';
                 this.execBadge.className = 'status-badge status-badge--degraded';
             } else if (isHalted) {
-                this.execBadge.textContent = 'HALTED';
+                this.execBadge.textContent = 'ĐÃ DỪNG';
                 this.execBadge.className = 'status-badge status-badge--halt';
             } else if (isHealthy) {
-                this.execBadge.textContent = 'HEALTHY';
+                this.execBadge.textContent = 'KHỎE MẠNH';
                 this.execBadge.className = 'status-badge status-badge--healthy';
             } else {
-                this.execBadge.textContent = status.status || 'DEGRADED';
+                this.execBadge.textContent = status.status || 'SUY GIẢM';
                 this.execBadge.className = 'status-badge status-badge--degraded';
             }
         }
 
         // WEB
         if (this.webBadge) {
-            this.webBadge.textContent = 'READY';
+            this.webBadge.textContent = 'SẴN SÀNG';
             this.webBadge.className = 'status-badge status-badge--healthy';
         }
 
         // TELEGRAM
         if (this.tgBadge) {
-            this.tgBadge.textContent = 'READY';
+            this.tgBadge.textContent = 'SẴN SÀNG';
             this.tgBadge.className = 'status-badge status-badge--healthy';
         }
 
         // HALT
         if (this.haltBadge) {
             if (isHalted) {
-                this.haltBadge.textContent = `ACTIVE (#${status.halt_generation || '1'})`;
+                this.haltBadge.textContent = `ĐANG DỪNG (#${status.halt_generation || '1'})`;
                 this.haltBadge.className = 'status-badge status-badge--halt';
             } else {
-                this.haltBadge.textContent = 'INACTIVE';
+                this.haltBadge.textContent = 'BÌNH THƯỜNG';
                 this.haltBadge.className = 'status-badge status-badge--healthy';
             }
         }
@@ -150,10 +158,10 @@ class DashboardApp {
         // RECOVERY
         if (this.recoveryBadge) {
             if (status.recovery_required) {
-                this.recoveryBadge.textContent = 'REQUIRED';
+                this.recoveryBadge.textContent = 'CẦN PHỤC HỒI';
                 this.recoveryBadge.className = 'status-badge status-badge--halt';
             } else {
-                this.recoveryBadge.textContent = 'CLEAR';
+                this.recoveryBadge.textContent = 'AN TOÀN';
                 this.recoveryBadge.className = 'status-badge status-badge--healthy';
             }
         }

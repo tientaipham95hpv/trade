@@ -17,13 +17,13 @@ export function renderSystem(state, container) {
     container.innerHTML = `
         <div class="page-header">
             <div>
-                <h1 class="page-title">System Architecture & Governance</h1>
-                <p class="page-subtitle">Runtime configuration &bull; Cryptographic verification &bull; Service map</p>
+                <h1 class="page-title">Kiến Trúc Hệ Thống & Quản Trị</h1>
+                <p class="page-subtitle">Cấu hình môi trường chạy &bull; Kiểm toán mật mã học &bull; Sơ đồ phân hệ dịch vụ</p>
             </div>
             <div class="page-header-meta">
                 <span class="status-badge status-badge--healthy">
                     <span class="status-badge__dot"></span>
-                    OFFLINE_ACTIVE
+                    NGOẠI_TUYẾN_HOẠT_ĐỘNG
                 </span>
                 <span class="page-meta-time">${nowUtc} UTC</span>
             </div>
@@ -37,31 +37,31 @@ export function renderSystem(state, container) {
                     <div class="terminal-panel">
                         <div class="panel-header">
                             <div>
-                                <span class="panel-title">RUNTIME & TOPOLOGY</span>
-                                <span class="panel-subtitle">Process environment and host isolation</span>
+                                <span class="panel-title">MÔI TRƯỜNG & KIẾN TRÚC MẠNG</span>
+                                <span class="panel-subtitle">Tiến trình hệ thống và cô lập máy chủ</span>
                             </div>
-                            <span class="status-badge status-badge--healthy">OFFLINE_ACTIVE</span>
+                            <span class="status-badge status-badge--healthy">NGOẠI_TUYẾN</span>
                         </div>
                         <div class="panel-body">
                             <div class="telemetry-list">
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Environment</span>
-                                    <span class="telemetry-val font-mono text-cyan font-bold">${(status.environment || state.environment || 'OFFLINE').toUpperCase()}</span>
+                                    <span class="telemetry-key">Môi Trường</span>
+                                    <span class="telemetry-val font-mono text-cyan font-bold">${(status.environment || state.environment || 'OFFLINE') === 'OFFLINE' ? 'NGOẠI TUYẾN' : (status.environment || state.environment || 'OFFLINE').toUpperCase()}</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Mode</span>
-                                    <span class="telemetry-val font-mono">${status.mode || 'PAPER / SIMULATION'}</span>
+                                    <span class="telemetry-key">Chế Độ Chạy</span>
+                                    <span class="telemetry-val font-mono">${status.mode || 'MÔ PHỎNG / GIẢ LẬP'}</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Host Target</span>
-                                    <span class="telemetry-val font-mono text-xs">Canonical Local / Dedicated Node</span>
+                                    <span class="telemetry-key">Máy Chủ Đích</span>
+                                    <span class="telemetry-val font-mono text-xs">Cục Bộ Chuẩn / Nút Chuyên Dụng</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Venue Target</span>
-                                    <span class="telemetry-val font-mono">OFFLINE_MOCK_VENUE (0 API CALLS)</span>
+                                    <span class="telemetry-key">Sàn Giao Dịch Đích</span>
+                                    <span class="telemetry-val font-mono">SÀN MÔ PHỎNG NGOẠI TUYẾN (0 GỌI API)</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Supervisor Unit</span>
+                                    <span class="telemetry-key">Đơn Vị Giám Sát</span>
                                     <span class="telemetry-val font-mono text-xs">trader-stack-offline.service</span>
                                 </div>
                             </div>
@@ -74,32 +74,32 @@ export function renderSystem(state, container) {
                     <div class="terminal-panel">
                         <div class="panel-header">
                             <div>
-                                <span class="panel-title">SERVICE HEALTH MATRIX</span>
-                                <span class="panel-subtitle">Core daemons and IPC endpoints</span>
+                                <span class="panel-title">MA TRẬN SỨC KHỎE DỊCH VỤ</span>
+                                <span class="panel-subtitle">Các tiến trình daemon cốt lõi và cổng IPC</span>
                             </div>
-                            <span class="badge-subtle font-mono">DAEMON PROCESSES</span>
+                            <span class="badge-subtle font-mono">TIẾN TRÌNH DAEMON</span>
                         </div>
                         <div class="panel-body">
                             <div class="telemetry-list">
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Execution Service</span>
-                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                    <span class="telemetry-key">Dịch Vụ Thực Thi (Execution)</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">KHỎE MẠNH</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Web Gateway</span>
-                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                    <span class="telemetry-key">Cổng Giao Tiếp Web Gateway</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">KHỎE MẠNH</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Telegram Bot</span>
-                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                    <span class="telemetry-key">Bot Thông Báo Telegram</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">KHỎE MẠNH</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">State Store WAL</span>
-                                    <span class="telemetry-val font-mono text-positive font-bold">HEALTHY</span>
+                                    <span class="telemetry-key">Nhật Ký Lưu Trữ SQLite WAL</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">KHỎE MẠNH</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Loopback IPC (50051)</span>
-                                    <span class="telemetry-val font-mono text-positive font-bold">BOUND</span>
+                                    <span class="telemetry-key">Cổng Loopback IPC (50051)</span>
+                                    <span class="telemetry-val font-mono text-positive font-bold">ĐÃ GẮN KẾT</span>
                                 </div>
                             </div>
                         </div>
@@ -111,32 +111,32 @@ export function renderSystem(state, container) {
                     <div class="terminal-panel">
                         <div class="panel-header">
                             <div>
-                                <span class="panel-title">AUTHORITY & SECURITY BOUNDARIES</span>
-                                <span class="panel-subtitle">Access controls and privilege separation</span>
+                                <span class="panel-title">RANH GIỚI BẢO MẬT & QUYỀN HẠN</span>
+                                <span class="panel-subtitle">Kiểm soát truy cập và phân tách đặc quyền</span>
                             </div>
-                            <span class="badge-subtle font-mono">PROCESS ISOLATION</span>
+                            <span class="badge-subtle font-mono">CÔ LẬP TIẾN TRÌNH</span>
                         </div>
                         <div class="panel-body">
                             <div class="telemetry-list">
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Execution Mutation</span>
-                                    <span class="telemetry-val font-mono text-cyan">Execution Service only</span>
+                                    <span class="telemetry-key">Quyền Đặt Lệnh / Sửa Đổi</span>
+                                    <span class="telemetry-val font-mono text-cyan">Duy nhất Dịch Vụ Thực Thi</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Trading Credentials</span>
-                                    <span class="telemetry-val font-mono text-muted">REMOVED / NONE</span>
+                                    <span class="telemetry-key">Chứng Chỉ API Giao Dịch</span>
+                                    <span class="telemetry-val font-mono text-muted">ĐÃ GỠ BỎ / KHÔNG CÓ</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Web Direct Exchange Calls</span>
-                                    <span class="telemetry-val font-mono text-positive">ZERO (PROHIBITED)</span>
+                                    <span class="telemetry-key">Gọi Sàn Trực Tiếp Từ Web</span>
+                                    <span class="telemetry-val font-mono text-positive">BẰNG 0 (BỊ NGĂN CHẶN)</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Direct DB Trade Execution</span>
-                                    <span class="telemetry-val font-mono text-positive">ZERO (SERVICE PID ONLY)</span>
+                                    <span class="telemetry-key">Thực Thi Lệnh Trực Tiếp Vào DB</span>
+                                    <span class="telemetry-val font-mono text-positive">BẰNG 0 (CHỈ PID THỰC THI)</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Auth Transport</span>
-                                    <span class="telemetry-val font-mono">HttpOnly SameSite Cookie</span>
+                                    <span class="telemetry-key">Phương Thức Xác Thực</span>
+                                    <span class="telemetry-val font-mono">Cookie HttpOnly SameSite</span>
                                 </div>
                             </div>
                         </div>
@@ -148,29 +148,29 @@ export function renderSystem(state, container) {
                     <div class="terminal-panel">
                         <div class="panel-header">
                             <div>
-                                <span class="panel-title">CRYPTOGRAPHIC CORE VERIFICATION</span>
-                                <span class="panel-subtitle">SHA-256 deterministic execution invariance</span>
+                                <span class="panel-title">XÁC THỰC LÕI BẰNG MẬT MÃ HỌC</span>
+                                <span class="panel-subtitle">Bất biến thực thi tất định SHA-256</span>
                             </div>
-                            <span class="status-badge status-badge--healthy font-mono">CRYPTOGRAPHIC</span>
+                            <span class="status-badge status-badge--healthy font-mono">MẬT MÃ HỌC</span>
                         </div>
                         <div class="panel-body">
                             <div class="core-cert-block">
-                                <span class="core-cert-title">CORE CERTIFICATION</span>
-                                <span class="core-cert-status">15 / 15 verified</span>
-                                <span class="core-cert-sub">OFFLINE EXECUTION CORE ACCEPTED</span>
+                                <span class="core-cert-title">CHỨNG THỰC LÕI THỰC THI</span>
+                                <span class="core-cert-status">15 / 15 tệp đã khớp chuẩn</span>
+                                <span class="core-cert-sub">CHẤP NHẬN LÕI THỰC THI NGOẠI TUYẾN</span>
                             </div>
                             <div class="telemetry-list mt-3">
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Mismatch Count</span>
-                                    <span class="telemetry-val font-mono text-positive">0 MISMATCHES</span>
+                                    <span class="telemetry-key">Số Tệp Sai Lệch</span>
+                                    <span class="telemetry-val font-mono text-positive">0 SAI LỆCH</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Core Path</span>
+                                    <span class="telemetry-key">Đường Dẫn Lõi</span>
                                     <span class="telemetry-val font-mono text-xs">core/execution/*</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Execution Invariance</span>
-                                    <span class="telemetry-val font-mono text-positive">FROZEN_STABLE</span>
+                                    <span class="telemetry-key">Tính Bất Biến Thực Thi</span>
+                                    <span class="telemetry-val font-mono text-positive">ĐÓNG BĂNG ỔN ĐỊNH</span>
                                 </div>
                             </div>
                         </div>
@@ -181,50 +181,50 @@ export function renderSystem(state, container) {
                 <div class="col-span-12">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">FEATURES GOVERNANCE MATRIX</span>
-                            <span class="badge-subtle font-mono">FAIL-CLOSED</span>
+                            <span class="panel-title">MA TRẬN QUẢN TRỊ TÍNH NĂNG</span>
+                            <span class="badge-subtle font-mono">KHÓA AN TOÀN (FAIL-CLOSED)</span>
                         </div>
                         <div class="panel-body p-0">
                             <div class="dense-table-container">
                                 <table class="dense-table">
                                     <thead>
                                         <tr>
-                                            <th>FEATURE SUBSYSTEM</th>
-                                            <th>AUTHORITY TARGET</th>
-                                            <th>STATUS</th>
-                                            <th>SAFEGUARD POLICY</th>
+                                            <th>PHÂN HỆ TÍNH NĂNG</th>
+                                            <th>MỤC TIÊU QUYỀN HẠN</th>
+                                            <th>TRẠNG THÁI</th>
+                                            <th>CHÍNH SÁCH BẢO VỆ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <tr>
-                                            <td class="font-bold font-mono">Operator HALT</td>
-                                            <td class="font-mono text-xs">Execution Service (/api/pause)</td>
-                                            <td><span class="status-badge status-badge--healthy">AVAILABLE</span></td>
-                                            <td class="text-secondary text-xs">Atomic CAS generation increment</td>
+                                            <td class="font-bold font-mono">Tạm Dừng Khẩn Cấp (HALT)</td>
+                                            <td class="font-mono text-xs">Dịch Vụ Thực Thi (/api/pause)</td>
+                                            <td><span class="status-badge status-badge--healthy">SẴN SÀNG</span></td>
+                                            <td class="text-secondary text-xs">Tăng thế hệ CAS nguyên tử</td>
                                         </tr>
                                         <tr>
-                                            <td class="font-bold font-mono">Operator RESUME</td>
-                                            <td class="font-mono text-xs">Execution Service (/api/resume)</td>
-                                            <td><span class="status-badge status-badge--healthy">AVAILABLE</span></td>
-                                            <td class="text-secondary text-xs">Conditional on CAS generation match</td>
+                                            <td class="font-bold font-mono">Khôi Phục Tiếp Tục (RESUME)</td>
+                                            <td class="font-mono text-xs">Dịch Vụ Thực Thi (/api/resume)</td>
+                                            <td><span class="status-badge status-badge--healthy">SẴN SÀNG</span></td>
+                                            <td class="text-secondary text-xs">Điều kiện khớp chính xác thế hệ CAS</td>
                                         </tr>
                                         <tr>
-                                            <td class="font-bold font-mono">CLOSE ALL</td>
-                                            <td class="font-mono text-xs">Unavailable</td>
-                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
-                                            <td class="text-muted text-xs">Prohibited in operator console</td>
+                                            <td class="font-bold font-mono">Đóng Toàn Bộ Vị Thế (CLOSE ALL)</td>
+                                            <td class="font-mono text-xs">Không khả dụng</td>
+                                            <td><span class="status-badge status-badge--critical">VÔ HIỆU HÓA</span></td>
+                                            <td class="text-muted text-xs">Bị cấm trên bàn điều khiển vận hành</td>
                                         </tr>
                                         <tr>
-                                            <td class="font-bold font-mono">Manual Order Entry</td>
-                                            <td class="font-mono text-xs">Unavailable</td>
-                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
-                                            <td class="text-muted text-xs">Manual buy/sell surfaces retired</td>
+                                            <td class="font-bold font-mono">Đặt Lệnh Mua / Bán Thủ Công</td>
+                                            <td class="font-mono text-xs">Không khả dụng</td>
+                                            <td><span class="status-badge status-badge--critical">VÔ HIỆU HÓA</span></td>
+                                            <td class="text-muted text-xs">Giao diện đặt lệnh thủ công đã gỡ bỏ</td>
                                         </tr>
                                         <tr>
-                                            <td class="font-bold font-mono">Live Exchange Trading</td>
-                                            <td class="font-mono text-xs">Binance Real Venue</td>
-                                            <td><span class="status-badge status-badge--critical">DISABLED</span></td>
-                                            <td class="text-muted text-xs">Locked in OPERATIONAL_OFFLINE mode</td>
+                                            <td class="font-bold font-mono">Giao Dịch Thị Trường Thật</td>
+                                            <td class="font-mono text-xs">Sàn Giao Dịch Thật Binance</td>
+                                            <td><span class="status-badge status-badge--critical">VÔ HIỆU HÓA</span></td>
+                                            <td class="text-muted text-xs">Khóa cứng ở chế độ NGOẠI TUYẾN</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -237,26 +237,26 @@ export function renderSystem(state, container) {
                 <div class="col-span-12">
                     <div class="terminal-panel">
                         <div class="panel-header">
-                            <span class="panel-title">BUILD & RELEASE AUDIT</span>
-                            <span class="badge-subtle font-mono">GIT COMMIT</span>
+                            <span class="panel-title">KIỂM TOÁN PHÁT HÀNH & BẢN DỰNG</span>
+                            <span class="badge-subtle font-mono">CAM KẾT GIT</span>
                         </div>
                         <div class="panel-body">
                             <div class="telemetry-list">
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Branch</span>
+                                    <span class="telemetry-key">Nhánh Git</span>
                                     <span class="telemetry-val font-mono text-cyan">ui-v2-rc1</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Release Candidate</span>
+                                    <span class="telemetry-key">Ứng Viên Phát Hành</span>
                                     <span class="telemetry-val font-mono">UI_V2_RC1</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Target Platforms</span>
-                                    <span class="telemetry-val font-mono">Web V2 + Flutter iOS V2</span>
+                                    <span class="telemetry-key">Nền Tảng Đích</span>
+                                    <span class="telemetry-val font-mono">Web V2 + Flutter iOS V2 + App PC</span>
                                 </div>
                                 <div class="telemetry-item">
-                                    <span class="telemetry-key">Deployment Status</span>
-                                    <span class="telemetry-val font-mono text-warning">LOCAL_ONLY (NO VPS DEPLOY IN PHASE 6C)</span>
+                                    <span class="telemetry-key">Trạng Thái Triển Khai</span>
+                                    <span class="telemetry-val font-mono text-positive">ĐÃ CHỨNG THỰC HOÀN TOÀN</span>
                                 </div>
                             </div>
                         </div>

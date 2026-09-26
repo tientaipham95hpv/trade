@@ -239,7 +239,7 @@ class PositionsTab extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Qty: ${QuantFormatters.formatNumber(pos.qty)}',
+                      'K.Lượng: ${QuantFormatters.formatNumber(pos.qty)}',
                       style: QuantTypography.caption,
                       overflow: TextOverflow.ellipsis,
                     ),

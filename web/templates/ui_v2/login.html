@@ -1,6 +1,6 @@
 {% extends "ui_v2/base.html" %}
 
-{% block title %}TRADER — Operator Authentication{% endblock %}
+{% block title %}TRẠM ĐỊNH LƯỢNG — Xác Thực Người Vận Hành{% endblock %}
 
 {% block body %}
 <div class="terminal-shell min-h-screen flex flex-col justify-between">
@@ -13,59 +13,59 @@
                     <polyline points="2 17 12 22 22 17"></polyline>
                     <polyline points="2 12 12 17 22 12"></polyline>
                 </svg>
-                <span>TRADER</span>
+                <span>TRẠM ĐỊNH LƯỢNG</span>
             </a>
-            <span class="env-badge env-badge--offline">OFFLINE</span>
+            <span class="env-badge env-badge--offline">NGOẠI TUYẾN</span>
         </div>
         <div class="top-telemetry-bar__right">
-            <a href="/" class="btn btn--outline font-mono text-xs">HOME</a>
+            <a href="/" class="btn btn--outline font-mono text-xs">TRANG CHỦ</a>
         </div>
     </header>
 
     <!-- Center Card -->
     <main class="flex-1 flex items-center justify-center p-4">
-        <div class="terminal-panel" style="max-width: 400px; width: 100%;">
+        <div class="terminal-panel" style="max-width: 420px; width: 100%;">
             <div class="panel-header">
-                <span class="panel-title">OPERATOR AUTHENTICATION</span>
-                <span class="badge-subtle font-mono text-cyan">V3</span>
+                <span class="panel-title">XÁC THỰC NGƯỜI ĐIỀU HÀNH</span>
+                <span class="badge-subtle font-mono text-cyan">PHIÊN BẢN V3</span>
             </div>
             <div class="panel-body">
                 <div class="text-left mb-5">
-                    <div class="font-bold text-base text-primary">Operator Console Login</div>
-                    <div class="text-xs text-muted font-mono mt-1">Execution Service monitoring • Client trading disabled</div>
+                    <div class="font-bold text-base text-primary">Đăng Nhập Bảng Vận Hành</div>
+                    <div class="text-xs text-muted font-sans mt-1">Giám sát Lõi Thực Thi • Khóa giao dịch trực tiếp từ trình duyệt</div>
                 </div>
 
                 <div id="login-error-alert" class="hidden mb-4">
                     <div class="risk-alert risk-alert--critical">
                         <div class="risk-alert__content">
-                            <div id="login-error-text" class="risk-alert__title text-xs">Invalid credentials.</div>
+                            <div id="login-error-text" class="risk-alert__title text-xs">Thông tin đăng nhập không chính xác.</div>
                         </div>
                     </div>
                 </div>
 
                 <form method="POST" action="/portal/login" class="flex flex-col gap-4">
                     <div class="form-group flex flex-col gap-1">
-                        <label for="username" class="text-xs font-mono text-secondary">USERNAME</label>
+                        <label for="username" class="text-xs font-sans font-semibold text-secondary">TÊN ĐĂNG NHẬP</label>
                         <input type="text" id="username" name="username" autocomplete="username" required
-                               placeholder="admin"
-                               style="background-color: var(--surface-high); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; border-radius: 4px; padding: 8px 10px; outline: none;">
+                               placeholder="trader-admin"
+                               style="background-color: var(--surface-high); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; border-radius: 4px; padding: 10px 12px; outline: none;">
                     </div>
 
                     <div class="form-group flex flex-col gap-1">
-                        <label for="password" class="text-xs font-mono text-secondary">PASSWORD</label>
+                        <label for="password" class="text-xs font-sans font-semibold text-secondary">MẬT KHẨU BẢO MẬT</label>
                         <input type="password" id="password" name="password" autocomplete="current-password" required
                                placeholder="••••••••"
-                               style="background-color: var(--surface-high); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; border-radius: 4px; padding: 8px 10px; outline: none;">
+                               style="background-color: var(--surface-high); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; border-radius: 4px; padding: 10px 12px; outline: none;">
                     </div>
 
-                    <button type="submit" class="btn btn-resume font-mono font-bold mt-2" style="width: 100%;">
-                        AUTHENTICATE TERMINAL
+                    <button type="submit" class="btn btn-resume font-sans font-bold mt-2" style="width: 100%; padding: 10px;">
+                        XÁC THỰC VÀO TRẠM VẬN HÀNH
                     </button>
                 </form>
 
                 <div class="mt-5 pt-3 border-t border-border text-center">
-                    <div class="text-xs text-muted font-mono">
-                        HttpOnly Cookie • Encrypted Loopback Transport
+                    <div class="text-xs text-muted font-sans">
+                        Chứng chỉ HttpOnly Cookie • Mã hóa truyền tải Loopback an toàn
                     </div>
                 </div>
             </div>
@@ -73,12 +73,12 @@
     </main>
 
     <!-- Footer -->
-    <footer class="py-3 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-mono">
-        <div>&copy; 2026 TRADER. All rights reserved.</div>
+    <footer class="py-3 px-6 border-t border-border flex justify-between items-center text-xs text-muted font-sans">
+        <div>&copy; 2026 BINANCE QUANT PRO. Bảo lưu mọi quyền.</div>
         <div class="flex gap-4">
-            <a href="/risk-warning" class="hover:text-primary">Risk Warning</a>
-            <a href="/privacy" class="hover:text-primary">Privacy</a>
-            <a href="/terms" class="hover:text-primary">Terms</a>
+            <a href="/risk-warning" class="hover:text-primary">Cảnh Báo Rủi Ro</a>
+            <a href="/privacy" class="hover:text-primary">Bảo Mật</a>
+            <a href="/terms" class="hover:text-primary">Điều Khoản</a>
         </div>
     </footer>
 </div>
@@ -94,13 +94,13 @@
         if (err || expired) {
             alertBox.classList.remove('hidden');
             if (err === 'invalid') {
-                alertText.textContent = 'Invalid operator username or password.';
+                alertText.textContent = 'Sai tên đăng nhập hoặc mật khẩu quản trị viên.';
             } else if (err === 'missing') {
-                alertText.textContent = 'Please enter both username and password.';
+                alertText.textContent = 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.';
+            } else if (err === 'rate_limited') {
+                alertText.textContent = 'Quá nhiều lần thử thất bại. Vui lòng đợi trong giây lát.';
             } else if (expired) {
-                alertText.textContent = 'Session expired. Please log in again.';
-            } else {
-                alertText.textContent = 'Authentication failed. Please verify credentials.';
+                alertText.textContent = 'Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.';
             }
         }
     })();

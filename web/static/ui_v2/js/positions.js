@@ -24,14 +24,14 @@ export function renderPositions(state, container) {
     container.innerHTML = `
         <div class="page-header">
             <div>
-                <h1 class="page-title">Positions</h1>
-                <p class="page-subtitle">Active execution inventory (${positions.length} open position${positions.length === 1 ? '' : 's'})</p>
+                <h1 class="page-title">Vị Thế Đang Mở</h1>
+                <p class="page-subtitle">Danh mục thực thi đang hoạt động (${positions.length} vị thế)</p>
             </div>
             <div class="page-header-meta">
                 <span class="live-stream-badge">
-                    <span class="pulse-dot"></span> LIVE TELEMETRY
+                    <span class="pulse-dot"></span> DỮ LIỆU TRỰC TIẾP
                 </span>
-                <span class="page-meta-time">Freshness: ${nowUtc} UTC</span>
+                <span class="page-meta-time">Độ tươi: ${nowUtc} UTC</span>
             </div>
         </div>
 
@@ -42,11 +42,11 @@ export function renderPositions(state, container) {
                 <div class="terminal-panel">
                     <div class="panel-header">
                         <div>
-                            <span class="panel-title">ACTIVE POSITIONS</span>
-                            <span class="panel-subtitle">Authoritative execution service inventory</span>
+                            <span class="panel-title">DANH SÁCH VỊ THẾ HOẠT ĐỘNG</span>
+                            <span class="panel-subtitle">Danh mục vị thế được xác thực từ dịch vụ thực thi</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="badge-subtle font-mono">${positions.length} ACTIVE</span>
+                            <span class="badge-subtle font-mono">${positions.length} ĐANG MỞ</span>
                         </div>
                     </div>
                     <div class="panel-body p-0">
@@ -60,17 +60,17 @@ export function renderPositions(state, container) {
                 <div class="terminal-panel" style="height: 100%;">
                     <div class="panel-header">
                         <div>
-                            <span class="panel-title">POSITION INSPECTOR</span>
-                            <span class="panel-subtitle">Authoritative detail</span>
+                            <span class="panel-title">KIỂM TRA CHI TIẾT VỊ THẾ</span>
+                            <span class="panel-subtitle">Chi tiết xác thực từ máy chủ</span>
                         </div>
-                        <span class="badge-subtle font-mono">READ-ONLY</span>
+                        <span class="badge-subtle font-mono">CHỈ ĐỌC</span>
                     </div>
                     <div class="panel-body flex flex-col justify-between" id="position-inspector-body">
                         ${renderInspectorContent(positions, selectedIndex)}
                     </div>
                     <div class="panel-footer">
-                        <span class="text-xs text-muted font-sans">MUTATION DISABLED &bull; OPERATOR CONSOLE</span>
-                        <span class="font-mono text-cyan text-xs">OFFLINE</span>
+                        <span class="text-xs text-muted font-sans">KHÓA THAY ĐỔI &bull; BÀN ĐIỀU KHIỂN VẬN HÀNH</span>
+                        <span class="font-mono text-cyan text-xs">NGOẠI TUYẾN</span>
                     </div>
                 </div>
             </div>
@@ -82,28 +82,28 @@ export function renderPositions(state, container) {
             <div class="terminal-panel">
                 <div class="panel-header">
                     <div>
-                        <span class="panel-title">PROTECTION STATE & GUARDRAILS</span>
-                        <span class="panel-subtitle">Server-side safety enforcement</span>
+                        <span class="panel-title">TRẠNG THÁI BẢO VỆ & HÀNG RÀO AN TOÀN</span>
+                        <span class="panel-subtitle">Thực thi an toàn phía máy chủ (Fail-closed)</span>
                     </div>
-                    <span class="status-badge status-badge--healthy">ARMED</span>
+                    <span class="status-badge status-badge--healthy">ĐÃ KÍCH HOẠT</span>
                 </div>
                 <div class="panel-body">
                     <div class="telemetry-list">
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Stop-Loss Protection</span>
-                            <span class="telemetry-val font-mono text-positive">ACTIVE_STOP (FAIL_CLOSED)</span>
+                            <span class="telemetry-key">Cắt Lỗ Tự Động (SL)</span>
+                            <span class="telemetry-val font-mono text-positive">DỪNG CHỦ ĐỘNG (FAIL_CLOSED)</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Take-Profit Execution</span>
-                            <span class="telemetry-val font-mono text-positive">TAKE_PROFIT_MARKET</span>
+                            <span class="telemetry-key">Chốt Lời Tự Động (TP)</span>
+                            <span class="telemetry-val font-mono text-positive">LỆNH THỊ TRƯỜNG TP</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Max Inventory Limit</span>
+                            <span class="telemetry-key">Giới Hạn Vị Thế Tối Đa</span>
                             <span class="telemetry-val font-mono">${positions.length} / ${state.status?.max_positions || 3}</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">CAS Admission Fence</span>
-                            <span class="telemetry-val font-mono text-cyan">GENERATION #${state.status?.halt_generation || 1}</span>
+                            <span class="telemetry-key">Rào Cản Tiếp Nhận CAS</span>
+                            <span class="telemetry-val font-mono text-cyan">THẾ HỆ #${state.status?.halt_generation || 1}</span>
                         </div>
                     </div>
                 </div>
@@ -113,28 +113,28 @@ export function renderPositions(state, container) {
             <div class="terminal-panel">
                 <div class="panel-header">
                     <div>
-                        <span class="panel-title">EXECUTION METADATA & INVENTORY AUDIT</span>
-                        <span class="panel-subtitle">Host isolation and venue boundaries</span>
+                        <span class="panel-title">SIÊU DỮ LIỆU THỰC THI & KIỂM TOÁN DANH MỤC</span>
+                        <span class="panel-subtitle">Cô lập máy chủ và ranh giới sàn giao dịch</span>
                     </div>
-                    <span class="badge-subtle font-mono">DAEMON IPC</span>
+                    <span class="badge-subtle font-mono">IPC TIẾN TRÌNH NỀN</span>
                 </div>
                 <div class="panel-body">
                     <div class="telemetry-list">
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Execution Adapter</span>
+                            <span class="telemetry-key">Bộ Điều Phối Thực Thi</span>
                             <span class="telemetry-val font-mono text-cyan">BinanceAdapter (ExecutionServiceClient)</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Venue Boundary</span>
-                            <span class="telemetry-val font-mono">OFFLINE_MOCK_VENUE (0 API CALLS)</span>
+                            <span class="telemetry-key">Ranh Giới Sàn Giao Dịch</span>
+                            <span class="telemetry-val font-mono">SÀN MÔ PHỎNG NGOẠI TUYẾN (0 GỌI API)</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Reconciliation Cadence</span>
-                            <span class="telemetry-val font-mono text-secondary">Continuous (2500ms heartbeat)</span>
+                            <span class="telemetry-key">Tần Suất Đối Soát Dữ Liệu</span>
+                            <span class="telemetry-val font-mono text-secondary">Liên tục (nhịp tim 2500ms)</span>
                         </div>
                         <div class="telemetry-item">
-                            <span class="telemetry-key">Inventory Verification</span>
-                            <span class="telemetry-val font-mono text-positive">100% INVARIANT MATCH</span>
+                            <span class="telemetry-key">Xác Thực Danh Mục</span>
+                            <span class="telemetry-val font-mono text-positive">100% KHỚP CHUẨN BẤT BIẾN</span>
                         </div>
                     </div>
                 </div>
@@ -150,8 +150,8 @@ function renderPositionsTable(positions, currentSelected) {
         return `
             <div class="empty-state py-12">
                 <div class="empty-state-symbol">—</div>
-                <div class="empty-state-title">No active positions</div>
-                <div class="empty-state-desc">Execution core remains flat in OPERATIONAL_OFFLINE mode</div>
+                <div class="empty-state-title">Không có vị thế nào đang mở</div>
+                <div class="empty-state-desc">Lõi thực thi duy trì trạng thái trống ở chế độ NGOẠI TUYẾN</div>
             </div>
         `;
     }
@@ -161,29 +161,32 @@ function renderPositionsTable(positions, currentSelected) {
             <table class="dense-table">
                 <thead>
                     <tr>
-                        <th>SYMBOL</th>
-                        <th>SIDE</th>
-                        <th class="text-right">QTY</th>
-                        <th class="text-right">ENTRY</th>
-                        <th class="text-right">MARK</th>
-                        <th class="text-right">PNL</th>
-                        <th class="text-right">SL</th>
-                        <th class="text-right">TP</th>
-                        <th>PROTECTION</th>
-                        <th>STATE</th>
+                        <th>CẶP GIAO DỊCH</th>
+                        <th>CHIỀU</th>
+                        <th class="text-right">KHỐI LƯỢNG</th>
+                        <th class="text-right">GIÁ VÀO</th>
+                        <th class="text-right">GIÁ MARK</th>
+                        <th class="text-right">LỜI/LỖ</th>
+                        <th class="text-right">CẮT LỖ (SL)</th>
+                        <th class="text-right">CHỐT LỜI (TP)</th>
+                        <th>CƠ CHẾ BẢO VỆ</th>
+                        <th>TRẠNG THÁI</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${positions.map((pos, idx) => {
-                        const side = (pos.side || 'LONG').toUpperCase();
-                        const sideClass = side === 'LONG' ? 'side-badge--long' : 'side-badge--short';
+                        const rawSide = (pos.side || 'LONG').toUpperCase();
+                        const isLong = rawSide === 'LONG';
+                        const sideText = isLong ? 'MUA (LONG)' : 'BÁN (SHORT)';
+                        const sideClass = isLong ? 'side-badge--long' : 'side-badge--short';
                         const unPnl = Formatters.pnl(pos.unrealized_pnl || pos.pnl);
                         const sym = Formatters.escapeHtml(pos.symbol || '—');
                         const isSelected = idx === currentSelected;
+                        const stateText = (pos.state || 'OPEN').toUpperCase() === 'OPEN' ? 'ĐANG MỞ' : (pos.state || 'ĐANG MỞ');
                         return `
                             <tr class="cursor-pointer row-hover ${isSelected ? 'row-selected' : ''}" data-position-idx="${idx}">
                                 <td class="font-bold font-mono text-cyan">${sym}</td>
-                                <td><span class="side-badge ${sideClass}">${side}</span></td>
+                                <td><span class="side-badge ${sideClass}">${sideText}</span></td>
                                 <td class="text-right font-mono">${Formatters.number(pos.qty || pos.quantity, 4)}</td>
                                 <td class="text-right font-mono">${Formatters.currency(pos.entry_price || pos.entry, 2)}</td>
                                 <td class="text-right font-mono">${Formatters.currency(pos.mark_price || pos.mark, 2)}</td>
@@ -191,12 +194,12 @@ function renderPositionsTable(positions, currentSelected) {
                                 <td class="text-right font-mono text-negative">${pos.stop_loss ? Formatters.currency(pos.stop_loss, 2) : '—'}</td>
                                 <td class="text-right font-mono text-positive">${pos.take_profit ? Formatters.currency(pos.take_profit, 2) : '—'}</td>
                                 <td>
-                                    <span class="badge-subtle font-mono">${pos.protection || 'ACTIVE_STOP'}</span>
+                                    <span class="badge-subtle font-mono">${pos.protection || 'DỪNG_TỰ_ĐỘNG'}</span>
                                 </td>
                                 <td>
                                     <span class="status-badge status-badge--healthy">
                                         <span class="status-badge__dot"></span>
-                                        ${pos.state || 'OPEN'}
+                                        ${stateText}
                                     </span>
                                 </td>
                             </tr>
@@ -217,75 +220,78 @@ function renderInspectorContent(positions, index) {
                     Chọn một vị thế để xem chi tiết
                 </div>
                 <div class="empty-state-desc" style="font-size: 11px;">
-                    Click a row in the active positions table to inspect authoritative details
+                    Nhấp vào một dòng trong bảng danh sách vị thế để kiểm tra thông tin xác thực chi tiết
                 </div>
             </div>
         `;
     }
 
     const pos = positions[index];
-    const side = (pos.side || 'LONG').toUpperCase();
-    const sideClass = side === 'LONG' ? 'side-badge--long' : 'side-badge--short';
+    const rawSide = (pos.side || 'LONG').toUpperCase();
+    const isLong = rawSide === 'LONG';
+    const sideText = isLong ? 'MUA (LONG)' : 'BÁN (SHORT)';
+    const sideClass = isLong ? 'side-badge--long' : 'side-badge--short';
     const unPnl = Formatters.pnl(pos.unrealized_pnl || pos.pnl);
     const sym = Formatters.escapeHtml(pos.symbol || '—');
+    const stateText = (pos.state || 'OPEN').toUpperCase() === 'OPEN' ? 'ĐANG MỞ' : (pos.state || 'ĐANG MỞ');
 
     return `
         <div>
             <div class="flex items-center justify-between pb-3 border-b border-border mb-3">
                 <div class="flex items-center gap-2">
                     <span class="font-bold text-lg font-mono text-cyan">${sym}</span>
-                    <span class="side-badge ${sideClass}">${side}</span>
+                    <span class="side-badge ${sideClass}">${sideText}</span>
                 </div>
                 <span class="status-badge status-badge--healthy">
                     <span class="status-badge__dot"></span>
-                    ${pos.state || 'OPEN'}
+                    ${stateText}
                 </span>
             </div>
 
             <div class="telemetry-list">
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Position Size</span>
+                    <span class="telemetry-key">Quy Mô Vị Thế</span>
                     <span class="telemetry-val font-mono font-bold">${Formatters.number(pos.qty || pos.quantity, 4)} ${sym.replace('USDT', '')}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Entry Price</span>
+                    <span class="telemetry-key">Giá Vào Trung Bình</span>
                     <span class="telemetry-val font-mono">${Formatters.currency(pos.entry_price || pos.entry, 2)}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Mark Price</span>
+                    <span class="telemetry-key">Giá Đánh Dấu (Mark)</span>
                     <span class="telemetry-val font-mono text-cyan">${Formatters.currency(pos.mark_price || pos.mark, 2)}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Unrealized PnL</span>
+                    <span class="telemetry-key">Lời / Lỗ Tạm Tính (PnL)</span>
                     <span class="telemetry-val font-mono font-bold ${unPnl.className}">${unPnl.text}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Stop Loss</span>
+                    <span class="telemetry-key">Điểm Cắt Lỗ (SL)</span>
                     <span class="telemetry-val font-mono text-negative">${pos.stop_loss ? Formatters.currency(pos.stop_loss, 2) : '—'}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Take Profit</span>
+                    <span class="telemetry-key">Điểm Chốt Lời (TP)</span>
                     <span class="telemetry-val font-mono text-positive">${pos.take_profit ? Formatters.currency(pos.take_profit, 2) : '—'}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Protection Mode</span>
-                    <span class="telemetry-val font-mono text-positive">${pos.protection || 'ACTIVE_STOP'}</span>
+                    <span class="telemetry-key">Cơ Chế Bảo Vệ</span>
+                    <span class="telemetry-val font-mono text-positive">${pos.protection || 'DỪNG_TỰ_ĐỘNG'}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Margin Mode</span>
-                    <span class="telemetry-val font-mono">ISOLATED</span>
+                    <span class="telemetry-key">Chế Độ Ký Quỹ</span>
+                    <span class="telemetry-val font-mono">CÔ LẬP (ISOLATED)</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Leverage</span>
+                    <span class="telemetry-key">Đòn Bẩy</span>
                     <span class="telemetry-val font-mono">${pos.leverage ? pos.leverage + 'x' : '5x'}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Liquidation Price</span>
+                    <span class="telemetry-key">Giá Thanh Lý Dự Kiến</span>
                     <span class="telemetry-val font-mono text-muted">${pos.liquidation_price ? Formatters.currency(pos.liquidation_price, 2) : '—'}</span>
                 </div>
                 <div class="telemetry-item">
-                    <span class="telemetry-key">Execution State</span>
-                    <span class="telemetry-val font-mono text-positive">${pos.state || 'OPEN'}</span>
+                    <span class="telemetry-key">Trạng Thái Thực Thi</span>
+                    <span class="telemetry-val font-mono text-positive">${stateText}</span>
                 </div>
             </div>
         </div>

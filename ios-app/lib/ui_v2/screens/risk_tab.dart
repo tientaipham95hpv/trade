@@ -174,7 +174,7 @@ class _RiskTabState extends State<RiskTab> {
           // 1. Circuit Breaker Telemetry Panel
           QuantPanel(
             title: 'TELEMETRY CẦU DAO RỦI RO',
-            subtitle: 'CIRCUIT BREAKER TELEMETRY',
+            subtitle: 'THÔNG SỐ GIÁM SÁT AN TOÀN',
             trailing: QuantStatusBadge(
               label: riskView.circuitBreakerStatus,
               type: isHalted ? QuantStatusType.halted : QuantStatusType.healthy,
@@ -182,11 +182,11 @@ class _RiskTabState extends State<RiskTab> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildRow('TRẠNG THÁI HALT', isHalted ? 'HALTED' : 'NORMAL', isHalted ? QuantColors.red : QuantColors.cyan),
+                _buildRow('TRẠNG THÁI CẦU DAO', isHalted ? 'ĐÃ DỪNG (HALTED)' : 'BÌNH THƯỜNG (NORMAL)', isHalted ? QuantColors.red : QuantColors.cyan),
                 const SizedBox(height: 6),
-                _buildRow('HALT GENERATION TOKEN', riskView.haltGeneration != null ? '#${riskView.haltGeneration}' : '—', QuantColors.cyan),
+                _buildRow('THẾ HỆ DỪNG (CAS TOKEN)', riskView.haltGeneration != null ? '#${riskView.haltGeneration}' : '—', QuantColors.cyan),
                 const SizedBox(height: 6),
-                _buildRow('LÝ DO DỪNG', riskView.haltReason ?? 'None', QuantColors.textPrimary),
+                _buildRow('LÝ DO DỪNG', riskView.haltReason ?? 'Không có', QuantColors.textPrimary),
                 const SizedBox(height: 6),
                 _buildRow('VỊ THẾ TỐI ĐA CHO PHÉP', '${riskView.maxPositions ?? 3} vị thế', QuantColors.textSecondary),
                 const SizedBox(height: 6),
@@ -199,7 +199,7 @@ class _RiskTabState extends State<RiskTab> {
           // 2. Health Dimensions Breakdown
           QuantPanel(
             title: 'CHIỀU KHÔNG GIAN BẢO MẬT',
-            subtitle: 'SUBSYSTEM HEALTH DIMENSIONS',
+            subtitle: 'TRẠNG THÁI CÁC PHÂN HỆ',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -218,7 +218,7 @@ class _RiskTabState extends State<RiskTab> {
           // 3. Operator Actions Surface (Phase 4 Active Controls)
           QuantPanel(
             title: 'ĐIỀU KHIỂN TÁC ĐỘNG KHẨN CẤP',
-            subtitle: 'PHASE 4 CAS GUARDS',
+            subtitle: 'CƠ CHẾ BẢO VỆ CAS',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

@@ -126,34 +126,40 @@ export function renderActivity(state, container) {
     container.innerHTML = `
         <div class="page-header">
             <div>
-                <h1 class="page-title">Activity & Audit Trail</h1>
-                <p class="page-subtitle">Authoritative execution receipts, safety events, and operator actions</p>
+                <h1 class="page-title">Nhật Ký & Dấu Vết Kiểm Toán</h1>
+                <p class="page-subtitle">Chứng từ thực thi, sự kiện an toàn và thao tác của người vận hành</p>
             </div>
             <div class="page-header-meta">
                 <span class="live-stream-badge">
-                    <span class="pulse-dot"></span> LIVE AUDIT STREAM
+                    <span class="pulse-dot"></span> DÒNG KIỂM TOÁN TRỰC TIẾP
                 </span>
-                <span class="page-meta-time">Last update: ${nowUtc} UTC</span>
+                <span class="page-meta-time">Cập nhật lần cuối: ${nowUtc} UTC</span>
             </div>
         </div>
 
         <div class="terminal-panel" style="min-height: calc(100vh - 200px); display: flex; flex-direction: column;">
             <div class="panel-header">
                 <div class="flex items-center gap-2">
-                    <span class="panel-title">AUDIT CONSOLE</span>
-                    <span class="panel-subtitle">Authoritative chronological execution log</span>
-                    ${hasFixtureEvents ? '<span class="badge-fixture">SANITIZED UI FIXTURE</span>' : ''}
+                    <span class="panel-title">BÀN ĐIỀU KHIỂN KIỂM TOÁN</span>
+                    <span class="panel-subtitle">Nhật ký thực thi theo trình tự thời gian</span>
+                    ${hasFixtureEvents ? '<span class="badge-fixture">DỮ LIỆU MẪU ĐÃ LÀM SẠCH</span>' : ''}
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="badge-subtle font-mono">${filteredEvents.length} / ${allEvents.length} RECORDS</span>
+                    <span class="badge-subtle font-mono">${filteredEvents.length} / ${allEvents.length} BẢN GHI</span>
                 </div>
             </div>
 
             <!-- Filter Strip -->
             <div class="activity-filter-strip">
-                ${['ALL', 'OPERATOR', 'CIRCUIT BREAKER', 'EXECUTION', 'SERVICES'].map(f => `
-                    <button class="filter-btn ${activeFilter === f ? 'active' : ''}" data-filter="${f}">
-                        ${f}
+                ${[
+                    { id: 'ALL', label: 'TẤT CẢ' },
+                    { id: 'OPERATOR', label: 'VẬN HÀNH' },
+                    { id: 'CIRCUIT BREAKER', label: 'CẦU DAO' },
+                    { id: 'EXECUTION', label: 'THỰC THI' },
+                    { id: 'SERVICES', label: 'DỊCH VỤ' }
+                ].map(f => `
+                    <button class="filter-btn ${activeFilter === f.id ? 'active' : ''}" data-filter="${f.id}">
+                        ${f.label}
                     </button>
                 `).join('')}
             </div>
@@ -164,7 +170,7 @@ export function renderActivity(state, container) {
                 </div>
                 <!-- Visible empty continuation state -->
                 <div class="audit-continuation-state">
-                    <span>— No additional events in the current window —</span>
+                    <span>— Không có sự kiện bổ sung nào trong cửa sổ hiện tại —</span>
                 </div>
             </div>
         </div>
@@ -186,8 +192,8 @@ function renderEventsTable(events) {
         return `
             <div class="empty-state py-12">
                 <div class="empty-state-symbol">—</div>
-                <div class="empty-state-title">No audit records found for filter</div>
-                <div class="empty-state-desc">Authoritative execution receipts and operator events will stream here</div>
+                <div class="empty-state-title">Không tìm thấy bản ghi kiểm toán phù hợp bộ lọc</div>
+                <div class="empty-state-desc">Chứng từ thực thi xác thực và sự kiện người vận hành sẽ hiển thị tại đây</div>
             </div>
         `;
     }
@@ -197,33 +203,45 @@ function renderEventsTable(events) {
             <table class="dense-table">
                 <thead>
                     <tr>
-                        <th>TIME</th>
-                        <th>SOURCE</th>
-                        <th>TYPE</th>
-                        <th>EVENT</th>
-                        <th>RESULT</th>
+                        <th>THỜI GIAN</th>
+                        <th>NGUỒN</th>
+                        <th>LOẠI SỰ KIỆN</th>
+                        <th>CHI TIẾT SỰ KIỆN</th>
+                        <th>KẾT QUẢ</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${events.map(ev => {
                         let resBadgeClass = 'status-badge--healthy';
-                        if (ev.result === 'REJECTED') resBadgeClass = 'status-badge--halt';
-                        else if (ev.result === 'INFO') resBadgeClass = 'status-badge--degraded';
+                        let resText = 'THÀNH CÔNG';
+                        if (ev.result === 'REJECTED') {
+                            resBadgeClass = 'status-badge--halt';
+                            resText = 'TỪ CHỐI';
+                        } else if (ev.result === 'INFO') {
+                            resBadgeClass = 'status-badge--degraded';
+                            resText = 'THÔNG TIN';
+                        }
+
+                        let srcText = ev.source;
+                        if (ev.source === 'OPERATOR') srcText = 'VẬN HÀNH';
+                        else if (ev.source === 'SYSTEM') srcText = 'HỆ THỐNG';
+                        else if (ev.source === 'EXECUTION') srcText = 'THỰC THI';
+                        else if (ev.source === 'CIRCUIT') srcText = 'CẦU DAO';
 
                         return `
                             <tr>
                                 <td class="font-mono text-muted text-xs whitespace-nowrap">${Formatters.timestamp(ev.time)}</td>
-                                <td class="font-mono text-xs"><span class="badge-subtle">${Formatters.escapeHtml(ev.source)}</span></td>
+                                <td class="font-mono text-xs"><span class="badge-subtle">${Formatters.escapeHtml(srcText)}</span></td>
                                 <td class="font-mono text-xs font-bold text-cyan">
                                     ${Formatters.escapeHtml(ev.type)}
-                                    ${ev.isFixture ? ' <span class="badge-fixture">FIXTURE</span>' : ''}
+                                    ${ev.isFixture ? ' <span class="badge-fixture">MẪU</span>' : ''}
                                 </td>
                                 <td class="font-mono text-xs text-secondary max-w-md truncate" title="${Formatters.escapeHtml(ev.event)}">
                                     ${Formatters.escapeHtml(ev.event)}
                                 </td>
                                 <td>
                                     <span class="status-badge ${resBadgeClass}">
-                                        ${Formatters.escapeHtml(ev.result)}
+                                        ${resText}
                                     </span>
                                 </td>
                             </tr>

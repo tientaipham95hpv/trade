@@ -321,11 +321,11 @@ async function pollDashboardData() {
     const btcRegime = btcMatrix.regime || data.btc_regime || 'BULL';
     if ($('statBtcRegime')) {
       if (btcRegime.includes('BULL') || btcRegime === 'UPTREND') {
-        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrow-trend-up text-profitGreen"></i> <span class="text-profitGreen">BULL (CẤM SHORT 100%)</span>';
+        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrow-trend-up text-profitGreen"></i> <span class="text-profitGreen">XU HƯỚNG TĂNG (CẤM SHORT)</span>';
       } else if (btcRegime.includes('BEAR') || btcRegime === 'DOWNTREND') {
-        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrow-trend-down text-lossRed"></i> <span class="text-lossRed">BEAR (CẤM LONG 100%)</span>';
+        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrow-trend-down text-lossRed"></i> <span class="text-lossRed">XU HƯỚNG GIẢM (CẤM LONG)</span>';
       } else {
-        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrows-left-right text-yellow-400"></i> <span class="text-yellow-400">SIDEWAY (ĐÁNH 2 CHIỀU)</span>';
+        $('statBtcRegime').innerHTML = '<i class="fa-solid fa-arrows-left-right text-yellow-400"></i> <span class="text-yellow-400">ĐI NGANG (CẢ 2 CHIỀU)</span>';
       }
     }
     if ($('statBtcDetails')) {
@@ -652,9 +652,9 @@ function renderFilteredRadar() {
     const isUp = pair.trend === 'UP' || pair.signal === 'BUY';
     const isDown = pair.trend === 'DOWN' || pair.signal === 'SELL';
     const badge = isUp 
-      ? '<span class="px-2 py-0.5 rounded bg-profitGreen/20 text-profitGreen text-[10px] font-bold border border-profitGreen/30">LONG ▲</span>'
+      ? '<span class="px-2 py-0.5 rounded bg-profitGreen/20 text-profitGreen text-[10px] font-bold border border-profitGreen/30">MUA (Long) ▲</span>'
       : (isDown 
-        ? '<span class="px-2 py-0.5 rounded bg-lossRed/20 text-lossRed text-[10px] font-bold border border-lossRed/30">SHORT ▼</span>'
+        ? '<span class="px-2 py-0.5 rounded bg-lossRed/20 text-lossRed text-[10px] font-bold border border-lossRed/30">BÁN (Short) ▼</span>'
         : '<span class="px-2 py-0.5 rounded bg-gray-500/20 text-gray-400 text-[10px] font-bold">CHỜ •</span>');
 
     const price = Number(pair.price || 0);

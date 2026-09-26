@@ -159,7 +159,7 @@ class PositionDetailSheet extends StatelessWidget {
             _buildDetailRow('Cắt lỗ (Stop Loss)', QuantFormatters.formatCurrency(position.stopLoss)),
             _buildDetailRow('Chốt lời (Take Profit)', QuantFormatters.formatCurrency(position.takeProfit)),
             _buildDetailRow('Trạng thái bảo vệ', position.protectionStatus ?? '—'),
-            _buildDetailRow('Trạng thái lệnh', position.state ?? 'OPEN'),
+            _buildDetailRow('Trạng thái lệnh', position.state == 'OPEN' ? 'ĐANG MỞ (OPEN)' : (position.state ?? 'ĐANG MỞ (OPEN)')),
 
             const SizedBox(height: QuantSpacing.spaceMd),
 

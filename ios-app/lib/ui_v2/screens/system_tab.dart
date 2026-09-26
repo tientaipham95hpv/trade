@@ -32,7 +32,7 @@ class SystemTab extends StatelessWidget {
           // 1. Governance Matrix Panel
           QuantPanel(
             title: 'MA TRẬN QUẢN TRỊ KIẾN TRÚC (GOVERNANCE)',
-            subtitle: 'ARCHITECTURE HARD RULES',
+            subtitle: 'NGUYÊN TẮC KIẾN TRÚC CỐ ĐỊNH',
             trailing: EnvironmentBadge.fromString(status?.environment),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +58,7 @@ class SystemTab extends StatelessWidget {
           // 2. Core Execution Certification
           QuantPanel(
             title: 'CHỨNG THỰC LÕI THỰC THI',
-            subtitle: 'CORE EXECUTION CERTIFICATION',
+            subtitle: 'CHỨNG THỰC BẢO TOÀN LÕI 15/15',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -70,7 +70,7 @@ class SystemTab extends StatelessWidget {
                 const SizedBox(height: 6),
                 _buildGovRow('Dịch vụ giám sát máy chủ', 'trader-stack-offline.service', QuantColors.textSecondary),
                 const SizedBox(height: 6),
-                _buildGovRow('Cơ sở dữ liệu lưu trữ', 'SQLite WAL Active', QuantColors.cyan),
+                _buildGovRow('Cơ sở dữ liệu lưu trữ', 'SQLite (Chế độ WAL Hoạt động)', QuantColors.cyan),
               ],
             ),
           ),
@@ -79,7 +79,7 @@ class SystemTab extends StatelessWidget {
           // 3. Live System Logs Viewer
           QuantPanel(
             title: 'NHẬT KÝ VẬN HÀNH',
-            subtitle: 'LIVE OPERATOR LOGS (/api/logs)',
+            subtitle: 'DỮ LIỆU NHẬT KÝ THỜI GIAN THỰC',
             trailing: IconButton(
               icon: const Icon(Icons.refresh, color: QuantColors.cyan, size: 18),
               onPressed: onRefreshLogs,
@@ -134,7 +134,7 @@ class SystemTab extends StatelessWidget {
           // 4. Operator Session & Logout
           QuantPanel(
             title: 'PHIÊN VẬN HÀNH HIỆN TẠI',
-            subtitle: 'OPERATOR SESSION',
+            subtitle: 'PHIÊN LÀM VIỆC QUẢN TRỊ',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

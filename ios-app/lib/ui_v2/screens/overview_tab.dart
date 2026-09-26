@@ -65,9 +65,9 @@ class OverviewTab extends StatelessWidget {
           // 1. System Status & Projection Panel
           QuantPanel(
             title: 'HỆ THỐNG VẬN HÀNH',
-            subtitle: st.projectionSource ?? 'PROJECTION',
+            subtitle: 'NGUỒN DỮ LIỆU THỰC THI',
             trailing: QuantStatusBadge(
-              label: st.status,
+              label: isHalted ? 'ĐÃ DỪNG' : (isHealthy ? 'KHỎE MẠNH' : 'CHƯA RÕ'),
               type: statusType,
             ),
             child: Column(
@@ -77,16 +77,16 @@ class OverviewTab extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('NGUỒN DỮ LIỆU', style: QuantTypography.caption),
-                    Text(st.projectionSource ?? 'EXECUTION_SERVICE', style: QuantTypography.technical.copyWith(fontSize: 11.5)),
+                    Text(st.projectionSource ?? 'DỊCH VỤ THỰC THI', style: QuantTypography.technical.copyWith(fontSize: 11.5)),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('CẦU DAO (CIRCUIT BREAKER)', style: QuantTypography.caption),
+                    Text('CẦU DAO TỰ ĐỘNG', style: QuantTypography.caption),
                     Text(
-                      isHalted ? 'TRIPPED' : 'ARMED',
+                      isHalted ? 'ĐÃ NGẮT' : 'SẴN SÀNG',
                       style: QuantTypography.technical.copyWith(
                         color: isHalted ? QuantColors.red : QuantColors.cyan,
                         fontWeight: FontWeight.w700,
@@ -99,9 +99,9 @@ class OverviewTab extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('HALT GENERATION', style: QuantTypography.caption),
+                    Text('THẾ HỆ DỪNG (CAS)', style: QuantTypography.caption),
                     Text(
-                      st.haltGeneration != null ? '${st.haltGeneration}' : '—',
+                      st.haltGeneration != null ? '#${st.haltGeneration}' : '—',
                       style: QuantTypography.technical.copyWith(
                         color: QuantColors.cyan,
                         fontWeight: FontWeight.w700,
@@ -183,7 +183,7 @@ class OverviewTab extends StatelessWidget {
                   ),
                   child: QuantMetric(
                     label: 'TRẠNG THÁI PNL',
-                    value: st.pnlState,
+                    value: st.pnlState == 'KNOWN_VALUE' ? 'XÁC ĐỊNH' : st.pnlState,
                     valueColor: st.pnlState == 'KNOWN_VALUE' ? QuantColors.cyan : QuantColors.textMuted,
                   ),
                 ),
@@ -210,7 +210,7 @@ class OverviewTab extends StatelessWidget {
 
           // 3. Active Positions Snapshot
           QuantSectionHeader(
-            title: 'VỊ THẾ ĐANG MỞ',
+            title: 'DANH SÁCH VỊ THẾ MỞ',
             action: InkWell(
               onTap: onNavigateToPositions,
               child: Text(
@@ -238,18 +238,18 @@ class OverviewTab extends StatelessWidget {
           // 4. Governance & Certification Banner
           QuantPanel(
             title: 'CHỨNG THỰC VẬN HÀNH',
-            subtitle: 'OFFLINE ARCHITECTURE',
+            subtitle: 'KIẾN TRÚC NGOẠI TUYẾN',
             trailing: EnvironmentBadge.fromString(status?.environment),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildGovRow('Lõi giao dịch (Core)', 'OFFLINE EXECUTION CORE ACCEPTED', QuantColors.cyan),
+                _buildGovRow('Lõi giao dịch (Core)', 'CHẤP NHẬN LÕI NGOẠI TUYẾN', QuantColors.cyan),
                 const SizedBox(height: 6),
-                _buildGovRow('Toàn vẹn mã nguồn', '15/15 PRESERVED (0 MISMATCH)', QuantColors.green),
+                _buildGovRow('Toàn vẹn mã nguồn', '15/15 KHỚP CHUẨN (0 SAI LỆCH)', QuantColors.green),
                 const SizedBox(height: 6),
-                _buildGovRow('Chứng chỉ API sàn', 'REMOVED (0 credentials)', QuantColors.textSecondary),
+                _buildGovRow('Chứng chỉ API sàn', 'ĐÃ GỠ BỎ (0 chứng chỉ)', QuantColors.textSecondary),
                 const SizedBox(height: 6),
-                _buildGovRow('Thị trường mở', 'OFFLINE ONLY (Live/Testnet Disabled)', QuantColors.gold),
+                _buildGovRow('Thị trường mở', 'CHỈ NGOẠI TUYẾN (Cấm Live/Testnet)', QuantColors.gold),
               ],
             ),
           ),

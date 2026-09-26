@@ -6,45 +6,45 @@
                 <polyline points="2 17 12 22 22 17"></polyline>
                 <polyline points="2 12 12 17 22 12"></polyline>
             </svg>
-            <span class="brand-name" title="BINANCE QUANT PRO">TRADER<span class="sr-only" style="display:none;"> BINANCE QUANT PRO</span></span>
+            <span class="brand-name" title="BINANCE QUANT PRO">TRẠM ĐỊNH LƯỢNG<span class="sr-only" style="display:none;"> BINANCE QUANT PRO</span></span>
             <span class="top-telemetry-brand-divider">|</span>
         </div>
 
         <div class="telemetry-unit">
-            <span class="telemetry-unit__key hidden-mobile">ENV</span>
-            <span id="telemetry-env" class="env-badge env-badge--offline">OFFLINE</span>
+            <span class="telemetry-unit__key hidden-mobile">MÔI TRƯỜNG</span>
+            <span id="telemetry-env" class="env-badge env-badge--offline">NGOẠI TUYẾN</span>
         </div>
         <div class="telemetry-unit">
-            <span class="telemetry-unit__key hidden-mobile">EXEC</span>
+            <span class="telemetry-unit__key hidden-mobile">LÕI THỰC THI</span>
             <span id="telemetry-exec" class="status-badge status-badge--healthy">
                 <span class="status-badge__dot"></span>
-                HEALTHY
+                KHỎE MẠNH
             </span>
         </div>
         <div class="telemetry-unit hidden-mobile">
-            <span class="telemetry-unit__key">HALT</span>
+            <span class="telemetry-unit__key">CẦU DAO</span>
             <span id="telemetry-halt" class="status-badge status-badge--healthy">
                 <span class="status-badge__dot"></span>
-                INACTIVE
+                BÌNH THƯỜNG
             </span>
         </div>
-        <!-- Hidden hooks for state synchronization if needed -->
-        <span id="telemetry-web" class="hidden" style="display:none;">READY</span>
-        <span id="telemetry-tg" class="hidden" style="display:none;">READY</span>
-        <span id="telemetry-recovery" class="hidden" style="display:none;">CLEAR</span>
+        <!-- Hooks ẩn đồng bộ trạng thái -->
+        <span id="telemetry-web" class="hidden" style="display:none;">SẴN SÀNG</span>
+        <span id="telemetry-tg" class="hidden" style="display:none;">SẴN SÀNG</span>
+        <span id="telemetry-recovery" class="hidden" style="display:none;">AN TOÀN</span>
     </div>
 
     <div class="top-telemetry-bar__right">
         <div class="telemetry-unit hidden-mobile">
-            <span class="telemetry-unit__key">IPC</span>
+            <span class="telemetry-unit__key">ĐỘ TRỄ IPC</span>
             <span id="telemetry-latency" class="telemetry-unit__val font-mono text-cyan">— ms</span>
         </div>
         <div class="telemetry-unit hidden-mobile">
             <span id="telemetry-clock" class="telemetry-unit__val font-mono text-secondary">--:--:-- UTC</span>
         </div>
-        <span class="badge-subtle font-mono" id="nav-operator-badge">admin</span>
-        <button id="btn-terminal-logout" class="btn btn--outline" title="Sign out of operator console">
-            LOGOUT
+        <span class="badge-subtle font-mono" id="nav-operator-badge">quản trị viên</span>
+        <button id="btn-terminal-logout" class="btn btn--outline" title="Đăng xuất khỏi trạm vận hành">
+            ĐĂNG XUẤT
         </button>
     </div>
 </header>

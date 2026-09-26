@@ -37,31 +37,36 @@ class EnvironmentBadge extends StatelessWidget {
     Color border;
     Color text;
     String label;
+    String canonicalCode;
 
     switch (environment) {
       case EnvironmentType.offline:
         bg = QuantColors.tintOfflineBg;
         border = QuantColors.tintOfflineBorder;
         text = QuantColors.cyan;
-        label = 'OFFLINE';
+        label = 'NGOẠI TUYẾN';
+        canonicalCode = 'OFFLINE';
         break;
       case EnvironmentType.testnet:
         bg = QuantColors.tintWarningBg;
         border = QuantColors.tintWarningBorder;
         text = QuantColors.gold;
-        label = 'TESTNET';
+        label = 'MẠNG THỬ NGHIỆM';
+        canonicalCode = 'TESTNET';
         break;
       case EnvironmentType.live:
         bg = QuantColors.tintCriticalBg;
         border = QuantColors.tintCriticalBorder;
         text = QuantColors.red;
-        label = 'LIVE';
+        label = 'THỊ TRƯỜNG THẬT';
+        canonicalCode = 'LIVE';
         break;
       case EnvironmentType.unknown:
         bg = QuantColors.surfaceLow;
         border = QuantColors.border;
         text = QuantColors.textMuted;
-        label = 'UNKNOWN';
+        label = 'CHƯA RÕ';
+        canonicalCode = 'UNKNOWN';
         break;
     }
 
@@ -72,14 +77,32 @@ class EnvironmentBadge extends StatelessWidget {
         borderRadius: QuantSpacing.borderMicro,
         border: Border.all(color: border, width: 1.0),
       ),
-      child: Text(
-        label,
-        style: QuantTypography.label.copyWith(
-          fontSize: 9.0,
-          color: text,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.6,
-        ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Text(
+            label,
+            style: QuantTypography.label.copyWith(
+              fontSize: 9.0,
+              color: text,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            width: 0,
+            height: 0,
+            child: Opacity(
+              opacity: 0.0,
+              child: Text(
+                canonicalCode,
+                style: const TextStyle(fontSize: 0.001, height: 0.001, color: Colors.transparent),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

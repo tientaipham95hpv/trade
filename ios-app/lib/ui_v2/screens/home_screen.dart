@@ -67,12 +67,16 @@ class _QuantHomeScreenState extends State<QuantHomeScreen> {
     final isHealthy = status?.isHealthy ?? false;
 
     QuantStatusType statusType;
+    String statusLabel = 'CHƯA RÕ';
     if (isHalted) {
       statusType = QuantStatusType.halted;
+      statusLabel = 'ĐÃ DỪNG';
     } else if (isHealthy) {
       statusType = QuantStatusType.healthy;
+      statusLabel = 'KHỎE MẠNH';
     } else {
       statusType = QuantStatusType.unknown;
+      statusLabel = status?.status ?? 'CHƯA RÕ';
     }
 
     final pages = [
@@ -116,7 +120,7 @@ class _QuantHomeScreenState extends State<QuantHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // App Brand & Mode: TRADER | OFFLINE | HEALTHY
+                  // App Brand & Mode: TRẠM ĐỊNH LƯỢNG | NGOẠI TUYẾN | KHỎE MẠNH
                   Row(
                     children: [
                       Container(
@@ -133,11 +137,11 @@ class _QuantHomeScreenState extends State<QuantHomeScreen> {
                       ),
                       const SizedBox(width: QuantSpacing.spaceXs),
                       Text(
-                        'TRADER',
+                        'TRẠM ĐỊNH LƯỢNG',
                         style: QuantTypography.heading.copyWith(
-                          fontSize: 13.0,
+                          fontSize: 12.5,
                           fontWeight: FontWeight.w800,
-                          letterSpacing: 0.6,
+                          letterSpacing: 0.5,
                         ),
                       ),
                       const SizedBox(width: QuantSpacing.spaceXs),
@@ -160,7 +164,7 @@ class _QuantHomeScreenState extends State<QuantHomeScreen> {
                       ),
                       const SizedBox(width: QuantSpacing.spaceXs),
                       QuantStatusBadge(
-                        label: status?.status ?? 'HEALTHY',
+                        label: statusLabel,
                         type: statusType,
                       ),
                     ],
