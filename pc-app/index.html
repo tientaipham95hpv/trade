@@ -33,12 +33,8 @@
   </script>
   <style>
     body {
-      background-color: #070B12;
-      background-image: 
-        radial-gradient(circle at 10% 10%, rgba(240, 185, 11, 0.04) 0%, transparent 45%),
-        radial-gradient(circle at 90% 90%, rgba(0, 240, 255, 0.035) 0%, transparent 45%),
-        radial-gradient(circle at 50% 50%, rgba(14, 203, 129, 0.02) 0%, transparent 60%);
-      color: #E8EDF5;
+      background-color: #080a0f;
+      color: #e2e8f0;
       user-select: none;
     }
     ::-webkit-scrollbar {
@@ -46,60 +42,24 @@
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #070B12;
+      background: #080a0f;
     }
     ::-webkit-scrollbar-thumb {
-      background: #202938;
+      background: #1c2436;
       border-radius: 4px;
     }
     ::-webkit-scrollbar-thumb:hover {
-      background: #334155;
+      background: #2a374f;
     }
-    .hud-card {
-      background: linear-gradient(180deg, rgba(23, 30, 43, 0.85) 0%, rgba(13, 17, 26, 0.95) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-top: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 12px;
-      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .hud-card:hover {
-      border-color: rgba(240, 185, 11, 0.3);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 26px -4px rgba(0, 0, 0, 0.65), 0 0 12px rgba(240, 185, 11, 0.08);
-    }
-    .hud-panel {
-      background: linear-gradient(180deg, rgba(20, 26, 38, 0.75) 0%, rgba(11, 15, 23, 0.9) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
-    }
-    .nav-tab {
-      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      border-radius: 8px;
-    }
+    .glow-gold { box-shadow: 0 0 15px rgba(240, 185, 11, 0.15); }
+    .glow-green { box-shadow: 0 0 15px rgba(14, 203, 129, 0.2); }
+    .glow-red { box-shadow: 0 0 15px rgba(246, 70, 93, 0.2); }
     .nav-tab.active {
-      background: linear-gradient(180deg, rgba(240, 185, 11, 0.18) 0%, rgba(240, 185, 11, 0.04) 100%);
+      background-color: rgba(240, 185, 11, 0.15);
       color: #F0B90B;
-      border: 1px solid rgba(240, 185, 11, 0.45);
-      box-shadow: 0 0 14px rgba(240, 185, 11, 0.15);
-      font-weight: 700;
+      border-color: rgba(240, 185, 11, 0.4);
+      font-weight: 600;
     }
-    .nav-tab:hover:not(.active) {
-      background: rgba(255, 255, 255, 0.05);
-      color: #fff;
-    }
-    .btn-action {
-      transition: all 0.2s ease;
-    }
-    .btn-action:hover {
-      filter: brightness(1.15);
-      transform: translateY(-1px);
-    }
-    .glow-gold { box-shadow: 0 0 16px rgba(240, 185, 11, 0.25); }
-    .glow-green { box-shadow: 0 0 16px rgba(14, 203, 129, 0.25); }
-    .glow-red { box-shadow: 0 0 16px rgba(246, 70, 93, 0.35); }
-    .glow-cyan { box-shadow: 0 0 16px rgba(0, 240, 255, 0.25); }
   </style>
 </head>
 <body class="h-screen flex flex-col font-sans overflow-hidden">
@@ -113,11 +73,11 @@
       <div>
         <div class="flex items-center space-x-2">
           <span class="font-bold text-sm tracking-wide text-white">BINANCE QUANT PRO</span>
-          <span class="text-[10px] bg-binanceGold/20 text-binanceGold border border-binanceGold/30 px-1.5 py-0.5 rounded font-mono font-semibold">TRẠM VẬN HÀNH v2.0</span>
+          <span class="text-[10px] bg-binanceGold/20 text-binanceGold border border-binanceGold/30 px-1.5 py-0.5 rounded font-mono font-semibold">TERMINAL v1.0</span>
         </div>
         <div class="flex items-center space-x-2 text-[11px] text-gray-400">
           <span id="connIndicator" class="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-          <span id="connStatus">Đang kết nối máy chủ...</span>
+          <span id="connStatus">Đang kết nối VPS...</span>
           <span class="text-gray-600">•</span>
           <span id="pingLatency" class="font-mono text-gray-400">-- ms</span>
         </div>
@@ -127,8 +87,8 @@
     <!-- CÁC NÚT ĐIỀU KHIỂN NHANH Ở GIỮA -->
     <div class="flex items-center space-x-2 font-mono text-xs">
       <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5">
-        <button id="btnModeBluechip" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">BLUECHIP (BTC/ETH)</button>
-        <button id="btnModeMarket" class="px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition">QUÉT TOP 80</button>
+        <button id="btnModeBluechip" class="px-2.5 py-1 rounded text-gray-400 hover:text-white transition">BLUECHIP</button>
+        <button id="btnModeMarket" class="px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold transition">TOP 80</button>
       </div>
       <div class="flex bg-darkBase border border-darkBorder rounded-lg p-0.5">
         <button id="btnPauseResume" class="px-3 py-1 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 flex items-center space-x-1 hover:bg-yellow-500/20 transition">
@@ -147,7 +107,7 @@
 
       <button id="btnEmergencyClose" class="px-3 py-1.5 rounded-lg bg-lossRed/20 hover:bg-lossRed text-lossRed hover:text-white border border-lossRed/40 text-xs font-bold font-mono tracking-wider flex items-center space-x-1.5 transition glow-red" title="Cắt sạch toàn bộ vị thế trên sàn Binance ngay lập tức [Ctrl+Shift+K]">
         <i class="fa-solid fa-radiation"></i>
-        <span>CẮT KHẨN CẤP [BẢO VỆ VỐN]</span>
+        <span>CẮT KHẨN CẤP [KILL-SWITCH]</span>
       </button>
 
       <button id="btnLoginOpen" class="px-2.5 py-1 rounded-lg bg-darkBase border border-darkBorder text-gray-400 hover:text-binanceGold flex items-center space-x-1 text-xs transition" title="Tài khoản đăng nhập">
@@ -169,7 +129,7 @@
     </button>
     <button id="tabBtnRadar" class="nav-tab px-3 py-1.5 rounded-lg flex items-center space-x-2 border border-transparent hover:bg-darkCardHover text-gray-400 transition">
       <i class="fa-solid fa-satellite-dish"></i>
-      <span>Bộ Quét 80 Coin</span>
+      <span>Scanner 80 Coin</span>
     </button>
     <button id="tabBtnHistory" class="nav-tab px-3 py-1.5 rounded-lg flex items-center space-x-2 border border-transparent hover:bg-darkCardHover text-gray-400 transition">
       <i class="fa-solid fa-clock-rotate-left"></i>
@@ -181,7 +141,7 @@
     </button>
     <button id="tabBtnLogs" class="nav-tab px-3 py-1.5 rounded-lg flex items-center space-x-2 border border-transparent hover:bg-darkCardHover text-gray-400 transition">
       <i class="fa-solid fa-terminal"></i>
-      <span>Nhật Ký Trực Tiếp</span>
+      <span>Nhật Ký Logs Live</span>
     </button>
     <button id="tabBtnAi" class="nav-tab px-3 py-1.5 rounded-lg flex items-center space-x-2 border border-transparent hover:bg-darkCardHover text-gray-400 transition">
       <i class="fa-solid fa-brain text-purple-400"></i>
@@ -192,64 +152,49 @@
   <!-- ==================== TAB 1: TỔNG QUAN & VỊ THẾ ==================== -->
   <div id="viewOverview" class="flex-1 flex flex-col overflow-hidden">
     <!-- THANH CHỈ SỐ HUD THỜI GIAN THỰC -->
-    <div class="px-4 py-3 grid grid-cols-5 gap-3.5">
+    <div class="bg-darkBase border-b border-darkBorder px-4 py-2.5 grid grid-cols-5 gap-3">
       <!-- Thẻ Tổng Vốn -->
-      <div class="hud-card p-3 flex flex-col justify-between">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
-          <span>Tổng Vốn Khả Dụng</span>
-          <i class="fa-solid fa-wallet text-binanceGold text-[11px]"></i>
-        </div>
-        <div id="statBalance" class="text-xl font-extrabold font-mono text-white mt-1">$0.00 USDT</div>
-        <div class="text-[10px] text-gray-500 font-mono mt-0.5 flex items-center space-x-1">
-          <span class="w-1.5 h-1.5 rounded-full bg-binanceGold inline-block"></span>
-          <span>Ký Quỹ Độc Lập Binance Futures</span>
-        </div>
+      <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tổng Vốn Khả Dụng</div>
+        <div id="statBalance" class="text-lg font-bold font-mono text-white mt-0.5">$0.00 USDT</div>
+        <div class="text-[10px] text-gray-500 font-mono mt-0.5">Binance Futures Isolated</div>
       </div>
 
       <!-- Thẻ PnL Tạm Tính -->
-      <div class="hud-card p-3 flex flex-col justify-between">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
-          <span>Lãi Lỗ Tạm Tính (Đang Mở)</span>
-          <i class="fa-solid fa-chart-line text-profitGreen text-[11px]"></i>
-        </div>
-        <div id="statUnrealized" class="text-xl font-extrabold font-mono text-profitGreen mt-1">+$0.00 USDT</div>
-        <div id="statUnrealizedPct" class="text-[11px] text-profitGreen font-mono font-semibold mt-0.5">+0.00%</div>
+      <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Lãi Lỗ Tạm Tính (Active)</div>
+        <div id="statUnrealized" class="text-lg font-bold font-mono text-profitGreen mt-0.5">+$0.00 USDT</div>
+        <div id="statUnrealizedPct" class="text-[10px] text-profitGreen font-mono mt-0.5">+0.00%</div>
       </div>
 
       <!-- Thẻ Xu Hướng Bitcoin (BTC Regime) -->
-      <div class="hud-card p-3 flex flex-col justify-between">
+      <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
         <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
           <span>Lá Chắn Xu Hướng BTC</span>
-          <span class="text-[9px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded font-mono">1H / 4H</span>
+          <span class="text-[9px] bg-blue-500/20 text-blue-400 px-1 rounded">Khung 1H/4H</span>
         </div>
-        <div id="statBtcRegime" class="text-xs font-bold font-mono text-cyan-400 mt-1 flex items-center space-x-1">
+        <div id="statBtcRegime" class="text-sm font-bold font-mono text-cyan-400 mt-1 flex items-center space-x-1">
           <i class="fa-solid fa-shield-halved"></i>
-          <span>XU HƯỚNG TĂNG (CẤM SHORT)</span>
+          <span>BULL (CẤM SHORT 100%)</span>
         </div>
         <div id="statBtcDetails" class="text-[10px] text-gray-400 font-mono mt-0.5 truncate">Đang đồng bộ dữ liệu...</div>
       </div>
 
       <!-- Thẻ Chỉ Số Tâm Lý (Fear & Greed) -->
-      <div class="hud-card p-3 flex flex-col justify-between">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
-          <span>Tâm Lý Thị Trường</span>
-          <i class="fa-solid fa-fire text-amber-500 text-[11px]"></i>
-        </div>
-        <div id="statFng" class="text-xs font-bold font-mono text-binanceGold mt-1 flex items-center space-x-1">
-          <i class="fa-solid fa-gauge-high"></i>
+      <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tâm Lý Thị Trường</div>
+        <div id="statFng" class="text-sm font-bold font-mono text-binanceGold mt-1 flex items-center space-x-1">
+          <i class="fa-solid fa-fire text-amber-500"></i>
           <span>71/100 (Tham Lam)</span>
         </div>
-        <div class="text-[10px] text-gray-400 font-mono mt-0.5">Đồng hồ đo cảm xúc thị trường</div>
+        <div class="text-[10px] text-gray-400 font-mono mt-0.5">Đồng hồ đo cảm xúc Crypto</div>
       </div>
 
       <!-- Thẻ Cầu Dao An Toàn (Circuit Breaker) -->
-      <div class="hud-card p-3 flex flex-col justify-between">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold flex items-center justify-between">
-          <span>Cầu Dao Bảo Vệ Vốn</span>
-          <i class="fa-solid fa-circle-check text-profitGreen text-[11px]"></i>
-        </div>
-        <div id="statCircuit" class="text-xs font-bold font-mono text-profitGreen mt-1 flex items-center space-x-1">
-          <i class="fa-solid fa-shield"></i>
+      <div class="bg-darkCard border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Cầu Dao Bảo Vệ Vốn</div>
+        <div id="statCircuit" class="text-sm font-bold font-mono text-profitGreen mt-1 flex items-center space-x-1">
+          <i class="fa-solid fa-circle-check"></i>
           <span>AN TOÀN HOẠT ĐỘNG</span>
         </div>
         <div class="text-[10px] text-gray-400 font-mono mt-0.5">Ngắt nghỉ: $30/ngày (12 tiếng)</div>
@@ -257,35 +202,34 @@
     </div>
 
     <!-- KHUNG VỊ THẾ & AUDIT -->
-    <div class="flex-1 flex gap-3.5 px-4 pb-4 overflow-hidden">
+    <div class="flex-1 flex overflow-hidden">
       <!-- CỘT TRÁI: BẢNG VỊ THẾ ĐANG MỞ (65%) -->
-      <div class="w-2/3 hud-panel flex flex-col overflow-hidden">
-        <div class="px-4 py-2.5 bg-darkCard/80 border-b border-darkBorder flex items-center justify-between">
-          <div class="flex items-center space-x-2.5">
-            <i class="fa-solid fa-layer-group text-binanceGold text-xs"></i>
-            <span class="text-xs font-bold uppercase tracking-wider text-white">Danh Sách Vị Thế Đang Mở</span>
-            <span id="badgePosCount" class="text-[10px] bg-binanceGold/15 text-binanceGold border border-binanceGold/30 px-2 py-0.5 rounded-full font-mono font-bold">0/3</span>
+      <div class="w-2/3 border-r border-darkBorder flex flex-col overflow-hidden">
+        <div class="px-4 py-2 bg-darkCard/50 border-b border-darkBorder flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Vị Thế Đang Mở (Live Positions)</span>
+            <span id="badgePosCount" class="text-[10px] bg-binanceGold/20 text-binanceGold px-1.5 py-0.2 rounded font-mono font-bold">0/3</span>
           </div>
-          <span class="text-[11px] text-gray-400 font-mono">Chốt Lời 3 Nấc: 33% @ 1R | 33% @ 2R | 34% Tối Đa</span>
+          <span class="text-[11px] text-gray-400 font-mono">Chốt Lời 3 Nấc: 33% @ 1R | 33% @ 2R | 34% Runner</span>
         </div>
 
         <div class="flex-1 overflow-y-auto p-3">
           <table class="w-full text-left text-xs font-mono">
             <thead>
-              <tr class="text-gray-400 border-b border-darkBorder/60 pb-2">
-                <th class="py-2 px-1">Cặp Giao Dịch</th>
-                <th class="py-2 px-1">Chiều</th>
-                <th class="py-2 px-1">Giá Vào</th>
-                <th class="py-2 px-1">Giá Hiện Tại</th>
-                <th class="py-2 px-1">Cắt Lỗ (SL)</th>
-                <th class="py-2 px-1">Chốt Lời (TP)</th>
-                <th class="py-2 px-1">Lãi Lỗ (PnL)</th>
-                <th class="py-2 px-1 text-right">Thao Tác</th>
+              <tr class="text-gray-400 border-b border-darkBorder pb-2">
+                <th class="py-1">Cặp Coin</th>
+                <th class="py-1">Chiều</th>
+                <th class="py-1">Giá Vào (Entry)</th>
+                <th class="py-1">Giá Hiện Tại</th>
+                <th class="py-1">Cắt Lỗ (SL)</th>
+                <th class="py-1">TP1 / TP2</th>
+                <th class="py-1">Lãi Lỗ (PnL)</th>
+                <th class="py-1 text-right">Thao Tác</th>
               </tr>
             </thead>
             <tbody id="positionsTableBody" class="divide-y divide-darkBorder/40">
               <tr>
-                <td colspan="8" class="text-center py-10 text-gray-500">Đang nạp dữ liệu vị thế từ máy chủ...</td>
+                <td colspan="8" class="text-center py-8 text-gray-500">Đang nạp dữ liệu vị thế từ VPS...</td>
               </tr>
             </tbody>
           </table>
@@ -293,26 +237,26 @@
       </div>
 
       <!-- CỘT PHẢI: NHẬT KÝ KIỂM TOÁN AI & MARKET PULSE (35%) -->
-      <div class="w-1/3 hud-panel flex flex-col overflow-hidden">
-        <div class="px-4 py-2.5 bg-darkCard/80 border-b border-darkBorder flex items-center justify-between">
+      <div class="w-1/3 flex flex-col overflow-hidden bg-darkCard/20">
+        <div class="px-4 py-2 bg-darkCard/50 border-b border-darkBorder flex items-center justify-between">
           <div class="flex items-center space-x-2">
             <i class="fa-solid fa-microchip text-binanceGold text-xs"></i>
-            <span class="text-xs font-bold uppercase tracking-wider text-white">Cổng Kiểm Toán Định Lượng & AI</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-white">Kiểm Toán Lệnh AI Gatekeeper</span>
           </div>
-          <span class="text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-full font-mono">Điểm chuẩn ≥ 7.5</span>
+          <span class="text-[10px] text-cyan-400 font-mono">Điểm chuẩn ≥ 7.5</span>
         </div>
         <div id="aiAuditFeed" class="flex-1 overflow-y-auto p-3 space-y-2 text-xs font-mono">
-          <div class="text-gray-500 text-center py-10">Đang lắng nghe tín hiệu thị trường...</div>
+          <div class="text-gray-500 text-center py-6">Đang lắng nghe tín hiệu thị trường...</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ==================== TAB 2: BỘ QUÉT TOP 80 COIN ==================== -->
+  <!-- ==================== TAB 2: SCANNER 80 COIN ==================== -->
   <div id="viewRadar" class="flex-1 hidden flex-col overflow-hidden bg-darkBase">
     <div class="px-4 py-2.5 bg-darkCard border-b border-darkBorder flex items-center justify-between">
       <div class="flex items-center space-x-3">
-        <span class="text-xs font-bold uppercase tracking-wider text-white">Bộ Quét Tín Hiệu Top 80 Cặp Coin</span>
+        <span class="text-xs font-bold uppercase tracking-wider text-white">Radar Quét Top 80 Cặp Coin</span>
         <div class="relative">
           <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-gray-500 text-xs"></i>
           <input type="text" id="inputRadarSearch" placeholder="Tìm coin (vd: BTC, SOL, DOGE)..." class="bg-darkBase border border-darkBorder rounded-lg pl-8 pr-3 py-1 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-binanceGold font-mono w-64">
@@ -320,9 +264,9 @@
       </div>
       <div class="flex items-center space-x-2 text-xs font-mono">
         <button id="btnFilterAll" class="px-2.5 py-1 rounded bg-binanceGold/20 text-binanceGold font-semibold border border-binanceGold/30">Tất Cả</button>
-        <button id="btnFilterLong" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-profitGreen">Chỉ MUA (Long) ▲</button>
-        <button id="btnFilterShort" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-lossRed">Chỉ BÁN (Short) ▼</button>
-        <button id="btnFilterTrend" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-cyan-400">Xu Hướng Mạnh (ADX > 25)</button>
+        <button id="btnFilterLong" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-profitGreen">Chỉ LONG ▲</button>
+        <button id="btnFilterShort" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-lossRed">Chỉ SHORT ▼</button>
+        <button id="btnFilterTrend" class="px-2.5 py-1 rounded bg-darkBase border border-darkBorder text-gray-400 hover:text-cyan-400">ADX > 25</button>
       </div>
     </div>
     <div class="flex-1 overflow-y-auto p-4">
@@ -335,31 +279,31 @@
   <!-- ==================== TAB 3: LỊCH SỬ & BÁO CÁO ==================== -->
   <div id="viewHistory" class="flex-1 hidden flex-col overflow-hidden bg-darkBase">
     <!-- THẺ KPI HIỆU SUẤT TỔNG THỂ -->
-    <div class="px-4 py-3 grid grid-cols-4 gap-3.5 font-mono">
-      <div class="hud-card p-3">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tổng Lệnh Đã Đóng</div>
-        <div id="histTotalTrades" class="text-xl font-extrabold text-white mt-1">0</div>
-        <div class="text-[10px] text-gray-500 mt-0.5">Chu kỳ kiểm thử hiện tại</div>
+    <div class="px-4 py-3 bg-darkCard border-b border-darkBorder grid grid-cols-4 gap-3 font-mono">
+      <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase">Tổng Lệnh Đã Đóng</div>
+        <div id="histTotalTrades" class="text-lg font-bold text-white mt-0.5">0</div>
+        <div class="text-[10px] text-gray-500">Chu kỳ kiểm thử hiện tại</div>
       </div>
-      <div class="hud-card p-3">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Tỷ Lệ Thắng</div>
-        <div id="histWinRate" class="text-xl font-extrabold text-profitGreen mt-1">0.0%</div>
-        <div id="histWinLoss" class="text-[10px] text-gray-400 mt-0.5">0 Thắng / 0 Thua</div>
+      <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase">Tỷ Lệ Thắng (Win Rate)</div>
+        <div id="histWinRate" class="text-lg font-bold text-profitGreen mt-0.5">0.0%</div>
+        <div id="histWinLoss" class="text-[10px] text-gray-400">0 Thắng / 0 Thua</div>
       </div>
-      <div class="hud-card p-3">
-        <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Lãi Ròng Tích Lũy</div>
-        <div id="histNetPnl" class="text-xl font-extrabold text-white mt-1">$0.00 USDT</div>
-        <div class="text-[10px] text-gray-500 mt-0.5">Lãi trừ lỗ thực tế</div>
+      <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5">
+        <div class="text-[10px] text-gray-400 uppercase">Lãi Ròng Tích Lũy (Net PnL)</div>
+        <div id="histNetPnl" class="text-lg font-bold text-white mt-0.5">$0.00 USDT</div>
+        <div class="text-[10px] text-gray-500">Lãi trừ lỗ thực tế</div>
       </div>
-      <div class="hud-card p-3 flex items-center justify-between">
+      <div class="bg-darkBase border border-darkBorder rounded-lg p-2.5 flex items-center justify-between">
         <div>
-          <div class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Hệ Số Lợi Nhuận (PF)</div>
-          <div id="histProfitFactor" class="text-xl font-extrabold text-cyan-400 mt-1">0.00</div>
-          <div class="text-[10px] text-gray-500 mt-0.5">Mục tiêu chuẩn: ≥ 1.35</div>
+          <div class="text-[10px] text-gray-400 uppercase">Hệ Số Lợi Nhuận (PF)</div>
+          <div id="histProfitFactor" class="text-lg font-bold text-cyan-400 mt-0.5">0.00</div>
+          <div class="text-[10px] text-gray-500">Mục tiêu chuẩn: ≥ 1.35</div>
         </div>
-        <button id="btnExportCsv" class="px-3 py-2 bg-binanceGold hover:bg-yellow-400 text-black font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow glow-gold">
+        <button id="btnExportCsv" class="px-3 py-2 bg-binanceGold hover:bg-yellow-400 text-black font-bold rounded-lg text-xs flex items-center space-x-1.5 transition shadow">
           <i class="fa-solid fa-file-arrow-down"></i>
-          <span>XUẤT BÁO CÁO CSV</span>
+          <span>XUẤT CSV</span>
         </button>
       </div>
     </div>
@@ -369,9 +313,9 @@
       <div class="flex items-center justify-between mb-1.5">
         <span class="text-xs font-bold font-mono text-white flex items-center space-x-1.5">
           <i class="fa-solid fa-arrow-trend-up text-profitGreen"></i>
-          <span>Đường Cong Vốn Lũy Kế</span>
+          <span>Đường Cong Vốn Lũy Kế (Cumulative Equity Curve)</span>
         </span>
-        <span class="text-[10px] text-gray-500 font-mono">Dữ liệu lịch sử giao dịch xác thực</span>
+        <span class="text-[10px] text-gray-500 font-mono">Dựa trên trade_history.csv</span>
       </div>
       <div id="equityChartContainer" class="w-full h-28 bg-darkBase rounded-lg border border-darkBorder p-1 flex items-center justify-center font-mono text-xs text-gray-500">
         Đang nạp dữ liệu đồ thị...
@@ -404,25 +348,25 @@
 
   <!-- ==================== TAB 4: CẤU HÌNH CHIẾN LƯỢC ==================== -->
   <div id="viewStrategy" class="flex-1 hidden overflow-y-auto p-6 bg-darkBase">
-    <div class="max-w-4xl mx-auto hud-panel p-6 shadow-2xl space-y-6">
+    <div class="max-w-4xl mx-auto bg-darkCard border border-darkBorder rounded-xl p-6 shadow-xl space-y-6">
       <div class="border-b border-darkBorder pb-4 flex items-center justify-between">
         <div>
           <h2 class="text-base font-bold text-white flex items-center space-x-2">
             <i class="fa-solid fa-sliders text-binanceGold"></i>
-            <span>Cấu Hình Tham Số Giao Dịch Thời Gian Thực</span>
+            <span>Cấu Hình Tham Số Giao Dịch Thời Gian Thực (Live Settings)</span>
           </h2>
-          <p class="text-xs text-gray-400 mt-1">Các thông số này sẽ có hiệu lực ngay lập tức trên máy chủ mà không cần khởi động lại tiến trình bot.</p>
+          <p class="text-xs text-gray-400 mt-1">Các thông số này sẽ có hiệu lực ngay lập tức trên máy chủ VPS mà không cần tắt hay restart bot.</p>
         </div>
         <button id="btnSaveLiveStrategy" class="px-4 py-2 bg-binanceGold hover:bg-yellow-400 text-black font-bold rounded-lg text-xs flex items-center space-x-2 transition shadow-lg">
           <i class="fa-solid fa-floppy-disk"></i>
-          <span>LƯU CẤU HÌNH TRỰC TIẾP</span>
+          <span>LƯU CẤU HÌNH LIVE</span>
         </button>
       </div>
 
       <div class="grid grid-cols-2 gap-6 font-mono text-xs">
         <!-- Chế độ giao dịch -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
-          <label class="font-bold text-gray-300 block">Chế Độ Quét & Giao Dịch</label>
+          <label class="font-bold text-gray-300 block">Chế Độ Quét & Giao Dịch (Trading Mode)</label>
           <p class="text-[11px] text-gray-500 mb-2">Chọn nhóm danh mục mục tiêu cho bot:</p>
           <div class="grid grid-cols-2 gap-2">
             <button id="stratBtnBluechip" type="button" class="py-2 px-3 rounded-lg border border-darkBorder text-gray-400 hover:text-white transition text-center">BLUECHIP (BTC/ETH)</button>
@@ -432,20 +376,20 @@
 
         <!-- Chiều đánh -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
-          <label class="font-bold text-gray-300 block">Chiều Đánh Cho Phép</label>
+          <label class="font-bold text-gray-300 block">Chiều Đánh Cho Phép (Direction)</label>
           <p class="text-[11px] text-gray-500 mb-2">Kiểm soát theo sở thích hoặc theo thị trường:</p>
           <select id="stratTradeDirection" class="w-full bg-darkCard border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
-            <option value="AUTO">TỰ ĐỘNG (Theo xu hướng BTC)</option>
-            <option value="BOTH">CẢ HAI (Cho phép cả Mua & Bán)</option>
-            <option value="LONG_ONLY">CHỈ MUA (Long Only)</option>
-            <option value="SHORT_ONLY">CHỈ BÁN (Short Only)</option>
+            <option value="AUTO">AUTO (Tự Động Theo BTC Regime)</option>
+            <option value="BOTH">BOTH (Cho phép cả Long & Short)</option>
+            <option value="LONG_ONLY">LONG_ONLY (Chỉ Mua / Long)</option>
+            <option value="SHORT_ONLY">SHORT_ONLY (Chỉ Bán / Short)</option>
           </select>
         </div>
 
         <!-- Đòn bẩy -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
           <div class="flex items-center justify-between">
-            <label class="font-bold text-gray-300">Đòn Bẩy Ký Quỹ</label>
+            <label class="font-bold text-gray-300">Đòn Bẩy (Leverage)</label>
             <span id="stratLeverageVal" class="text-binanceGold font-bold text-sm">5x</span>
           </div>
           <input type="range" id="stratLeverage" min="1" max="20" step="1" value="5" class="w-full accent-binanceGold cursor-pointer">
@@ -459,7 +403,7 @@
         <!-- Rủi ro mỗi lệnh -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
           <div class="flex items-center justify-between">
-            <label class="font-bold text-gray-300">Mức Rủi Ro Mỗi Lệnh (Risk %)</label>
+            <label class="font-bold text-gray-300">Rủi Ro Mỗi Lệnh (Risk %)</label>
             <span id="stratRiskVal" class="text-binanceGold font-bold text-sm">1.5%</span>
           </div>
           <input type="range" id="stratRisk" min="0.5" max="5.0" step="0.1" value="1.5" class="w-full accent-binanceGold cursor-pointer">
@@ -473,7 +417,7 @@
         <!-- Bộ lọc ADX tối thiểu -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
           <div class="flex items-center justify-between">
-            <label class="font-bold text-gray-300">Ngưỡng Lọc Sức Mạnh Xu Hướng (ADX Tối Thiểu)</label>
+            <label class="font-bold text-gray-300">Ngưỡng Lọc Sức Mạnh Xu Hướng (ADX Min)</label>
             <span id="stratAdxVal" class="text-cyan-400 font-bold text-sm">20</span>
           </div>
           <input type="range" id="stratAdx" min="12" max="35" step="1" value="20" class="w-full accent-cyan-400 cursor-pointer">
@@ -486,9 +430,9 @@
 
         <!-- Giới hạn quy mô tài khoản thực -->
         <div class="bg-darkBase border border-darkBorder rounded-lg p-4 space-y-2">
-          <label class="font-bold text-gray-300 block">Hạn Mức Vốn Khả Dụng (USD)</label>
+          <label class="font-bold text-gray-300 block">Hạn Mức Vốn Khả Dụng (Hard Cap USD)</label>
           <input type="number" id="stratHardCap" value="100" min="10" max="100000" class="w-full bg-darkCard border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
-          <p class="text-[10px] text-gray-500">Giới hạn số dư tối đa mà bot được quyền phân bổ giao dịch.</p>
+          <p class="text-[10px] text-gray-500">Giới hạn số dư tối đa mà bot được quyền phân bổ.</p>
         </div>
       </div>
 
@@ -504,7 +448,7 @@
         </label>
         <label class="flex items-center space-x-3 cursor-pointer">
           <input type="checkbox" id="stratDynamicLev" checked class="w-4 h-4 accent-binanceGold rounded">
-          <span class="text-gray-300">Đòn Bẩy Động Theo Biến Động</span>
+          <span class="text-gray-300">Đòn Bẩy Động (Volatility)</span>
         </label>
       </div>
 
@@ -518,7 +462,7 @@
       <div class="flex items-center space-x-3">
         <span class="font-bold text-white flex items-center space-x-2">
           <i class="fa-solid fa-terminal text-profitGreen"></i>
-          <span>Nhật Ký Chạy Hệ Thống Máy Chủ (Bảng Điều Khiển Trực Tiếp)</span>
+          <span>Nhật Ký Chạy Hệ Thống VPS (Live Console)</span>
         </span>
         <span id="logSourceBadge" class="text-[10px] bg-darkBase border border-darkBorder text-gray-400 px-2 py-0.5 rounded">Nguồn: bot.log</span>
       </div>
@@ -538,7 +482,7 @@
     </div>
     <div class="flex-1 p-3 overflow-hidden flex flex-col">
       <div id="logTerminalBox" class="flex-1 bg-[#05070a] border border-darkBorder rounded-xl p-4 overflow-y-auto font-mono text-[11px] leading-relaxed select-text">
-        <div class="text-gray-500">Đang nạp nhật ký từ máy chủ...</div>
+        <div class="text-gray-500">Đang nạp nhật ký từ máy chủ VPS...</div>
       </div>
     </div>
   </div>
@@ -549,9 +493,9 @@
       <div class="flex items-center space-x-2">
         <i class="fa-solid fa-brain text-purple-400 text-sm"></i>
         <span class="font-bold text-white">Trợ Lý Phân Tích Định Lượng AI Copilot</span>
-        <span class="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded">Trí Tuệ Nhân Tạo Quant</span>
+        <span class="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.5 rounded">DeepSeek V4.1 Flash</span>
       </div>
-      <span class="text-gray-400">Trực tiếp giám sát xu hướng BTC, danh mục lệnh & biến động thị trường</span>
+      <span class="text-gray-400">Trực tiếp theo dõi BTC Regime, Active Orders & Volatility</span>
     </div>
 
     <!-- Quick Prompts Chips -->
@@ -599,11 +543,11 @@
       <div class="space-y-3 text-xs font-mono">
         <div>
           <label class="text-gray-400 block mb-1">Tên đăng nhập quản trị:</label>
-          <input type="text" id="loginUsername" value="" autocomplete="username" placeholder="Tên quản trị đã bootstrap" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
+          <input type="text" id="loginUsername" value="admin" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div>
           <label class="text-gray-400 block mb-1">Mật khẩu quản trị:</label>
-          <input type="password" id="loginPassword" value="" autocomplete="current-password" placeholder="Mật khẩu quản trị đã bootstrap" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
+          <input type="password" id="loginPassword" value="admin123456" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div id="loginErrorMsg" class="text-lossRed text-[11px] hidden"></div>
       </div>
@@ -622,14 +566,18 @@
       <div class="flex items-center justify-between border-b border-darkBorder pb-3">
         <div class="flex items-center space-x-2 text-binanceGold font-bold text-sm">
           <i class="fa-solid fa-gear"></i>
-          <span>CẤU HÌNH KẾT NỐI MÁY CHỦ</span>
+          <span>CẤU HÌNH MÁY CHỦ VPS</span>
         </div>
         <button id="btnCloseSettings" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="space-y-3 text-xs font-mono">
         <div>
-          <label class="text-gray-400 block mb-1">Địa chỉ máy chủ kết nối (Server URL):</label>
+          <label class="text-gray-400 block mb-1">Địa chỉ máy chủ VPS (Server URL):</label>
           <input type="text" id="cfgServerUrl" value="https://trader.noza.site" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
+        </div>
+        <div>
+          <label class="text-gray-400 block mb-1">Mã xác thực phiên (Auth Token / Password):</label>
+          <input type="password" id="cfgAuthToken" class="w-full bg-darkBase border border-darkBorder rounded-lg px-3 py-2 text-white focus:outline-none focus:border-binanceGold">
         </div>
         <div class="pt-2 space-y-2 border-t border-darkBorder">
           <label class="flex items-center space-x-2 cursor-pointer">

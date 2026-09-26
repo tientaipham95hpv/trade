@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'ui_v2/screens/home_screen.dart';
+import 'services/api_service.dart';
+import 'screens/home_screen.dart';
+import 'ui_v2/screens/home_screen.dart' as v2;
 import 'ui_v2/screens/login_screen.dart';
 import 'ui_v2/services/auth_store.dart';
 import 'ui_v2/services/polling_controller.dart';
@@ -10,7 +12,7 @@ import 'ui_v2/theme/quant_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Dark Institutional Status Bar theme
+  // Set iOS Status Bar theme to light text (for dark background)
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -19,30 +21,28 @@ void main() async {
     ),
   );
 
-  final authStore = AuthStore();
-  final apiClient = QuantApiClient(authStore: authStore);
-  final isAuthenticated = await authStore.hasToken() && await apiClient.checkAuth();
+  final apiService = ApiService();
+  await apiService.loadSettings();
 
-  runApp(BinanceQuantProApp(
-    authStore: authStore,
-    apiClient: apiClient,
-    initialIsAuthenticated: isAuthenticated,
-  ));
+  runApp(BinanceQuantProApp(apiService: apiService));
 }
 
 class BinanceQuantProApp extends StatefulWidget {
+  final ApiService? apiService;
   final AuthStore? authStore;
   final QuantApiClient? apiClient;
   final PollingController? pollingController;
   final bool? initialIsAuthenticated;
+  final bool useV2;
 
   const BinanceQuantProApp({
     super.key,
+    this.apiService,
     this.authStore,
     this.apiClient,
     this.pollingController,
     this.initialIsAuthenticated,
-    dynamic apiService, // Compatibility parameter for legacy test invocation
+    this.useV2 = false,
   });
 
   @override
@@ -50,85 +50,76 @@ class BinanceQuantProApp extends StatefulWidget {
 }
 
 class _BinanceQuantProAppState extends State<BinanceQuantProApp> {
-  late final AuthStore _authStore;
-  late final QuantApiClient _apiClient;
-  late final PollingController _pollingController;
+  late final ApiService _apiService;
+  AuthStore? _authStore;
+  QuantApiClient? _apiClient;
+  PollingController? _pollingController;
   bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _authStore = widget.authStore ?? AuthStore(useMemoryOnly: true);
-    _apiClient = widget.apiClient ?? QuantApiClient(authStore: _authStore);
-    _pollingController = widget.pollingController ?? PollingController(apiClient: _apiClient);
+    _apiService = widget.apiService ?? ApiService();
 
-    _apiClient.onUnauthorized = () {
-      if (mounted) {
-        setState(() {
-          _isAuthenticated = false;
-        });
+    if (widget.useV2) {
+      _authStore = widget.authStore ?? AuthStore(useMemoryOnly: true);
+      _apiClient = widget.apiClient ?? QuantApiClient(authStore: _authStore!);
+      _pollingController = widget.pollingController ?? PollingController(apiClient: _apiClient!);
+
+      _apiClient!.onUnauthorized = () {
+        if (mounted) {
+          setState(() {
+            _isAuthenticated = false;
+          });
+        }
+      };
+
+      if (widget.initialIsAuthenticated != null) {
+        _isAuthenticated = widget.initialIsAuthenticated!;
       }
-    };
-
-    if (widget.initialIsAuthenticated != null) {
-      _isAuthenticated = widget.initialIsAuthenticated!;
-    } else {
-      _checkAuthStatus();
     }
-  }
-
-  Future<void> _checkAuthStatus() async {
-    final hasToken = await _authStore.hasToken();
-    if (!hasToken) {
-      if (mounted && _isAuthenticated) {
-        setState(() {
-          _isAuthenticated = false;
-        });
-      }
-      return;
-    }
-
-    final isValid = await _apiClient.checkAuth();
-    if (mounted && _isAuthenticated != isValid) {
-      setState(() {
-        _isAuthenticated = isValid;
-      });
-    }
-  }
-
-  void _onLoginSuccess() {
-    setState(() {
-      _isAuthenticated = true;
-    });
-  }
-
-  void _onLogout() {
-    setState(() {
-      _isAuthenticated = false;
-    });
   }
 
   @override
   void dispose() {
-    _pollingController.dispose();
+    _pollingController?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.useV2) {
+      return MaterialApp(
+        title: 'Binance Quant Pro',
+        debugShowCheckedModeBanner: false,
+        theme: QuantTheme.darkTheme,
+        home: _isAuthenticated
+            ? v2.QuantHomeScreen(
+                pollingController: _pollingController!,
+                onLogout: () => setState(() => _isAuthenticated = false),
+              )
+            : LoginScreen(
+                apiClient: _apiClient!,
+                onLoginSuccess: () => setState(() => _isAuthenticated = true),
+              ),
+      );
+    }
+
+    // Giao diện gốc (Classic 5-tab iOS Terminal)
     return MaterialApp(
       title: 'Binance Quant Pro',
       debugShowCheckedModeBanner: false,
-      theme: QuantTheme.darkTheme,
-      home: _isAuthenticated
-          ? QuantHomeScreen(
-              pollingController: _pollingController,
-              onLogout: _onLogout,
-            )
-          : LoginScreen(
-              apiClient: _apiClient,
-              onLoginSuccess: _onLoginSuccess,
-            ),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF080A0F),
+        colorScheme: const ColorScheme.dark(
+          primary: Color(0xFFF0B90B),
+          surface: Color(0xFF10141E),
+        ),
+        fontFamily: 'SF Pro Display',
+        useMaterial3: true,
+      ),
+      home: HomeScreen(apiService: _apiService),
     );
   }
 }
