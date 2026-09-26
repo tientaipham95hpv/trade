@@ -44,6 +44,13 @@ class QuantMetric extends StatelessWidget {
         color: QuantColors.surfaceLow,
         borderRadius: QuantSpacing.borderDefault,
         border: Border.all(color: QuantColors.border, width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

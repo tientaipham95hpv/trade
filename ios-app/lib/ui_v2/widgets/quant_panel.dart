@@ -36,6 +36,13 @@ class QuantPanel extends StatelessWidget {
         color: QuantColors.surface,
         borderRadius: QuantSpacing.borderDefault,
         border: Border.all(color: borderColor, width: 1.0),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

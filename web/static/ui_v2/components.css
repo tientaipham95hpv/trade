@@ -8,30 +8,43 @@
    1. TerminalPanel
    ========================================================================== */
 .terminal-panel {
-  background-color: var(--surface);
+  background: var(--surface-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-shadow: var(--shadow-panel);
-  transition: border-color var(--transition-fast);
+  transition: all var(--transition-default);
+  position: relative;
+}
+
+.terminal-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .terminal-panel:hover {
-  border-color: var(--border-active);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .terminal-panel-header,
 .panel-header {
-  background-color: var(--surface-low);
+  background: linear-gradient(180deg, rgba(23, 30, 43, 0.75) 0%, rgba(13, 17, 26, 0.85) 100%);
   border-bottom: 1px solid var(--border);
-  padding: 6px var(--space-md);
+  padding: 8px var(--space-lg);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-xs);
-  min-height: 32px;
+  min-height: 38px;
 }
 
 .terminal-panel-title-group {
@@ -42,11 +55,11 @@
 
 .terminal-panel-title,
 .panel-title {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--text-primary);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .terminal-panel-subtitle,
@@ -55,6 +68,9 @@
   color: var(--text-muted);
   font-family: var(--font-mono);
   margin-left: var(--space-xs);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 2px 6px;
+  border-radius: var(--radius-micro);
 }
 
 .terminal-panel-actions,
@@ -78,7 +94,7 @@
 .panel-footer {
   background-color: var(--surface-lowest);
   border-top: 1px solid var(--border);
-  padding: 4px var(--space-md);
+  padding: 6px var(--space-md);
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -95,22 +111,37 @@
    2. MetricCard & Key-Value Lists
    ========================================================================== */
 .metric-card {
-  background: linear-gradient(180deg, #121824 0%, #0D111A 100%);
-  border: 1px solid var(--border);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: var(--radius-container);
-  padding: 12px 14px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 98px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  min-height: 104px;
+  box-shadow: var(--shadow-panel);
+  transition: all var(--transition-default);
   position: relative;
   min-width: 0;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.14) 50%, transparent 100%);
+  pointer-events: none;
 }
 
 .metric-card:hover {
-  border-color: var(--border-active);
+  background: var(--surface-card-hover);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .metric-card__header {
@@ -123,25 +154,27 @@
 .metric-card__header-left {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
 .metric-card__icon-box {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-micro);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  color: var(--accent-cyan);
   flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.1);
 }
 
 .metric-card__icon-box svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   stroke: currentColor;
   stroke-width: 2;
   fill: none;
@@ -151,9 +184,9 @@
 .metric-label,
 .metric-card__label {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
   font-family: var(--font-sans);
   white-space: nowrap;
@@ -165,7 +198,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-xs);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .metric-card-value,
@@ -174,8 +207,8 @@
   font-family: var(--font-mono);
   font-feature-settings: var(--font-numeric-features);
   font-variant-numeric: tabular-nums;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--text-primary);
   line-height: 1.2;
   white-space: nowrap;
@@ -185,10 +218,10 @@
 .metric-caption,
 .metric-card__sub {
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-muted);
   font-family: var(--font-sans);
-  margin-top: 3px;
+  margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -198,9 +231,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 0;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .telemetry-item:last-child {
@@ -213,13 +246,13 @@
   font-weight: 500;
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
 
 .telemetry-val {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -229,24 +262,32 @@
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 7px;
-  border-radius: var(--radius-micro);
-  font-size: 11px;
-  font-weight: 600;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   font-family: var(--font-mono);
   line-height: 1.1;
   border: 1px solid transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
 }
 
 .status-badge__dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background-color: currentColor;
   flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse-dot 2s ease-in-out infinite;
 }
 
 .status-badge--healthy,
@@ -385,21 +426,22 @@
 }
 
 .dense-table th {
-  padding: 8px 12px;
-  height: 34px;
+  padding: 10px 14px;
+  height: 38px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  background: var(--surface-low);
   white-space: nowrap;
   user-select: none;
   border-bottom: 1px solid var(--border);
 }
 
 .dense-table td {
-  padding: 8px 12px;
-  height: 38px;
+  padding: 10px 14px;
+  height: 42px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
   white-space: nowrap;
@@ -408,7 +450,7 @@
 }
 
 .dense-table tbody tr:hover td {
-  background-color: var(--surface-high);
+  background-color: rgba(56, 189, 248, 0.04);
 }
 
 .dense-table tbody tr:last-child td {
@@ -416,17 +458,17 @@
 }
 
 /* ==========================================================================
-   5. Buttons (Restrained Outline Terminal Buttons)
+   5. Buttons (Modern Institutional Gradient & Glow Buttons)
    ========================================================================== */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  padding: 6px 12px;
-  height: 30px;
+  padding: 6px 14px;
+  height: 32px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--font-mono);
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -458,48 +500,59 @@
   background-color: var(--surface-high);
 }
 
-/* Dark Red Outline HALT Button */
+/* Dark Red Gradient HALT Button with Soft Glow */
 .btn-halt,
 .btn-terminal.danger {
-  border: 1px solid var(--critical);
-  background-color: transparent;
-  color: var(--critical);
-  font-weight: 700;
-  padding: 8px 16px;
-  height: 36px;
+  border: 1px solid rgba(246, 70, 93, 0.6);
+  background: linear-gradient(180deg, rgba(246, 70, 93, 0.22) 0%, rgba(246, 70, 93, 0.1) 100%);
+  color: #fff;
+  font-weight: 800;
+  padding: 8px 18px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 14px rgba(246, 70, 93, 0.2);
+  transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .btn-halt:hover:not(:disabled),
 .btn-terminal.danger:hover:not(:disabled) {
-  background-color: rgba(255, 92, 104, 0.15);
+  background: linear-gradient(180deg, rgba(246, 70, 93, 0.4) 0%, rgba(246, 70, 93, 0.22) 100%);
   border-color: var(--critical);
-  color: #fff;
+  box-shadow: 0 0 20px rgba(246, 70, 93, 0.4);
+  transform: translateY(-1px);
 }
 
-/* Neutral/Cyan Outline RESUME Button */
+/* Neutral/Cyan Gradient RESUME Button with Soft Glow */
 .btn-resume,
 .btn-terminal.primary {
-  border: 1px solid var(--accent-cyan);
-  background-color: transparent;
-  color: var(--accent-cyan);
-  font-weight: 700;
-  padding: 8px 16px;
-  height: 36px;
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.22) 0%, rgba(56, 189, 248, 0.1) 100%);
+  color: #fff;
+  font-weight: 800;
+  padding: 8px 18px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.2);
+  transition: all var(--transition-fast);
+  cursor: pointer;
 }
 
 .btn-resume:hover:not(:disabled),
 .btn-terminal.primary:hover:not(:disabled) {
-  background-color: rgba(61, 217, 235, 0.15);
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.4) 0%, rgba(56, 189, 248, 0.22) 100%);
   border-color: var(--accent-cyan);
-  color: #fff;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
+  transform: translateY(-1px);
 }
 
 .btn-resume:disabled {
   border-color: var(--border);
   color: var(--text-muted);
-  background-color: var(--surface-low);
+  background: var(--surface-low);
   opacity: 0.4;
   cursor: not-allowed !important;
+  box-shadow: none;
 }
 
 /* Emergency Close Muted Note */
